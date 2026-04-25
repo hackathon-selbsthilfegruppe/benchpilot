@@ -82,7 +82,7 @@ export default function Start({
     const next = EXAMPLE_QUESTIONS[exampleIndexRef.current % EXAMPLE_QUESTIONS.length];
     exampleIndexRef.current = (exampleIndexRef.current + 1) % EXAMPLE_QUESTIONS.length;
     setStep("hypothesis");
-    setQuestion(next);
+    setChatInput(next);
   }
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -432,22 +432,12 @@ function HypothesisView({
   return (
     <>
       <div className="rounded-lg border border-accent bg-accent-soft p-4">
-        <div className="flex items-center justify-between">
-          <label
-            htmlFor="research-question"
-            className="text-xs font-semibold uppercase tracking-wide text-accent-soft-fg"
-          >
-            Research question
-          </label>
-          <button
-            type="button"
-            onClick={onCycleExample}
-            className="rounded border border-accent-soft-fg/30 px-2 py-0.5 text-[10px] uppercase tracking-wide text-accent-soft-fg/80 hover:bg-accent-soft-fg/10"
-            title="Cycle through canned example questions"
-          >
-            example ⌘/Ctrl + ;
-          </button>
-        </div>
+        <label
+          htmlFor="research-question"
+          className="text-xs font-semibold uppercase tracking-wide text-accent-soft-fg"
+        >
+          Research question
+        </label>
         <textarea
           id="research-question"
           ref={questionRef}
@@ -460,7 +450,17 @@ function HypothesisView({
       </div>
 
       <div className="flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface-elev p-4">
-        <div className="text-sm font-semibold">Chat with the orchestrator</div>
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold">Chat with the orchestrator</div>
+          <button
+            type="button"
+            onClick={onCycleExample}
+            className="rounded border border-border-strong px-2 py-0.5 text-[10px] uppercase tracking-wide text-subtle hover:bg-surface"
+            title="Drop a canned example into the chat input (cycles)"
+          >
+            example ⌘/Ctrl + ;
+          </button>
+        </div>
         <div ref={chatScrollRef} className="min-h-[8rem] flex-1 overflow-y-auto rounded-md border border-border bg-surface px-3 py-2 text-sm">
           {chat.map((turn, i) => (
             <ChatBubble key={i} turn={turn} />
