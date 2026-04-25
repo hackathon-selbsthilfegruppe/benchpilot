@@ -314,6 +314,25 @@ const EXAMPLE_QUESTIONS = [
   "Does trehalose outperform sucrose as a HeLa cryoprotectant for post-thaw viability?",
 ];
 
+function useAutoResize(value: string, minRows = 1, maxRows = 8) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const cs = window.getComputedStyle(el);
+    const lineHeight = parseFloat(cs.lineHeight) || 20;
+    const padding = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const border = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    el.style.height = "auto";
+    const max = lineHeight * maxRows + padding + border;
+    const min = lineHeight * minRows + padding + border;
+    const next = Math.min(max, Math.max(min, el.scrollHeight + border));
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight + border > max ? "auto" : "hidden";
+  }, [value, minRows, maxRows]);
+  return ref;
+}
+
 function useTypewriterPlaceholder(examples: string[], paused: boolean): string {
   const [text, setText] = useState("");
   const indexRef = useRef(0);
@@ -384,31 +403,36 @@ function HypothesisView({
   onContinue: () => void;
 }) {
   const placeholder = useTypewriterPlaceholder(EXAMPLE_QUESTIONS, question.length > 0);
+  const questionRef = useAutoResize(question, 1, 8);
+  const chatInputRef = useAutoResize(chatInput, 1, 6);
   return (
     <>
       <div className="rounded-lg border border-accent bg-accent-soft p-4">
         <label className="text-xs font-semibold uppercase tracking-wide text-accent-soft-fg">
           Research question
         </label>
-        <input
+        <textarea
+          ref={questionRef}
           value={question}
           onChange={(e) => onQuestionChange(e.target.value)}
           placeholder={placeholder}
-          className="mt-2 w-full bg-transparent text-lg font-semibold leading-snug text-accent-soft-fg outline-none placeholder:text-accent-soft-fg/50"
+          rows={1}
+          className="mt-2 w-full resize-none bg-transparent text-lg font-semibold leading-snug text-accent-soft-fg outline-none placeholder:text-accent-soft-fg/50"
         />
       </div>
 
       <div className="flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface-elev p-4">
         <div className="text-sm font-semibold">Chat with the orchestrator</div>
-        <div ref={chatScrollRef} className="min-h-[18rem] flex-1 overflow-y-auto rounded-md border border-border bg-surface px-3 py-2 text-sm">
+        <div ref={chatScrollRef} className="min-h-[8rem] flex-1 overflow-y-auto rounded-md border border-border bg-surface px-3 py-2 text-sm">
           {chat.map((turn, i) => (
             <ChatBubble key={i} turn={turn} />
           ))}
           {streaming && <ChatBubble turn={{ role: "agent", text: streaming }} />}
           {pending && !streaming && <span className="text-xs text-subtle">orchestrator thinking…</span>}
         </div>
-        <div className="flex gap-2">
-          <input
+        <div className="flex items-end gap-2">
+          <textarea
+            ref={chatInputRef}
             value={chatInput}
             onChange={(e) => onChatInputChange(e.target.value)}
             onKeyDown={(e) => {
@@ -417,8 +441,9 @@ function HypothesisView({
                 onSend();
               }
             }}
-            placeholder="Ask the orchestrator to refine, narrow, or sharpen…"
-            className="flex-1 rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-foreground"
+            placeholder="Ask the orchestrator to refine, narrow, or sharpen…  (Enter to send, Shift+Enter for newline)"
+            rows={2}
+            className="flex-1 resize-none rounded-md border border-border-strong bg-surface px-3 py-2 text-sm leading-relaxed text-foreground"
             disabled={pending}
           />
           <button
