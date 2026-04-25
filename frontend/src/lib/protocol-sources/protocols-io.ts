@@ -54,7 +54,7 @@ export const protocolsIoSource: ProtocolSource = {
       const detail = await res.text().catch(() => "");
       if (detail.includes("PROTOCOLS_IO_TOKEN")) {
         throw new Error(
-          "protocols.io is not configured — set PROTOCOLS_IO_TOKEN in backend/.env (see backend/.env.example) and restart the backend. You can also Finalize without protocols and the orchestrator will draft the bench from your question alone.",
+          "not configured — set PROTOCOLS_IO_TOKEN in backend/.env (see backend/.env.example) and restart the backend",
         );
       }
       throw new Error(
