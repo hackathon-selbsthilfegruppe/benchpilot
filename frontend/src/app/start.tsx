@@ -78,20 +78,24 @@ export default function Start({
   }, [chat, streaming]);
 
   const exampleIndexRef = useRef(0);
+  function cycleExample() {
+    const next = EXAMPLE_QUESTIONS[exampleIndexRef.current % EXAMPLE_QUESTIONS.length];
+    exampleIndexRef.current = (exampleIndexRef.current + 1) % EXAMPLE_QUESTIONS.length;
+    setStep("hypothesis");
+    setQuestion(next);
+  }
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey;
-      if (!mod || e.altKey) return;
-      if (e.key === "." || e.code === "Period") {
+      if (!mod || e.altKey || e.shiftKey) return;
+      if (e.key === ";" || e.code === "Semicolon") {
         e.preventDefault();
-        const next = EXAMPLE_QUESTIONS[exampleIndexRef.current % EXAMPLE_QUESTIONS.length];
-        exampleIndexRef.current = (exampleIndexRef.current + 1) % EXAMPLE_QUESTIONS.length;
-        setStep("hypothesis");
-        setQuestion(next);
+        cycleExample();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function ensureSession(): Promise<BenchpilotSessionSummary> {
@@ -275,6 +279,7 @@ export default function Start({
               pending={pending}
               chatScrollRef={chatScrollRef}
               onContinue={goToProtocols}
+              onCycleExample={cycleExample}
             />
           </div>
           <div hidden={step !== "protocols"} className="flex flex-1 flex-col gap-3">
@@ -407,6 +412,7 @@ function HypothesisView({
   pending,
   chatScrollRef,
   onContinue,
+  onCycleExample,
 }: {
   question: string;
   onQuestionChange: (v: string) => void;
@@ -418,6 +424,7 @@ function HypothesisView({
   pending: boolean;
   chatScrollRef: React.RefObject<HTMLDivElement | null>;
   onContinue: () => void;
+  onCycleExample: () => void;
 }) {
   const placeholder = useTypewriterPlaceholder(EXAMPLE_QUESTIONS, question.length > 0);
   const questionRef = useAutoResize(question, 1, 8);
@@ -432,9 +439,14 @@ function HypothesisView({
           >
             Research question
           </label>
-          <span className="text-[10px] uppercase tracking-wide text-accent-soft-fg/70">
-            ⌘/Ctrl + . cycles example questions
-          </span>
+          <button
+            type="button"
+            onClick={onCycleExample}
+            className="rounded border border-accent-soft-fg/30 px-2 py-0.5 text-[10px] uppercase tracking-wide text-accent-soft-fg/80 hover:bg-accent-soft-fg/10"
+            title="Cycle through canned example questions"
+          >
+            example ⌘/Ctrl + ;
+          </button>
         </div>
         <textarea
           id="research-question"
