@@ -16,6 +16,8 @@
     "dev:backend": "npm run dev --workspace backend",
     "dev:start": "./scripts/start-dev.sh",
     "dev:stop": "./scripts/stop-dev.sh",
+    "remote:start": "./scripts/start-remote.sh",
+    "remote:stop": "./scripts/stop-remote.sh",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   }
