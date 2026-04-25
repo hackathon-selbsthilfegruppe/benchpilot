@@ -1,0 +1,280 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "protocols.io API Schemas",
+  "definitions": {
+
+    "Image": {
+      "type": "object",
+      "properties": {
+        "source":      { "type": ["string", "null"] },
+        "placeholder": { "type": ["string", "null"] },
+        "webp_source": { "type": ["string", "null"] }
+      }
+    },
+
+    "User": {
+      "type": "object",
+      "properties": {
+        "name":        { "type": ["string", "null"] },
+        "affiliation": { "type": ["string", "null"] },
+        "username":    { "type": ["string", "null"] },
+        "link":        { "type": ["string", "null"] },
+        "image":       { "$ref": "#/definitions/Image" }
+      }
+    },
+
+    "Author": {
+      "allOf": [{ "$ref": "#/definitions/User" }],
+      "properties": {
+        "note": { "type": ["string", "null"] }
+      }
+    },
+
+    "ProtocolSummary": {
+      "description": "Lightweight protocol object returned in list/search results",
+      "type": "object",
+      "properties": {
+        "id":              { "type": "integer" },
+        "title":           { "type": "string" },
+        "image":           { "$ref": "#/definitions/Image" },
+        "doi":             { "type": ["string", "null"] },
+        "uri":             { "type": "string" },
+        "published_on":    { "type": "integer", "description": "Unix timestamp" },
+        "created_on":      { "type": "integer", "description": "Unix timestamp" },
+        "creator":         { "$ref": "#/definitions/User" },
+        "public":          { "type": ["integer", "boolean"] },
+        "version_id":      { "type": "integer" },
+        "link":            { "type": ["string", "null"] },
+        "number_of_steps": { "type": "integer" },
+        "authors":         { "type": "array", "items": { "$ref": "#/definitions/User" } },
+        "versions":        { "type": "array", "items": { "$ref": "#/definitions/ProtocolSummary" } }
+      },
+      "required": ["id", "title", "uri"]
+    },
+
+    "ProtocolStats": {
+      "type": "object",
+      "properties": {
+        "number_of_views":                  { "type": "integer" },
+        "number_of_steps":                  { "type": "integer" },
+        "number_of_bookmarks":              { "type": "integer" },
+        "number_of_comments":               { "type": "integer" },
+        "number_of_bookmarked_comments":    { "type": "integer" },
+        "number_of_steps_comments":         { "type": "integer" },
+        "number_of_protocol_comments":      { "type": "integer" },
+        "number_of_exports":                { "type": "integer" },
+        "number_of_runs":                   { "type": "integer" },
+        "number_of_votes":                  { "type": "integer" },
+        "number_of_reagents":               { "type": "integer" },
+        "number_of_equipments":             { "type": "integer" },
+        "number_of_collections":            { "type": "integer" },
+        "number_of_forks": {
+          "type": "object",
+          "properties": {
+            "private": { "type": "integer" },
+            "public":  { "type": "integer" }
+          }
+        },
+        "number_of_accessible_forks":       { "type": "integer" }
+      }
+    },
+
+    "ProtocolAccess": {
+      "type": "object",
+      "properties": {
+        "can_view":            { "type": "boolean" },
+        "can_edit":            { "type": "boolean" },
+        "can_remove":          { "type": "boolean" },
+        "can_add":             { "type": "boolean" },
+        "can_publish":         { "type": "boolean" },
+        "can_get_doi":         { "type": "boolean" },
+        "can_share":           { "type": "boolean" },
+        "can_move":            { "type": "boolean" },
+        "can_move_outside":    { "type": "boolean" },
+        "can_transfer":        { "type": "boolean" },
+        "can_download":        { "type": "boolean" },
+        "limited_run":         { "type": "boolean" },
+        "is_locked":           { "type": "boolean" }
+      }
+    },
+
+    "ProtocolDetail": {
+      "description": "Full protocol object returned by GET /v4/protocols/:id",
+      "type": "object",
+      "properties": {
+        "id":                        { "type": "integer" },
+        "guid":                      { "type": "string" },
+        "title":                     { "type": "string" },
+        "title_html":                { "type": "string" },
+        "uri":                       { "type": "string" },
+        "url":                       { "type": "string" },
+        "doi":                       { "type": ["string", "null"] },
+        "reserved_doi":              { "type": "string" },
+        "is_doi_reserved":           { "type": "boolean" },
+        "description":               { "type": "string" },
+        "before_start":              { "type": "string" },
+        "guidelines":                { "type": "string" },
+        "materials_text":            { "type": "string" },
+        "warning":                   { "type": "string" },
+        "link":                      { "type": ["string", "null"] },
+        "public":                    { "type": "boolean" },
+        "published_on":              { "type": "integer" },
+        "created_on":                { "type": "integer" },
+        "type_id":                   { "type": "integer" },
+        "version_id":                { "type": "integer" },
+        "version_uri":               { "type": "string" },
+        "version_class":             { "type": "integer" },
+        "fork_id":                   { "type": ["integer", "null"] },
+        "item_id":                   { "type": "integer" },
+        "is_in_pending_publishing":  { "type": "boolean" },
+        "is_in_transfer":            { "type": ["boolean", "null"] },
+        "image":                     { "$ref": "#/definitions/Image" },
+        "creator":                   { "$ref": "#/definitions/User" },
+        "authors":                   { "type": "array", "items": { "$ref": "#/definitions/Author" } },
+        "access":                    { "$ref": "#/definitions/ProtocolAccess" },
+        "stats":                     { "$ref": "#/definitions/ProtocolStats" },
+        "units": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id":         { "type": "integer" },
+              "type_id":    { "type": "integer" },
+              "name":       { "type": "string" },
+              "can_manage": { "type": "integer" },
+              "read_only":  { "type": "integer" }
+            }
+          }
+        }
+      },
+      "required": ["id", "title", "uri"]
+    },
+
+    "Step": {
+      "type": "object",
+      "properties": {
+        "id":            { "type": "integer" },
+        "guid":          { "type": "string" },
+        "previous_id":   { "type": "integer" },
+        "previous_guid": { "type": ["string", "null"] },
+        "modified_on":   { "type": "integer" },
+        "components":    { "type": "array" }
+      }
+    },
+
+    "Vendor": {
+      "type": "object",
+      "properties": {
+        "name":        { "type": ["string", "null"] },
+        "affiliation": { "type": ["string", "null"] },
+        "username":    { "type": ["string", "null"] },
+        "link":        { "type": ["string", "null"] },
+        "image":       { "$ref": "#/definitions/Image" }
+      }
+    },
+
+    "Material": {
+      "type": "object",
+      "properties": {
+        "id":         { "type": "integer" },
+        "name":       { "type": "string" },
+        "mol_weight": { "type": "number" },
+        "linfor":     { "type": "string" },
+        "url":        { "type": ["string", "null"] },
+        "sku":        { "type": ["string", "null"] },
+        "vendor":     { "$ref": "#/definitions/Vendor" }
+      }
+    },
+
+    "Comment": {
+      "type": "object",
+      "properties": {
+        "comment_id":    { "type": "integer" },
+        "discussion_id": { "type": "integer" },
+        "is_discussion": { "type": "integer" },
+        "parent_id":     { "type": "integer" },
+        "body":          { "type": "string", "description": "Draft.js JSON string" },
+        "created_on":    { "type": "integer" },
+        "changed_on":    { "type": "integer" },
+        "can_edit":      { "type": "integer" },
+        "can_delete":    { "type": "integer" },
+        "creator":       { "$ref": "#/definitions/User" },
+        "step_id":       { "type": "integer" },
+        "step_number":   { "type": "integer" },
+        "is_public":     { "type": "integer" },
+        "is_private":    { "type": "integer" },
+        "comments":      { "type": ["array", "null"], "items": { "$ref": "#/definitions/Comment" } }
+      }
+    },
+
+    "Pagination": {
+      "type": "object",
+      "properties": {
+        "current_page":   { "type": "integer" },
+        "total_pages":    { "type": "integer" },
+        "total_results":  { "type": "integer" },
+        "next_page":      { "type": ["string", "null"] },
+        "prev_page":      { "type": ["string", "null"] },
+        "page_size":      { "type": "integer" },
+        "first":          { "type": "integer" },
+        "last":           { "type": "integer" },
+        "changed_on":     { "type": ["string", "null"] }
+      }
+    },
+
+    "OAuthTokenResponse": {
+      "type": "object",
+      "properties": {
+        "access_token":        { "type": "string" },
+        "token_type":          { "type": "string" },
+        "expires_in":          { "type": "string" },
+        "scope":               { "type": "string" },
+        "refresh_token":       { "type": "string" },
+        "refresh_expires_in":  { "type": "string" },
+        "user":                { "$ref": "#/definitions/User" },
+        "status_code":         { "type": "integer" }
+      }
+    },
+
+    "ProtocolListResponse": {
+      "type": "object",
+      "properties": {
+        "items":       { "type": "array", "items": { "$ref": "#/definitions/ProtocolSummary" } },
+        "pagination":  { "$ref": "#/definitions/Pagination" },
+        "status_code": { "type": "integer" }
+      }
+    },
+
+    "ProtocolDetailResponse": {
+      "type": "object",
+      "properties": {
+        "payload":     { "$ref": "#/definitions/ProtocolDetail" },
+        "status_code": { "type": "integer" }
+      }
+    },
+
+    "StepsResponse": {
+      "type": "object",
+      "properties": {
+        "steps":       { "type": "array", "items": { "$ref": "#/definitions/Step" } },
+        "status_code": { "type": "integer" }
+      }
+    },
+
+    "MaterialsResponse": {
+      "type": "object",
+      "properties": {
+        "materials":   { "type": "array", "items": { "$ref": "#/definitions/Material" } },
+        "status_code": { "type": "integer" }
+      }
+    },
+
+    "CommentsResponse": {
+      "type": "object",
+      "properties": {
+        "comments":    { "type": "array", "items": { "$ref": "#/definitions/Comment" } },
+        "status_code": { "type": "integer" }
+      }
+    }
+  }
+}
