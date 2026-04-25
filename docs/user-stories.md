@@ -135,7 +135,7 @@ The challenge brief defines the deliverable; personas just sharpen *who you're b
 
 | Stage | Who tests it | What "good" looks like for them |
 |---|---|---|
-| 1. Hypothesis input | Maya, Sebastian, Park | Sebastian pastes a client brief; Maya types her PhD hypothesis; Park tests a cross-domain one. All accepted without reformatting. |
+| 1. Hypothesis input | Maya, Sebastian, Park, Hanna | Sebastian pastes a client brief; Maya types her PhD hypothesis; Park tests a cross-domain one; Hanna refines hers in dialogue with the orchestrator on the start page. All accepted without reformatting. The start page also pulls candidate protocols from configured sources and asks the orchestrator to draft a protocol template (= the bench's components) before finalize. |
 | 2. Literature QC | Jonas, Patel | Jonas sees his old paper as "exact match"; Patel sees 2 prior papers as "similar work exists". |
 | 3. Experiment plan | Aisha (quality bar), Sebastian (turnaround) | Aisha would order the materials. Sebastian would send the plan to the client. |
 | Stretch: review loop | Okonkwo | His correction to plan #1 visibly changes plan #2 in the same domain. |

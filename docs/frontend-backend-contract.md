@@ -33,17 +33,74 @@ Not:
 
 ### Progressive integration
 
-The contract has three layers:
+The contract has four layers:
 
+- **Phase 0:** hypothesis intake (frontend-only, materializes a bench on disk)
 - **Phase 1:** chat/session contract
 - **Phase 2:** component/resource contract
 - **Phase 3:** task delegation contract
 
-The UI should be able to ship against Phase 1 before Phase 2 and Phase 3 exist.
+The UI should be able to ship against Phase 1 before Phase 2 and Phase 3 exist. Phase 0 is already implemented and runs entirely inside the Next.js app — it doesn't go through the Node backend.
 
 ### Stream normalization
 
 The backend may receive raw pi events, but it should normalize them into a smaller BenchPilot event stream that the UI can depend on.
+
+## 2.5 Phase 0 — Hypothesis intake (frontend routes)
+
+These routes live in `frontend/src/app/api/` because they read/write `frontend/components-data/` directly. The orchestrator that runs the chat in the start page goes through Phase 1 (`POST /api/agent-sessions` + the streaming prompt endpoint).
+
+### `POST /api/protocol-sources/search`
+
+Request:
+
+```json
+{ "query": "enzyme pH stability", "pageSize": 8 }
+```
+
+Response:
+
+```json
+{
+  "sources": [
+    {
+      "sourceId": "protocols-io",
+      "hits": [
+        {
+          "sourceId": "protocols-io",
+          "externalId": "12345",
+          "title": "pH–activity assay (steady-state)",
+          "authors": "Smith et al.",
+          "url": "https://www.protocols.io/view/...",
+          "doi": "10.17504/...",
+          "description": "...",
+          "publishedAt": "2024-08-12T00:00:00.000Z"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Per-source errors are returned inline in the same block (`{ sourceId, hits: [], error }`) so one broken adapter does not break the page. New adapters slot in by implementing `frontend/src/lib/protocol-sources/types.ts#ProtocolSource` and registering in `frontend/src/lib/protocol-sources/index.ts`.
+
+### `POST /api/hypotheses`
+
+Request:
+
+```json
+{
+  "template": {
+    "hypothesis": { "name": "...", "summary": "...", "preprompt": "..." },
+    "components": [{ "id": "kebab", "name": "...", "preprompt": "...", "summary": "..." }],
+    "supporting": [{ "id": "protocols", "name": "...", "preprompt": "...", "summary": "..." }]
+  },
+  "slugBase": "optional override",
+  "domain": "optional"
+}
+```
+
+Response: `{ "slug": "<allocated-slug>" }`. Writes `hypothesis.json`, `index.json`, and one `component.json` per drafted component into `frontend/components-data/<slug>/`, then updates `hypotheses.json`. The frontend immediately routes to `/bench/<slug>`.
 
 ## 3. Phase 1 — Chat/session contract
 
@@ -489,6 +546,7 @@ The frontend should not depend on:
 
 ## 11. Recommended implementation order
 
+0. ✅ Ship the Phase 0 hypothesis intake routes (done — `POST /api/protocol-sources/search` and `POST /api/hypotheses`).
 1. Ship the Phase 1 chat/session contract first.
 2. Let the UI connect to live chats immediately.
 3. Add the component/resource endpoints second.

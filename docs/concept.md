@@ -12,12 +12,23 @@ The set of components is **not fixed**. New components can be introduced, retire
 
 The product is built up in steps so we can validate each layer of structure before adding the next:
 
+0. **Hypothesis intake & protocol discovery.** Before there is any bench, the researcher arrives at a start page, defines a research question (refining it in dialogue with the orchestrator), pulls candidate protocols from external sources (currently protocols.io, with more sources slotted in behind a pluggable adapter), and asks the orchestrator to draft a *protocol template*. The template is an ordered list of component skeletons that becomes the bench in step 3. This step seeds the bench instead of the bench being hand-authored.
 1. **Chat only.** A single chatbox. The researcher talks to BenchPilot; nothing else is in play.
 2. **Chat + first component.** Introduce one component (e.g. *hypothesis generation*). Establish the idiom for what a component looks and behaves like.
 3. **Chat + multiple components.** Add more components (literature, reagents, budget, …). Validate that the model scales.
 4. **Drill-down.** Each component can expand from summary into details.
 5. **Cross-component awareness.** Components see each other's tables of contents and can request details from one another (read-only).
 6. **Cross-component tasks.** Components can send explicit tasks to other components, wait for result documents, and then continue their own work.
+
+### Hypothesis intake flow (step 0 detail)
+
+The start page is a single live surface with three panels that share one orchestrator session:
+
+1. **Hypothesis** — free-form text plus a chat with the orchestrator that can suggest revisions. When the orchestrator emits a `Revised question:` line, the question textarea is updated in place.
+2. **Protocol discovery** — fans out to all configured `ProtocolSource` adapters (see *Protocol-source adapters* below) and shows candidate protocols as keep/drop cards. Default state is "keep all."
+3. **Protocol template** — the orchestrator is given the (refined) question plus the kept protocols and asked for a single fenced JSON block with the shape `{ hypothesis: { name, summary, preprompt }, components: [...], supporting?: [...] }`. The result is parsed into editable component skeletons.
+
+"Finalize" turns the template into a real bench: it allocates a unique slug, writes `hypothesis.json`, an `index.json`, and one `component.json` per drafted component (with empty TOC and tasks), updates `hypotheses.json`, and routes the user to `/bench/<slug>`. From there the existing bench takes over.
 
 ## What a component is
 
@@ -39,6 +50,17 @@ component/
     <slug>.md          # one file per TOC entry — the substantive content
     ...
 ```
+
+### Protocol components
+
+Components seeded by the start-page template are *protocol components*: they share the same shape as any other component (preprompt, tooling, summary, TOC, tasks, data) but are born from a protocol template rather than from chat. Concretely:
+
+- `id`, `name`, `preprompt`, and `summary` are taken straight from the orchestrator's draft.
+- `toc` and `tasks` start empty — the bench fills them in over time.
+- `tooling` defaults to "read own data + sibling TOCs/summaries; write own data only," with `protocols` getting an extra line granting it the protocols.io live-search tool.
+- The kept external protocols are referenced in the supporting `protocols` component's preprompt so the bench retains its provenance.
+
+Protocol components are not a separate type — they are ordinary components. The label is just a reminder of how they entered the bench.
 
 A top-level `index.json` lists the component IDs in display order:
 
@@ -184,6 +206,23 @@ For the clickdummy, the API to do this exists at `POST /api/tasks` (server appen
 
 - **Strip rows** show `→ N` next to a component's name when it has open inbound tasks. Nothing else is added at the strip level — keeping the bench overview minimal.
 - **Open component** has a tab strip on the right pane: *Chat | Tasks (in N / out M)*. The Tasks tab lists inbound (from receiver's inbox) and outbound (computed from other inboxes) with status symbols and Accept / Decline / Mark-done controls on the inbound side.
+
+## Protocol-source adapters
+
+External protocol corpora are pluggable. Each source implements:
+
+```ts
+interface ProtocolSource {
+  id: string;            // stable identifier, e.g. "protocols-io"
+  label: string;         // human-readable
+  isConfigured(): boolean;
+  search(query: string, pageSize: number): Promise<ProtocolHit[]>;
+}
+```
+
+A `ProtocolHit` is a normalized record (`sourceId`, `externalId`, `title`, `authors?`, `url`, `doi?`, `description?`, `publishedAt?`). `POST /api/protocol-sources/search` fans out to every registered source in parallel and returns one result block per source (including per-source errors so one broken adapter doesn't break the page).
+
+Today only `protocols-io` is implemented. Adding a new source is a single new file plus one entry in the registry; the start page picks it up automatically.
 
 ## Open questions
 

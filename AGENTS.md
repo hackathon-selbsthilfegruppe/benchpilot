@@ -21,6 +21,8 @@ For hackathon speed, the app currently integrates the published npm package `@ma
 - Keep agent sessions **role-scoped** and tied to a working directory under `workspace/components/<role-id>/`.
 - First milestone: create and manage multiple **standby pi sessions** from the backend so the UI can start/prompt them quickly.
 
+The orchestrator role is now used in **two places**: (1) the start page, where one short-lived session refines the research question and drafts the protocol template (see `frontend/src/app/start.tsx` + `frontend/src/lib/hypothesis-template.ts`); (2) the workbench at `/bench/<slug>`, where it routes between long-lived component sessions. Both go through the same `POST /api/agent-sessions` + streaming `prompt` endpoints.
+
 ## Shared data model
 
 Role workspaces live under `workspace/components/<role-id>/` and trend toward this shape:

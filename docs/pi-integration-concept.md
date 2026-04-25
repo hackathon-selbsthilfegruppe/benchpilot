@@ -181,6 +181,8 @@ Each component maps to a long-lived backend-managed pi session.
 
 In addition, delegated work creates **task-run sessions**. Those are fresh pi sessions scoped to one incoming task for a target component.
 
+A third short-lived session shape now exists: the **hypothesis-intake session** on the start page. It is a single orchestrator session used to refine the research question and then to draft a protocol template (a fenced JSON block describing the components the bench should be seeded with). This session is typically discarded after the user clicks Finalize and lands on `/bench/<slug>`, where a fresh long-lived workbench orchestrator session takes over.
+
 ### Session states
 
 - `idle`

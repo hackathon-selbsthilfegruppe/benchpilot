@@ -4,6 +4,8 @@ Status: proposal for the second implementation step after live chats are working
 
 This document proposes the backend-side model for components, resources, summaries, TOCs, lazy loading, and the supporting API/CLI structure.
 
+> Scope note: components are no longer hand-curated — they are seeded by the start-page hypothesis intake flow, which writes them under `frontend/components-data/<slug>/`. The proposal below describes how the Node backend would serve those components once they exist on disk. See `docs/concept.md` ("Hypothesis intake & protocol discovery") and `docs/frontend-backend-contract.md` (Phase 0) for how the bench is created in the first place.
+
 ## 1. Design goals
 
 The backend model should:

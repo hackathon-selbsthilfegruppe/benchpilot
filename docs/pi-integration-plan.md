@@ -380,6 +380,15 @@ Why:
 
 If later we need process isolation per agent, we can still move selected roles to RPC/subprocess mode.
 
+## Hypothesis-intake sessions
+
+Before the workbench exists, the start page (`/`) needs a session to talk to. It uses the same `POST /api/agent-sessions` flow as the workbench, just for one short-lived orchestrator session that:
+
+1. refines the research question via chat (panel 1),
+2. is later prompted with the kept protocols and asked to emit a fenced-JSON protocol template (panel 3).
+
+The template parsing and on-disk materialization are in the Next.js app (`frontend/src/lib/hypothesis-template.ts` and `frontend/src/lib/hypothesis-fs.ts`), not the Node backend. From pi's point of view this is just another session — no special handling required.
+
 ## Next steps after this scaffold
 
 1. Let the UI create/list/prompt warm sessions.

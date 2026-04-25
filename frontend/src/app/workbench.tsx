@@ -758,7 +758,7 @@ function ComponentStrip({
           onChange={(e) => {
             const next = e.target.value;
             if (next !== activeHypothesisSlug) {
-              window.location.search = `?hypothesis=${encodeURIComponent(next)}`;
+              window.location.href = `/bench/${encodeURIComponent(next)}`;
             }
           }}
           aria-label="Switch hypothesis"

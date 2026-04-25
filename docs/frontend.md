@@ -2,6 +2,23 @@
 
 > Status: draft. UI design notes for the clickdummy. Pairs with [`concept.md`](./concept.md).
 
+## Routes
+
+- `/` — the **start page** (hypothesis intake). Three stacked panels sharing one orchestrator session. See *Start page* below.
+- `/bench/<slug>` — the **workbench**, the layout this document was originally about. Materialized from the start page on Finalize.
+
+The hypothesis switcher inside the workbench navigates to `/bench/<slug>` (no more `?hypothesis=` query string).
+
+## Start page
+
+The start page is the new entry point. It has three panels, all sharing one orchestrator session so the chat context carries forward:
+
+1. **Hypothesis** — a textarea plus a chat where the user can ask the orchestrator to refine the research question. When the orchestrator emits a line beginning with `Revised question:` the textarea is updated in place.
+2. **Protocol discovery** — fans out to all configured `ProtocolSource` adapters via `POST /api/protocol-sources/search` and shows candidate protocols as keep/drop cards (default: keep all).
+3. **Protocol template** — sends the kept hypothesis text plus the kept protocols to the orchestrator and asks for a single fenced-JSON template (`{ hypothesis, components, supporting? }`). The result is parsed into editable component skeletons.
+
+"Finalize" POSTs the template to `POST /api/hypotheses`, which writes the bench files on disk, then routes to `/bench/<slug>`.
+
 ## Layout: the workbench
 
 The screen has two persistent regions and one focus region:

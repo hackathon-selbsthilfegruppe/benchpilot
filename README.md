@@ -11,6 +11,8 @@ Early milestone:
 - manage multiple **standby** agent sessions from the backend
 - keep the UI free to evolve separately
 
+The frontend now opens at a **start page** (`/`) where the user defines a research question, searches across configured protocol-source adapters (currently protocols.io), and asks the orchestrator to draft a *protocol template* (an ordered list of component skeletons). On finalize, the bench is materialized on disk under `frontend/components-data/<slug>/` and the user is routed to `/bench/<slug>`. See `docs/concept.md` ("Hypothesis intake & protocol discovery") for the full flow.
+
 ## Why pi
 
 We are using the `@mariozechner/pi-coding-agent` SDK in the backend because it already provides:
@@ -80,6 +82,30 @@ npm run dev
 
 Backend default URL:
 - `http://localhost:8787`
+
+## Frontend hypothesis-intake API
+
+These routes live in the Next.js app (not the Node backend) because they touch `frontend/components-data/` directly.
+
+### Search across all configured protocol sources
+
+```bash
+curl -X POST http://localhost:3000/api/protocol-sources/search \
+  -H 'content-type: application/json' \
+  -d '{ "query": "enzyme pH stability", "pageSize": 8 }'
+```
+
+Response: `{ sources: [{ sourceId, hits: [...], error? }] }`. One block per registered adapter; per-source errors are returned inline so one broken adapter does not break the page. Adapters live under `frontend/src/lib/protocol-sources/` and implement the `ProtocolSource` interface.
+
+### Finalize a hypothesis template into a bench
+
+```bash
+curl -X POST http://localhost:3000/api/hypotheses \
+  -H 'content-type: application/json' \
+  -d @template.json
+```
+
+Body shape: `{ template: { hypothesis: { name, summary, preprompt }, components: [...], supporting?: [...] }, slugBase?, domain? }`. Response: `{ slug }`. Writes `hypothesis.json`, `index.json`, and one `component.json` per drafted component, then updates `hypotheses.json`.
 
 ## Backend API
 

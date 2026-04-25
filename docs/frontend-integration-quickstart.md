@@ -4,6 +4,16 @@ Status: tactical frontend handoff for the first integration stage.
 
 This document is intentionally short. It describes the **minimum stable flow** the frontend should build against right now.
 
+## Entry point: the start page
+
+The user-facing entry is `/`, the start page (`frontend/src/app/start.tsx`). It uses the same chat/session endpoints below — there is one orchestrator session that refines the question and drafts a protocol template. Once the user clicks Finalize, the start page POSTs to `/api/hypotheses` and routes to `/bench/<slug>`, where the workbench takes over with the long-lived component sessions described in this document.
+
+The two intake-only routes are:
+- `POST /api/protocol-sources/search` — fans out to all configured protocol-source adapters.
+- `POST /api/hypotheses` — finalizes a template into bench files.
+
+Both live in the Next.js app, not the Node backend. The session/prompt endpoints below are unchanged.
+
 ## Goal of stage 1
 
 Connect the UI to live backend-managed chats.
