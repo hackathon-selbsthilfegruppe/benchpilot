@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<article xmlns:xlink="http://www.w3.org/1999/xlink" article-type="protocol">
+  <front>
+    <article-meta>
+      <article-id pub-id-type="doi">10.21769/BioProtoc.demo.0002</article-id>
+      <article-id pub-id-type="pmcid">PMC0000001</article-id>
+      <title-group>
+        <article-title>pH–activity assay for soluble enzymes</article-title>
+      </title-group>
+      <contrib-group>
+        <contrib contrib-type="author">
+          <name>
+            <surname>Marsh</surname>
+            <given-names>Vera</given-names>
+          </name>
+        </contrib>
+        <contrib contrib-type="author">
+          <name>
+            <surname>Schmidt</surname>
+            <given-names>Anke</given-names>
+          </name>
+        </contrib>
+      </contrib-group>
+      <pub-date pub-type="epub">
+        <day>15</day>
+        <month>3</month>
+        <year>2024</year>
+      </pub-date>
+      <abstract>
+        <p>A standard buffer-series assay for measuring steady-state enzyme activity from pH 4.0 to pH 8.0 in 0.5-unit increments.</p>
+      </abstract>
+    </article-meta>
+  </front>
+  <body>
+    <sec sec-type="materials">
+      <title>Materials</title>
+      <p>Buffer panel; activity substrate; standardized enzyme aliquots.</p>
+    </sec>
+    <sec sec-type="procedure">
+      <title>Procedure</title>
+      <list list-type="order">
+        <list-item><label>1.</label><p>Prepare buffer panel spanning pH 4.0–8.0 in 0.5-unit steps.</p></list-item>
+        <list-item><label>2.</label><p>Equilibrate enzyme aliquots at room temperature for 5 min.</p></list-item>
+        <list-item><label>3.</label><p>Initiate assay with substrate; record activity at each pH (n=3 per condition).</p></list-item>
+        <list-item><label>4.</label><p>Fit pH–activity curve and extract midpoint.</p></list-item>
+      </list>
+    </sec>
+  </body>
+  <back>
+    <ref-list>
+      <ref id="r1">
+        <element-citation publication-type="journal">
+          <article-title>Buffer systems for biochemistry</article-title>
+          <ext-link ext-link-type="uri" xlink:href="https://doi.org/10.1016/example"/>
+          <pub-id pub-id-type="doi">10.1016/example</pub-id>
+        </element-citation>
+      </ref>
+    </ref-list>
+  </back>
+</article>

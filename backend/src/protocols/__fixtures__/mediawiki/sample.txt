@@ -1,0 +1,21 @@
+'''Standard PCR'''
+
+This page describes the lab's standard PCR setup.
+
+== Materials ==
+* '''Plasmid template''' (10 ng/µL)
+* Primers, forward and reverse (10 µM each)
+* REDExtract PCR Mix (Sigma)
+
+== Equipment ==
+* Thermocycler (Bio-Rad C1000)
+* PCR strip tubes
+
+== Procedure ==
+# Place PCR tubes on ice.
+# Mix per reaction: 21 µL water, 3 µL primers, 6 µL plasmid, 30 µL REDExtract.
+# Aliquot 19.8 µL into two extra tubes for technical replicates.
+# Run on the thermocycler with the [[Standard PCR cycle]] profile.
+# Run 2 µL on a 1% agarose gel to confirm the band.
+
+See also [[Cloning workflows]] for downstream steps.

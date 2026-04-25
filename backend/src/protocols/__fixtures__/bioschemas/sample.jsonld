@@ -1,0 +1,50 @@
+{
+  "@context": "https://schema.org",
+  "@type": ["LabProtocol", "CreativeWork"],
+  "@id": "https://example.org/protocols/trypan-blue-viability",
+  "identifier": "10.21769/BioProtoc.demo.0001",
+  "doi": "10.21769/BioProtoc.demo.0001",
+  "name": "Trypan blue cell viability assay",
+  "description": "Count viable cells using trypan blue exclusion on a hemocytometer.",
+  "url": "https://bio-protocol.org/example",
+  "datePublished": "2024-06-01",
+  "license": { "url": "https://creativecommons.org/licenses/by/4.0/" },
+  "author": [
+    { "@type": "Person", "name": "Jane Doe" },
+    { "@type": "Person", "name": "Alex Lee" }
+  ],
+  "tool": [
+    { "@type": "DefinedTerm", "name": "hemocytometer", "identifier": "RRID:SCR_001234" }
+  ],
+  "supply": [
+    { "@type": "DefinedTerm", "name": "trypan blue 0.4%", "description": "Sigma T8154" }
+  ],
+  "step": [
+    {
+      "@type": "HowToStep",
+      "position": 1,
+      "text": "Resuspend cells in PBS to 1×10^6/mL.",
+      "totalTime": "PT5M"
+    },
+    {
+      "@type": "HowToStep",
+      "position": 2,
+      "text": "Mix 50 µL of cell suspension with 50 µL 0.4% trypan blue.",
+      "totalTime": "PT2M"
+    },
+    {
+      "@type": "HowToStep",
+      "position": 3,
+      "text": "Load 10 µL onto the hemocytometer; count viable and dead cells in 4 quadrants.",
+      "tool": [{ "@type": "DefinedTerm", "name": "hemocytometer" }]
+    }
+  ],
+  "citation": [
+    {
+      "@type": "ScholarlyArticle",
+      "name": "Strober 2015 — Trypan blue exclusion test",
+      "url": "https://doi.org/10.1002/0471142735.ima03bs111",
+      "doi": "10.1002/0471142735.ima03bs111"
+    }
+  ]
+}

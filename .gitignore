@@ -7,3 +7,6 @@ frontend/dist/
 backend/workspace/
 workspace/components/*
 !workspace/components/.gitkeep
+.env
+.env.local
+.env.*.local

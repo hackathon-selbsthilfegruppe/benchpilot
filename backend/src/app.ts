@@ -3,6 +3,10 @@ import cors from "cors";
 import { z } from "zod";
 
 import type { RoleDefinition, SessionSummary, StreamEnvelope } from "./types.js";
+import {
+  fetchProtocolIo,
+  searchProtocolsIo,
+} from "./protocols/index.js";
 
 export interface SessionService {
   list(): SessionSummary[];
@@ -85,6 +89,27 @@ export function createApp(pool: SessionService) {
     } finally {
       res.end();
     }
+  }));
+
+  const protocolsSearchSchema = z.object({
+    query: z.string().min(1),
+    pageSize: z.number().int().positive().max(50).optional(),
+  });
+
+  app.post("/api/protocols/search", asyncHandler(async (req, res) => {
+    const { query, pageSize } = protocolsSearchSchema.parse(req.body);
+    const hits = await searchProtocolsIo(query, pageSize ?? 10);
+    res.json({ hits });
+  }));
+
+  app.get("/api/protocols/:uri", asyncHandler(async (req, res) => {
+    const uri = req.params.uri;
+    if (typeof uri !== "string" || uri.length === 0) {
+      res.status(400).json({ error: "Missing protocol uri" });
+      return;
+    }
+    const protocol = await fetchProtocolIo(uri);
+    res.json({ protocol });
   }));
 
   app.delete("/api/agent-sessions/:sessionId", asyncHandler(async (req, res) => {
