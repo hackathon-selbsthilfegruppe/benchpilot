@@ -11,6 +11,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 
 import { buildRoleSystemPrompt, ensureRoleWorkspace, normalizeRoleDefinition } from "./roles.js";
+import { normalizeSessionEvent } from "./stream-events.js";
 import type { RoleDefinition, SessionSummary, StreamEnvelope, ToolMode } from "./types.js";
 
 type PiSession = Awaited<ReturnType<typeof createAgentSession>>["session"];
@@ -135,12 +136,10 @@ export class SessionPool {
     managed.summary.lastUsedAt = new Date().toISOString();
 
     const unsubscribe = managed.session.subscribe((event: any) => {
-      onEvent({
-        type: "session_event",
-        sessionId,
-        roleId: managed.summary.role.id,
-        event,
-      });
+      const chunks = normalizeSessionEvent(event, sessionId, managed.summary.role.id);
+      for (const chunk of chunks) {
+        onEvent(chunk);
+      }
     });
 
     try {
@@ -149,7 +148,7 @@ export class SessionPool {
       managed.summary.lastUsedAt = new Date().toISOString();
       managed.summary.modelId = managed.session.model?.id;
       onEvent({
-        type: "session_complete",
+        type: "message_completed",
         sessionId,
         roleId: managed.summary.role.id,
         assistantText: extractLatestAssistantText(managed.session.messages),
@@ -243,3 +242,4 @@ function extractLatestAssistantText(messages: unknown[]): string | null {
 
   return null;
 }
+

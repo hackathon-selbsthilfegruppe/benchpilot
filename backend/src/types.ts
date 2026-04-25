@@ -31,22 +31,34 @@ export interface SessionSummary {
   modelId?: string;
 }
 
+interface StreamEnvelopeBase {
+  sessionId: string;
+  roleId: string;
+}
+
 export type StreamEnvelope =
-  | {
-      type: "session_event";
-      sessionId: string;
-      roleId: string;
-      event: unknown;
-    }
-  | {
-      type: "session_complete";
-      sessionId: string;
-      roleId: string;
+  | (StreamEnvelopeBase & {
+      type: "session_started";
+    })
+  | (StreamEnvelopeBase & {
+      type: "message_delta";
+      text: string;
+    })
+  | (StreamEnvelopeBase & {
+      type: "tool_started";
+      toolName: string;
+      summary: string;
+    })
+  | (StreamEnvelopeBase & {
+      type: "tool_finished";
+      toolName: string;
+      ok: boolean;
+    })
+  | (StreamEnvelopeBase & {
+      type: "message_completed";
       assistantText: string | null;
-    }
-  | {
+    })
+  | (StreamEnvelopeBase & {
       type: "session_error";
-      sessionId: string;
-      roleId: string;
       error: string;
-    };
+    });
