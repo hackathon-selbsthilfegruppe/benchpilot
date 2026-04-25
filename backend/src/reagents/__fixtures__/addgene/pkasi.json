@@ -1,0 +1,21 @@
+{
+  "id": 16077,
+  "name": "pCAG-Cre",
+  "url": "https://www.addgene.org/16077/",
+  "depositor": "Connie Cepko Lab",
+  "species": "synthetic construct",
+  "vector_type": "Mammalian Expression",
+  "plasmid_type": "Encodes one insert",
+  "expression": ["Mammalian Cells"],
+  "selectable_markers": ["Ampicillin"],
+  "genes": [{ "name": "Cre", "species": "P1 bacteriophage" }],
+  "description": "Plasmid expressing Cre recombinase under the CAG promoter for use in mammalian cells.",
+  "articles": [
+    {
+      "title": "Efficient gene transfer into the embryonic mouse brain using in vivo electroporation",
+      "url": "https://doi.org/10.1006/dbio.2001.0439",
+      "doi": "10.1006/dbio.2001.0439",
+      "pubmed_id": 11697861
+    }
+  ]
+}
