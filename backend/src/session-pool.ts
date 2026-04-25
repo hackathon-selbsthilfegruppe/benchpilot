@@ -10,6 +10,7 @@ import {
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 
+import { resolvePreferredModel } from "./model-selection.js";
 import { buildRoleSystemPrompt, ensureRoleWorkspace, normalizeRoleDefinition } from "./roles.js";
 import { normalizeSessionEvent } from "./stream-events.js";
 import type { RoleDefinition, SessionSummary, StreamEnvelope, ToolMode } from "./types.js";
@@ -198,23 +199,7 @@ export class SessionPool {
   }
 
   private resolveConfiguredModel() {
-    const configured = process.env.BENCHPILOT_MODEL?.trim();
-    if (!configured) {
-      return undefined;
-    }
-
-    const [provider, ...modelParts] = configured.split("/");
-    const modelId = modelParts.join("/");
-    if (!provider || !modelId) {
-      throw new Error(`Invalid BENCHPILOT_MODEL: ${configured}. Expected provider/model-id`);
-    }
-
-    const model = this.modelRegistry.find(provider, modelId);
-    if (!model) {
-      throw new Error(`Configured model not found: ${configured}`);
-    }
-
-    return model;
+    return resolvePreferredModel(this.modelRegistry, process.env.BENCHPILOT_MODEL);
   }
 }
 

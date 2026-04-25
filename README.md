@@ -67,6 +67,11 @@ export ANTHROPIC_API_KEY=...
 export BENCHPILOT_MODEL=anthropic/claude-sonnet-4-5
 ```
 
+Current backend default preference, when no `BENCHPILOT_MODEL` is set:
+- `openai-codex/gpt-5.4-mini`
+
+This is useful when your existing pi auth is already configured for `openai-codex`.
+
 ### 4. Run the backend
 
 ```bash
