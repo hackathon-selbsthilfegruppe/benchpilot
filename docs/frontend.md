@@ -4,30 +4,50 @@
 
 ## Layout: the workbench
 
-- **Left:** the chat panel — always visible, always primary. This is where the user drives the session.
-- **Right:** a vertical stack of **component cards**. Each card shows the component's name and a short summary, with its table of contents below. Clicking a TOC entry expands the relevant detail (inline or in a side drawer — see open questions).
-- Components appear in the order they are added to the project. A future iteration will allow reordering / pinning / hiding.
+The screen has two persistent regions and one focus region:
 
-The visual story is: as the project matures, structure literally accretes next to the conversation. Early on, the right side is empty — it's just chat. Over time, cards appear and fill in.
+- **Orchestrator chat (always visible).** The top-level chat from step 1. The user can always reach it. This is the chat with the orchestrator, not with any specific component.
+- **Component strip (always visible).** Every component is shown as a **summary card** — name + short summary + (optionally collapsed) TOC. The user can see all components at a glance, all the time. No component's data or chat is open here, just its summary surface.
+- **Active component (one at a time).** Exactly one component can be **opened** into a focus area. When opened, that component reveals its **details** (data files, drillable through its TOC) and its **own chat**. Opening a different component closes the previous one. Closing returns the user to "just summaries + orchestrator chat."
 
-## Visual progression (mirrors the concept progression)
+So at any moment the user sees: the orchestrator chat, every component's summary, and at most one component fully expanded with its details and its component-specific chat.
 
-1. **Chat only.** Full-width chat. No right pane yet.
-2. **Chat + first component card.** Right pane appears with one card.
-3. **Chat + multiple component cards.** Cards stack vertically; the pane scrolls.
-4. **Drill-down.** TOC entries become clickable; details render somewhere (inline / drawer).
-5. **Cross-component awareness.** Components can surface "see also" links into each other's TOCs.
+## Why this shape
 
-## Card anatomy
+- **Summaries always visible** — the bench-of-components metaphor only works if you can take in the whole bench at once. Hiding components defeats the purpose.
+- **Only one component open** — component chats and detail views are heavy; stacking them would compete with the orchestrator chat and with each other. One-at-a-time keeps focus clear.
+- **Orchestrator chat persistent** — it is the user's home base and the entry point when no component is active or when a request spans multiple components.
 
-Each component card shows:
+## Visual progression
 
-- **Header:** component name + (later) small affordances (collapse, pin, etc.).
-- **Summary:** rendered from the component's `summary.md`. One paragraph.
-- **Table of contents:** rendered from `toc.md`. List of detail entries with their 1-line descriptors. Clickable in step 4+.
+1. **Chat only.** Orchestrator chat fills the screen. No component strip yet.
+2. **First component appears.** Component strip shows up with one summary card.
+3. **More components.** Strip fills with cards; orchestrator chat stays put.
+4. **Open a component.** Clicking a card opens that component into the focus area: details + its own chat. Other cards remain as summaries; orchestrator chat remains visible.
+5. **Cross-component awareness.** Open component can surface "see also" links into other components' TOCs (clicking switches which component is open).
+
+## Card anatomy (summary state)
+
+Each summary card shows:
+
+- **Header** — component name.
+- **Summary** — rendered from the component's `summary.md`. One paragraph.
+- **TOC peek** — top entries from `toc.md`, collapsible once cards multiply.
+- **Open** affordance — turns this card into the active component.
+
+## Open component anatomy (focus state)
+
+When a component is opened, the focus area shows:
+
+- **Header** — component name + close affordance.
+- **Component chat** — chat scoped to this component's preprompt and tooling.
+- **Details** — data files, navigated via the TOC. Renders the selected `data/<slug>.md`.
+
+How exactly the focus area is positioned relative to the orchestrator chat and the summary strip is the main remaining layout question (see below).
 
 ## Open questions
 
-- **Detail rendering:** inline expansion within the card, or a side drawer that overlays the chat? Decide at step 4.
-- **Card density:** how much summary/TOC do we show before requiring expansion? Probably summary always, TOC collapsible once cards multiply.
-- **Empty state:** what does the right pane look like before any component exists? Probably nothing — keep step 1 as pure chat.
+- **Where does the focus area live?** Three candidates: (a) center column between orchestrator chat (left) and component strip (right); (b) overlay/drawer on top of the strip when a card is opened; (c) the strip itself expands the active card in place and demotes the others to slim tiles. (c) feels most native to the "bench" metaphor.
+- **Component chat vs. orchestrator chat visibility.** Both visible side-by-side, or does the component chat take focus and the orchestrator chat collapse to a dock? Probably both visible, but smaller orchestrator when a component is open.
+- **Card density** — how much summary/TOC do we show before requiring expansion? Summary always; TOC collapsible once cards multiply.
+- **Empty state** — what does the workbench look like before any component exists? Pure orchestrator chat, no strip.
