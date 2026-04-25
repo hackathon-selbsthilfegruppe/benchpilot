@@ -77,6 +77,23 @@ export default function Start({
     });
   }, [chat, streaming]);
 
+  const exampleIndexRef = useRef(0);
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod || e.altKey) return;
+      if (e.key === "." || e.code === "Period") {
+        e.preventDefault();
+        const next = EXAMPLE_QUESTIONS[exampleIndexRef.current % EXAMPLE_QUESTIONS.length];
+        exampleIndexRef.current = (exampleIndexRef.current + 1) % EXAMPLE_QUESTIONS.length;
+        setStep("hypothesis");
+        setQuestion(next);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   async function ensureSession(): Promise<BenchpilotSessionSummary> {
     if (session) return session;
     const created = await createSession(ORCHESTRATOR_ROLE);
@@ -408,12 +425,17 @@ function HypothesisView({
   return (
     <>
       <div className="rounded-lg border border-accent bg-accent-soft p-4">
-        <label
-          htmlFor="research-question"
-          className="text-xs font-semibold uppercase tracking-wide text-accent-soft-fg"
-        >
-          Research question
-        </label>
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor="research-question"
+            className="text-xs font-semibold uppercase tracking-wide text-accent-soft-fg"
+          >
+            Research question
+          </label>
+          <span className="text-[10px] uppercase tracking-wide text-accent-soft-fg/70">
+            ⌘/Ctrl + . cycles example questions
+          </span>
+        </div>
         <textarea
           id="research-question"
           ref={questionRef}
