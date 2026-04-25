@@ -1,0 +1,13 @@
+{
+  "components": [
+    "field-sites",
+    "rock-samples",
+    "instruments",
+    "analyses",
+    "budget"
+  ],
+  "supporting": [
+    "literature",
+    "protocols"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "id": "budget",
+  "name": "Budget",
+  "preprompt": "You are the budget component. You track committed and discretionary spend, surface upcoming decisions, and answer affordability questions from other components.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. External: institutional finance ledger (placeholder). Write: own data only.",
+  "summary": "AUD 90k Pilbara grant. AUD 52k committed (fieldwork + contract O-isotope batch). AUD 12k held for contract LA-ICP-MS fallback. Discretionary headroom ~AUD 26k.",
+  "toc": [
+    { "slug": "envelope", "title": "Pilbara grant envelope", "descriptor": "AUD 90,000 — fixed; runs through 2026-12-31.", "status": "info" },
+    { "slug": "commitments", "title": "Committed spend", "descriptor": "AUD 52,000 on contracts and standing fieldwork commitments.", "status": "ok" },
+    { "slug": "fallback", "title": "LA-ICP-MS fallback reserve", "descriptor": "AUD 12,000 held; releases if institutional calibration slips past 2026-05-20.", "status": "pending" }
+  ],
+  "tasks": []
+}

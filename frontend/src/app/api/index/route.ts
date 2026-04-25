@@ -4,6 +4,7 @@ import { writeIndex } from "@/lib/components-fs";
 export const runtime = "nodejs";
 
 type PatchBody = {
+  hypothesis: string;
   components: string[];
   supporting: string[];
 };
@@ -16,13 +17,17 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (!Array.isArray(body.components) || !Array.isArray(body.supporting)) {
+  if (
+    typeof body.hypothesis !== "string" ||
+    !Array.isArray(body.components) ||
+    !Array.isArray(body.supporting)
+  ) {
     return NextResponse.json(
-      { error: "components and supporting must be arrays" },
+      { error: "hypothesis, components and supporting are required" },
       { status: 400 },
     );
   }
 
-  await writeIndex(body.components, body.supporting);
+  await writeIndex(body.hypothesis, body.components, body.supporting);
   return NextResponse.json({ ok: true });
 }

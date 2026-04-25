@@ -24,17 +24,24 @@ const TASK_STATUS_SYMBOL: Record<TaskStatus, string> = {
   done: "✓",
 };
 
+type HypothesisOption = { slug: string; name: string; domain?: string };
+
 export default function Workbench({
   components: initialComponents,
   supporting: initialSupporting,
-  projectHeader,
+  hypothesis,
+  hypotheses,
+  activeHypothesisSlug,
 }: {
   components: BenchComponent[];
   supporting: BenchComponent[];
-  projectHeader: BenchComponent | null;
+  hypothesis: BenchComponent;
+  hypotheses: HypothesisOption[];
+  activeHypothesisSlug: string;
 }) {
   const [components, setComponents] = useState<BenchComponent[]>(initialComponents);
   const [supporting, setSupporting] = useState<BenchComponent[]>(initialSupporting);
+  const [hypothesisState, setHypothesisState] = useState<BenchComponent>(hypothesis);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openDetail, setOpenDetail] = useState<Record<string, string>>({});
   const [activeRightTab, setActiveRightTab] = useState<Record<string, "chat" | "tasks">>({});
@@ -98,7 +105,11 @@ export default function Workbench({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope: chatId, messages: apiMessages }),
+        body: JSON.stringify({
+          hypothesis: activeHypothesisSlug,
+          scope: chatId,
+          messages: apiMessages,
+        }),
       });
 
       if (!res.ok) {
@@ -137,6 +148,12 @@ export default function Workbench({
       );
     setComponents(updateList);
     setSupporting(updateList);
+    if (updated.to === hypothesisState.id) {
+      setHypothesisState((prev) => ({
+        ...prev,
+        tasks: prev.tasks.map((t) => (t.id === updated.id ? updated : t)),
+      }));
+    }
   }
 
   async function handleDrop(targetId: string, targetGroup: "primary" | "supporting") {
@@ -179,6 +196,7 @@ export default function Workbench({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          hypothesis: activeHypothesisSlug,
           components: result.primary,
           supporting: result.supporting,
         }),
@@ -203,7 +221,7 @@ export default function Workbench({
       const res = await fetch(`/api/tasks/${task.to}/${task.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ hypothesis: activeHypothesisSlug, status }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
       const { task: updated } = (await res.json()) as { task: Task };
@@ -214,42 +232,24 @@ export default function Workbench({
     }
   }
 
-  const projectHeaderActive =
-    projectHeader !== null && activeId === projectHeader.id;
-
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-      {projectHeader && (
-        <button
-          type="button"
-          onClick={() =>
-            setActiveId(projectHeaderActive ? null : projectHeader.id)
-          }
-          className="group flex w-full items-center gap-2 border-b border-border bg-surface px-6 py-2.5 text-left transition hover:bg-surface-elev"
-        >
-          <span className="shrink-0 text-sm font-semibold text-foreground">
-            {projectHeader.name}
-          </span>
-          <span className="min-w-0 truncate text-xs text-muted">
-            {projectHeader.summary}
-          </span>
-          <span className="ml-auto shrink-0 text-[11px] text-subtle group-hover:text-accent">
-            {projectHeaderActive ? "← collapse" : "open →"}
-          </span>
-        </button>
-      )}
+      <AppHeader
+        theme={theme}
+        onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+      />
       <div className="flex min-h-0 flex-1 overflow-hidden">
       <OrchestratorPanel
         messages={chats.orchestrator ?? []}
         pending={!!pending.orchestrator}
         onSend={(t) => send("orchestrator", t)}
-        theme={theme}
-        onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
       />
       <ComponentStrip
         components={components}
         supporting={supporting}
-        projectHeader={projectHeader}
+        hypothesis={hypothesisState}
+        hypotheses={hypotheses}
+        activeHypothesisSlug={activeHypothesisSlug}
         activeId={activeId}
         onOpen={setActiveId}
         onClose={() => setActiveId(null)}
@@ -287,14 +287,10 @@ function OrchestratorPanel({
   messages,
   pending,
   onSend,
-  theme,
-  onToggleTheme,
 }: {
   messages: Message[];
   pending: boolean;
   onSend: (text: string) => void;
-  theme: Theme;
-  onToggleTheme: () => void;
 }) {
   return (
     <section className="flex w-[380px] shrink-0 flex-col border-r border-border bg-surface">
@@ -304,7 +300,6 @@ function OrchestratorPanel({
           Orchestrator
         </h1>
         <span className="ml-auto text-xs text-subtle">always on</span>
-        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </header>
       <ChatLog messages={messages} pending={pending} className="flex-1" />
       <ChatInput
@@ -313,6 +308,67 @@ function OrchestratorPanel({
         disabled={pending}
       />
     </section>
+  );
+}
+
+function AppHeader({
+  theme,
+  onToggleTheme,
+}: {
+  theme: Theme;
+  onToggleTheme: () => void;
+}) {
+  return (
+    <header className="flex items-center gap-3 border-b border-border bg-surface px-6 py-3">
+      <BenchPilotLogo />
+      <div className="flex flex-col leading-tight">
+        <span className="text-sm font-semibold tracking-wide text-foreground">
+          BenchPilot
+        </span>
+        <span className="text-[10px] uppercase tracking-wider text-subtle">
+          a bench for scientific engineers
+        </span>
+      </div>
+      <div className="ml-auto flex items-center gap-3">
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+        <ProfileBadge />
+      </div>
+    </header>
+  );
+}
+
+function BenchPilotLogo() {
+  return (
+    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-accent bg-accent-soft text-accent-soft-fg">
+      <svg
+        viewBox="0 0 24 24"
+        width="18"
+        height="18"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
+        <path d="M4 4v12a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4V4" />
+        <path d="M4 4h16" />
+        <path d="M9 4v6" />
+        <path d="M15 4v6" />
+        <circle cx="12" cy="14" r="2" />
+      </svg>
+    </span>
+  );
+}
+
+function ProfileBadge() {
+  return (
+    <span
+      title="Vera Marsh — researcher"
+      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-strong bg-surface-elev text-xs font-semibold text-foreground"
+    >
+      VM
+    </span>
   );
 }
 
@@ -384,7 +440,9 @@ function MoonIcon() {
 function ComponentStrip({
   components,
   supporting,
-  projectHeader,
+  hypothesis,
+  hypotheses,
+  activeHypothesisSlug,
   activeId,
   onOpen,
   onClose,
@@ -408,7 +466,9 @@ function ComponentStrip({
 }: {
   components: BenchComponent[];
   supporting: BenchComponent[];
-  projectHeader: BenchComponent | null;
+  hypothesis: BenchComponent;
+  hypotheses: HypothesisOption[];
+  activeHypothesisSlug: string;
   activeId: string | null;
   onOpen: (id: string) => void;
   onClose: () => void;
@@ -430,7 +490,7 @@ function ComponentStrip({
   activeHeightPx: number | null;
   setActiveHeightPx: (px: number | null) => void;
 }) {
-  const allComponentsForRefs = [...components, ...supporting];
+  const allComponentsForRefs = [hypothesis, ...components, ...supporting];
 
   function renderCard(c: BenchComponent, isSupporting: boolean) {
     const isActive = c.id === activeId;
@@ -479,36 +539,89 @@ function ComponentStrip({
     );
   }
 
-  const renderActiveProjectHeader = () => {
-    if (!projectHeader || activeId !== projectHeader.id) return null;
-    const detailSlug =
-      openDetail[projectHeader.id] ?? projectHeader.toc[0]?.slug;
-    const detailDoc =
-      projectHeader.details.find((d) => d.slug === detailSlug) ??
-      projectHeader.details[0];
+  function renderHypothesisRow() {
+    const isActive = activeId === hypothesis.id;
+    if (isActive) {
+      const detailSlug = openDetail[hypothesis.id] ?? hypothesis.toc[0]?.slug;
+      const detailDoc =
+        hypothesis.details.find((d) => d.slug === detailSlug) ??
+        hypothesis.details[0];
+      const inboundOpen = hypothesis.tasks.filter(
+        (t) => t.status === "open",
+      ).length;
+      const outbound = allComponentsForRefs
+        .filter((other) => other.id !== hypothesis.id)
+        .flatMap((other) => other.tasks)
+        .filter((t) => t.from === hypothesis.id);
+      return (
+        <ComponentCard
+          component={hypothesis}
+          allComponents={allComponentsForRefs}
+          state="active"
+          variant="hypothesis"
+          onOpen={() => onOpen(hypothesis.id)}
+          onClose={onClose}
+          chatMessages={chats[hypothesis.id] ?? []}
+          chatPending={!!pending[hypothesis.id]}
+          onSendChat={(t) => sendToComponent(hypothesis.id, t)}
+          detailDoc={detailDoc}
+          onSelectDetail={(slug) => setOpenDetail(hypothesis.id, slug)}
+          activeDetailSlug={detailSlug}
+          inboundOpen={inboundOpen}
+          outboundTasks={outbound}
+          rightTab={activeRightTab[hypothesis.id] ?? "chat"}
+          setRightTab={(tab) => setActiveRightTab(hypothesis.id, tab)}
+          onChangeTaskStatus={onChangeTaskStatus}
+          activeHeightPx={activeHeightPx}
+          setActiveHeightPx={setActiveHeightPx}
+        />
+      );
+    }
+    const inboundOpen = hypothesis.tasks.filter(
+      (t) => t.status === "open",
+    ).length;
     return (
-      <ComponentCard
-        component={projectHeader}
-        allComponents={[projectHeader, ...components]}
-        state="active"
-        onOpen={() => onOpen(projectHeader.id)}
-        onClose={onClose}
-        chatMessages={chats[projectHeader.id] ?? []}
-        chatPending={!!pending[projectHeader.id]}
-        onSendChat={(t) => sendToComponent(projectHeader.id, t)}
-        detailDoc={detailDoc}
-        onSelectDetail={(slug) => setOpenDetail(projectHeader.id, slug)}
-        activeDetailSlug={detailSlug}
-        inboundOpen={0}
-        outboundTasks={[]}
-        rightTab={activeRightTab[projectHeader.id] ?? "chat"}
-        setRightTab={(tab) => setActiveRightTab(projectHeader.id, tab)}
-        onChangeTaskStatus={onChangeTaskStatus}
-        activeHeightPx={activeHeightPx}
-        setActiveHeightPx={setActiveHeightPx}
-      />
+      <div className="flex w-full items-center gap-3 rounded-lg border border-accent bg-accent-soft px-4 py-3">
+        <select
+          value={activeHypothesisSlug}
+          onChange={(e) => {
+            const next = e.target.value;
+            if (next !== activeHypothesisSlug) {
+              window.location.search = `?hypothesis=${encodeURIComponent(next)}`;
+            }
+          }}
+          aria-label="Switch hypothesis"
+          className="shrink-0 rounded-md border border-border-strong bg-surface px-2 py-1 text-xs font-semibold text-foreground"
+        >
+          {hypotheses.map((h) => (
+            <option key={h.slug} value={h.slug}>
+              {h.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => onOpen(hypothesis.id)}
+          className="group flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-1 text-left transition hover:bg-surface"
+        >
+          <span className="truncate text-xs text-accent-soft-fg">
+            {hypothesis.summary}
+          </span>
+          {inboundOpen > 0 && (
+            <span
+              title={`${inboundOpen} open inbound task${inboundOpen === 1 ? "" : "s"}`}
+              className="shrink-0 font-mono text-xs text-accent-soft-fg"
+            >
+              → {inboundOpen}
+            </span>
+          )}
+          <span className="ml-auto shrink-0 text-[11px] text-accent-soft-fg group-hover:text-accent">
+            open →
+          </span>
+        </button>
+      </div>
     );
-  };
+  }
 
   return (
     <section className="flex flex-1 flex-col overflow-hidden bg-background">
@@ -528,7 +641,7 @@ function ComponentStrip({
           onDragLeaveStrip();
         }}
       >
-        {renderActiveProjectHeader()}
+        {renderHypothesisRow()}
         {components.map((c) => renderCard(c, false))}
         {supporting.length > 0 && (
           <div className="mt-3 flex items-center gap-3">
@@ -576,7 +689,7 @@ function ComponentCard({
   component: BenchComponent;
   allComponents: BenchComponent[];
   state: "summary" | "active" | "demoted";
-  variant?: "primary" | "supporting";
+  variant?: "primary" | "supporting" | "hypothesis";
   onOpen: () => void;
   onClose: () => void;
   chatMessages: Message[];

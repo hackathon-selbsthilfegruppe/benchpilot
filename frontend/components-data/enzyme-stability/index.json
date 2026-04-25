@@ -1,8 +1,6 @@
 {
-  "projectHeader": "research-topic",
   "components": [
     "reagents",
-    "hypothesis",
     "samples",
     "animals",
     "cell-culture",
@@ -11,6 +9,7 @@
     "budget"
   ],
   "supporting": [
-    "literature"
+    "literature",
+    "protocols"
   ]
 }

@@ -1,5 +1,11 @@
 import "server-only";
-import { loadAllComponents, type BenchComponent } from "./components-fs";
+import {
+  loadComponent,
+  loadComponentIds,
+  loadHypothesis,
+  loadSupportingIds,
+  type BenchComponent,
+} from "./components-fs";
 
 function formatToc(c: BenchComponent): string {
   return c.toc.map((t) => `  - ${t.title} — ${t.descriptor}`).join("\n");
@@ -16,14 +22,32 @@ function formatComponentBrief(c: BenchComponent): string {
   ].join("\n");
 }
 
+async function loadAllForHypothesis(
+  slug: string,
+): Promise<{ hypothesis: BenchComponent; all: BenchComponent[] }> {
+  const [hypothesis, primaryIds, supportingIds] = await Promise.all([
+    loadHypothesis(slug),
+    loadComponentIds(slug),
+    loadSupportingIds(slug),
+  ]);
+  const allIds = [...primaryIds, ...supportingIds];
+  const components = await Promise.all(
+    allIds.map((id) => loadComponent(slug, id)),
+  );
+  return { hypothesis, all: [hypothesis, ...components] };
+}
+
 export async function buildSystemPrompt(
+  hypothesisSlug: string,
   scope: "orchestrator" | string,
 ): Promise<string> {
-  const all = await loadAllComponents();
+  const { hypothesis, all } = await loadAllForHypothesis(hypothesisSlug);
 
   if (scope === "orchestrator") {
     return [
-      "You are the **orchestrator** of BenchPilot, a workspace for a scientific engineering project.",
+      "You are the **orchestrator** of BenchPilot, a workspace for a scientific research project.",
+      "",
+      `The active hypothesis is **${hypothesis.name}**. Anchor every answer in this frame.`,
       "",
       "Your role: route the user's questions across the components below, synthesize cross-component answers, and admit when a question would be better answered by a single component (point the user there).",
       "",
@@ -45,6 +69,8 @@ export async function buildSystemPrompt(
 
   return [
     `You are the **${self.name}** component of BenchPilot.`,
+    "",
+    `The active hypothesis is **${hypothesis.name}**. Stay grounded in it.`,
     "",
     "## Your preprompt",
     self.preprompt,

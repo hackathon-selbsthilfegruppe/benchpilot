@@ -1,0 +1,14 @@
+{
+  "id": "analyses",
+  "name": "Analyses",
+  "preprompt": "You are the analyses component. You design, sequence, and track the analytical work that tests the hypothesis. You report status and outcomes back to other components.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. External: lab data exports (placeholders). Write: own data only.",
+  "summary": "Petrography running; EMPA chlorite thermobarometry the deciding analysis (gated on instruments). LA-ICP-MS trace transects waiting on instrument calibration. O-isotope batch sent to contract lab.",
+  "toc": [
+    { "slug": "petrography", "title": "Petrographic survey", "descriptor": "Running; preliminary read favours H1 in komatiitic units.", "status": "ok" },
+    { "slug": "empa-thermobarometry", "title": "EMPA chlorite thermobarometry", "descriptor": "Deciding analysis for H1 vs H2; runs 2026-05-13.", "status": "pending" },
+    { "slug": "la-icpms-transects", "title": "LA-ICP-MS trace transects", "descriptor": "Blocked on instrument calibration.", "status": "blocked" },
+    { "slug": "o-isotope", "title": "O-isotope analysis (chlorite/serpentine)", "descriptor": "Sent to contract lab; results expected 2026-05-30.", "status": "pending" }
+  ],
+  "tasks": []
+}

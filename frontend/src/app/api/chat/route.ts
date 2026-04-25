@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 type ApiMessage = { role: "user" | "assistant"; content: string };
 
 type RequestBody = {
+  hypothesis: string;
   scope: "orchestrator" | string;
   messages: ApiMessage[];
 };
@@ -81,17 +82,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { scope, messages } = body;
-  if (!scope || !Array.isArray(messages) || messages.length === 0) {
+  const { hypothesis, scope, messages } = body;
+  if (
+    !hypothesis ||
+    !scope ||
+    !Array.isArray(messages) ||
+    messages.length === 0
+  ) {
     return NextResponse.json(
-      { error: "scope and non-empty messages are required" },
+      { error: "hypothesis, scope, and non-empty messages are required" },
       { status: 400 },
     );
   }
 
   let systemPrompt: string;
   try {
-    systemPrompt = await buildSystemPrompt(scope);
+    systemPrompt = await buildSystemPrompt(hypothesis, scope);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 400 });

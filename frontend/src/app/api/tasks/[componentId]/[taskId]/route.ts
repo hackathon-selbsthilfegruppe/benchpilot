@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { loadComponent, writeComponentTasks } from "@/lib/components-fs";
+import {
+  loadComponent,
+  loadHypothesis,
+  writeComponentTasks,
+} from "@/lib/components-fs";
 import type { TaskStatus } from "@/lib/components-shared";
 
 export const runtime = "nodejs";
@@ -8,7 +12,7 @@ const VALID_STATUSES: TaskStatus[] = ["open", "accepted", "declined", "done"];
 
 type Params = { componentId: string; taskId: string };
 
-type PatchBody = { status?: TaskStatus };
+type PatchBody = { hypothesis: string; status?: TaskStatus };
 
 export async function PATCH(
   req: Request,
@@ -23,6 +27,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
+  if (!body.hypothesis) {
+    return NextResponse.json(
+      { error: "hypothesis is required" },
+      { status: 400 },
+    );
+  }
   if (body.status && !VALID_STATUSES.includes(body.status)) {
     return NextResponse.json(
       { error: `status must be one of ${VALID_STATUSES.join(", ")}` },
@@ -30,9 +40,12 @@ export async function PATCH(
     );
   }
 
-  let component;
+  let owner;
   try {
-    component = await loadComponent(componentId);
+    owner =
+      componentId === "hypothesis"
+        ? await loadHypothesis(body.hypothesis)
+        : await loadComponent(body.hypothesis, componentId);
   } catch {
     return NextResponse.json(
       { error: `unknown component: ${componentId}` },
@@ -40,16 +53,16 @@ export async function PATCH(
     );
   }
 
-  const idx = component.tasks.findIndex((t) => t.id === taskId);
+  const idx = owner.tasks.findIndex((t) => t.id === taskId);
   if (idx === -1) {
     return NextResponse.json({ error: "task not found" }, { status: 404 });
   }
 
-  const updated = { ...component.tasks[idx], ...(body.status ? { status: body.status } : {}) };
-  const next = [...component.tasks];
+  const updated = { ...owner.tasks[idx], ...(body.status ? { status: body.status } : {}) };
+  const next = [...owner.tasks];
   next[idx] = updated;
 
-  await writeComponentTasks(componentId, next);
+  await writeComponentTasks(body.hypothesis, componentId, next);
 
   return NextResponse.json({ task: updated });
 }

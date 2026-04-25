@@ -1,0 +1,13 @@
+{
+  "id": "protocols",
+  "name": "Protocols",
+  "preprompt": "You are the protocols component. You curate published, runnable laboratory protocols (primarily from protocols.io) that ground the project's experiments in established methodology. You match planned analyses to the closest published procedures and surface methodology conflicts.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. External: protocols.io REST API via /api/protocols/search (live search). Write: own data only.",
+  "summary": "Three matched protocols seeded for the active experiments: pH–activity assay baseline, cofactor-displacement workup, and DLS measurement. More can be pulled in via live protocols.io search.",
+  "toc": [
+    { "slug": "ph-activity-assay", "title": "pH–activity assay (steady-state)", "descriptor": "Backbone for EXP-01 and EXP-02.", "status": "ok" },
+    { "slug": "cofactor-spin-filter", "title": "Cofactor displacement by spin-filtration", "descriptor": "Closest published method for EXP-03.", "status": "pending" },
+    { "slug": "dls-ph-screen", "title": "DLS measurement across pH", "descriptor": "Reference protocol for EXP-04 (optional).", "status": "info" }
+  ],
+  "tasks": []
+}

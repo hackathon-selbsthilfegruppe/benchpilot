@@ -1,0 +1,13 @@
+{
+  "id": "field-sites",
+  "name": "Field Sites",
+  "preprompt": "You are the field-sites component. You track the physical localities the project samples from — outcrops, drill holes, traverses — their access, status, and any locality-specific constraints. Flag re-sampling windows and access risks.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. External: GPS waypoints, station permit log (placeholders). Write: own data only.",
+  "summary": "Three working sites in the Marble Bar window: DR-22 drill core (in storage), Coppin Gap outcrop (re-accessible until June), and Strelley Pool unit B-7 (one return visit budgeted).",
+  "toc": [
+    { "slug": "dr-22", "title": "Drill core DR-22", "descriptor": "Primary chronostratigraphic record; in cold storage at base.", "status": "ok" },
+    { "slug": "coppin-gap", "title": "Coppin Gap outcrop", "descriptor": "Re-sampling window closes 2026-06-15.", "status": "pending" },
+    { "slug": "strelley-pool-b7", "title": "Strelley Pool — unit B-7", "descriptor": "One return visit budgeted; chlorite-rich horizon.", "status": "pending" }
+  ],
+  "tasks": []
+}
