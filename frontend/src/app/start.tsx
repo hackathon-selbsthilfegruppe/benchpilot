@@ -537,6 +537,22 @@ function ProtocolsView({
             {searching ? "Searching…" : sources.length === 0 ? "Search now" : "Re-search"}
           </button>
         </div>
+        {sources.length > 0 && sources.every((s) => s.error) && (
+          <div className="mt-3 rounded-md border border-status-pending bg-status-pending-soft p-3 text-xs text-foreground">
+            <div className="font-semibold">Every protocol source returned an error.</div>
+            <ul className="mt-1 list-disc space-y-1 pl-4">
+              {sources.map((s) => (
+                <li key={s.sourceId}>
+                  <span className="font-mono">{s.sourceId}</span>: {s.error}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-2">
+              You can still <span className="font-semibold">Finalize</span> below — the orchestrator
+              will draft the bench from your question alone.
+            </div>
+          </div>
+        )}
         <div className="mt-3 flex max-h-[36rem] flex-col gap-3 overflow-y-auto pr-1">
           {sources.map((src) => (
             <div key={src.sourceId} className="rounded-md border border-border bg-surface p-2">
