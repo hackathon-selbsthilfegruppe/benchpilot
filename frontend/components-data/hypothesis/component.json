@@ -1,0 +1,23 @@
+{
+  "id": "hypothesis",
+  "name": "Hypothesis Generation",
+  "preprompt": "You are the hypothesis component. You propose, refine, and stress-test research hypotheses against the available evidence and constraints from other components.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. Write: own data only.",
+  "summary": "Three working hypotheses on enzyme stability under variable pH. H1 currently leading; H3 deprioritized after literature scan.",
+  "toc": [
+    { "slug": "h1", "title": "H1 — pH-stabilized active site", "descriptor": "Primary hypothesis. Strongest literature support.", "status": "ok" },
+    { "slug": "h2", "title": "H2 — Cofactor displacement at low pH", "descriptor": "Plausible secondary mechanism. Needs reagent check.", "status": "pending" },
+    { "slug": "h3", "title": "H3 — Aggregation-driven inactivation", "descriptor": "Deprioritized — conflicts with Smith 2024.", "status": "done" }
+  ],
+  "tasks": [
+    {
+      "id": "task-001",
+      "from": "experiments",
+      "to": "hypothesis",
+      "title": "Restate the falsifiable prediction for H1 vs H2",
+      "body": "Before we run EXP-02 (H148A pH curve), spell out the exact pH-curve shapes you'd expect for H1 vs H2 so we can pre-register the readout.",
+      "status": "accepted",
+      "created": "2026-04-22T09:00:00Z"
+    }
+  ]
+}

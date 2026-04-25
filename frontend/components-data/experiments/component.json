@@ -1,0 +1,24 @@
+{
+  "id": "experiments",
+  "name": "Experiments",
+  "preprompt": "You are the experiments component. You design, sequence, and track wet-lab experiments that test the project's hypotheses, and you report status and outcomes back.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. External: ELN entries, plate-reader exports (placeholder for the clickdummy). Write: own data only.",
+  "summary": "4 experiments planned. EXP-01 (WT pH curve) complete; EXP-02 (H148A pH curve) blocked on mutant delivery; EXP-03 (cofactor displacement) gated on cofactor reorder; EXP-04 (DLS) optional re-check.",
+  "toc": [
+    { "slug": "exp-01-wt-ph", "title": "EXP-01 — WT pH–activity curve", "descriptor": "Complete. Baseline midpoint pH 6.3.", "status": "done" },
+    { "slug": "exp-02-h148a-ph", "title": "EXP-02 — H148A pH–activity curve", "descriptor": "Blocked: H148A mutant ETA 2026-05-11.", "status": "blocked" },
+    { "slug": "exp-03-cofactor", "title": "EXP-03 — Cofactor displacement assay", "descriptor": "Gated on cofactor reorder approval.", "status": "blocked" },
+    { "slug": "exp-04-dls", "title": "EXP-04 — DLS across pH (optional)", "descriptor": "Low priority. Confirms Smith 2024 in our hands.", "status": "info" }
+  ],
+  "tasks": [
+    {
+      "id": "task-004",
+      "from": "hypothesis",
+      "to": "experiments",
+      "title": "Sequence EXP-02 immediately when H148A arrives",
+      "body": "EXP-02 is the deciding experiment for H1 vs H2 — please don't let it sit in the queue once the mutant lands.",
+      "status": "accepted",
+      "created": "2026-04-20T16:00:00Z"
+    }
+  ]
+}

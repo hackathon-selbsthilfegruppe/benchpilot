@@ -4,7 +4,7 @@
 
 ## What it is
 
-BenchPilot is a **bench for scientific engineers** — a workspace that helps a researcher run and reason about an experimental project end-to-end. The bench is composed of **components** (hypothesis generation, literature research, reagents, budget, …) that the researcher uses, inspects, and extends over time.
+BenchPilot is a **bench for scientific engineers** — a workspace that helps a researcher run and reason about an experimental project end-to-end. The bench is composed of **components** (hypothesis generation, literature research, reagents, budget, experiments, …) that the researcher uses, inspects, and extends over time.
 
 The set of components is **not fixed**. New components can be introduced, retired, or re-ordered as the project evolves. Both the surface the user interacts with and the underlying content model must treat components as a flexible, growing list rather than a hard-coded structure.
 
@@ -17,28 +17,57 @@ The product is built up in steps so we can validate each layer of structure befo
 3. **Chat + multiple components.** Add more components (literature, reagents, budget, …). Validate that the model scales.
 4. **Drill-down.** Each component can expand from summary into details.
 5. **Cross-component awareness.** Components see each other's tables of contents and can request details from one another (read-only).
+6. **Cross-component tasks.** Components can send tasks to each other; receivers accept / decline / mark them done.
 
 ## What a component is
 
-A component is more than a folder of markdown — it is a small, self-contained agent for one slice of the project. Each component bundles four things:
+A component is a small, self-contained agent for one slice of the project. Each component bundles:
 
 - **Preprompt** — the instructions that define the component's role, tone, and scope (e.g. "you are the literature research component; you summarize papers and surface conflicts with current hypotheses").
 - **Tooling** — how this component accesses data. What can it read, what can it write, what external services or retrieval methods is it allowed to use? Tooling is per-component because a *reagents* component needs different capabilities than a *hypothesis* component.
-- **Data** — a folder of markdown files the component owns and edits. This is the substantive content the component is producing.
-- **Table of contents (TOC)** — a structured list of the data files (titles + short descriptors). The TOC is what other components see; it is the component's public surface.
+- **Summary** — a short abstract of the component's current state, used as cheap cross-component context.
+- **Table of contents (TOC)** — a structured list of the component's data entries (slug, title, descriptor, status). The TOC is what other components see; it is the component's public surface.
+- **Tasks** — the inbox: tasks other components have sent *to* this component (see *Cross-component tasks* below).
+- **Data** — long-form markdown files (one per TOC entry) holding the substantive content the component is producing.
 
-A component additionally exposes a **summary** — a short abstract of its current state, derived from or alongside the TOC, used as cheap context for other components.
+The component's structure (everything except the long-form data bodies) lives in a single `component.json`. Long-form data lives as markdown files. This keeps the structure machine-editable and the prose human-editable:
 
 ```
 component/
-  preprompt.md     # role, scope, behavior
-  tooling.md       # what this component can do (read/write/external access)
-  summary.md       # one paragraph: what this component currently knows / contains
-  toc.md           # ordered list of data entries (title + 1-line descriptor)
+  component.json       # id, name, preprompt, tooling, summary, toc, tasks
   data/
-    <slug>.md      # individual content files owned by this component
+    <slug>.md          # one file per TOC entry — the substantive content
     ...
 ```
+
+A top-level `index.json` lists the component IDs in display order:
+
+```
+components-data/
+  index.json           # { "components": ["hypothesis", "literature", …] }
+  hypothesis/
+    component.json
+    data/
+      h1.md
+      h2.md
+      h3.md
+  literature/ …
+  reagents/ …
+  experiments/ …
+  budget/ …
+```
+
+### TOC entry status
+
+Each TOC entry carries a `status` field — one of:
+
+- `ok` — active, going well
+- `pending` — waiting on something
+- `blocked` — actively blocked
+- `done` — finished, no further work
+- `info` — purely informational (no work attached)
+
+Status drives the symbol shown next to each entry inside the open component (`○ ◷ ⊘ ✓ ·`). Component-level status (e.g. for global rollups) is intentionally *not* displayed on summary rows — only the per-entry status is surfaced.
 
 ## Each component has its own chat
 
@@ -53,7 +82,7 @@ This raises a coordination question: when the user's request spans components ("
 
 Open: is the orchestrator a "real" component (with its own preprompt/tooling/data), or a separate construct? Leaning toward "real component" for uniformity, with `data/` being a thin log of routing decisions.
 
-## Cross-component context rules
+## Cross-component context rules (reads)
 
 - Every component has, in its working context, the **TOCs of all other components** plus their **summaries**. This is cheap and always available.
 - A component can **request** the full body of another component's data file on demand (read).
@@ -62,10 +91,51 @@ Open: is the orchestrator a "real" component (with its own preprompt/tooling/dat
 
 This gives us a "everyone sees the table of contents, anyone can ask to read a chapter, nobody edits another component's chapters" model. Write isolation isn't enforced in code yet — it's a design constraint we'll honor and revisit when this becomes a real system.
 
+## Cross-component tasks (writes, structured)
+
+Reads aren't enough. Components also need to *ask each other to do things*: budget asks reagents to confirm a vendor before approving the spend; hypothesis asks experiments to sequence EXP-02 the moment a reagent arrives. To support this without breaking the "no component writes another's data" rule, we introduce **tasks**.
+
+A task is a small structured record:
+
+```json
+{
+  "id": "task-001",
+  "from": "experiments",
+  "to": "hypothesis",
+  "title": "Restate the falsifiable prediction for H1 vs H2",
+  "body": "Before we run EXP-02 (H148A pH curve), spell out the exact pH-curve shapes you'd expect …",
+  "status": "open",
+  "created": "2026-04-22T09:00:00Z"
+}
+```
+
+Status moves through `open → accepted → done`, or `open → declined`.
+
+### Storage: receiver-owned inbox
+
+Each component owns its **inbox** — the `tasks` array inside its own `component.json`. A task addressed to *reagents* is appended to `reagents/component.json#tasks`. Receivers manage status transitions on their own file; nobody else writes to it.
+
+Senders never have their own outbound store; the outbound view is computed by scanning all *other* components' inboxes for entries where `from === self`.
+
+This keeps the strict rule — *components only write their own data* — intact, with one acknowledged carve-out: a sender appends to a receiver's inbox at task creation time. We treat the inbox as conceptually belonging to the receiver (like email), and the sender's "send" as a privileged primitive operation rather than a direct write to data the receiver owns.
+
+### How tasks are created
+
+Tasks are **not** created by the user filling out a form. They are created by a component (running through its chat / preprompt) when the conversation calls for it — the component decides "this is a request for another component" and emits a structured task to that component's inbox.
+
+For the clickdummy, the API to do this exists at `POST /api/tasks` (server appends to the receiver's `component.json#tasks`), but the UI doesn't expose a manual create form. Status transitions go through `PATCH /api/tasks/:componentId/:taskId`.
+
+### How tasks are surfaced
+
+- **Strip rows** show `→ N` next to a component's name when it has open inbound tasks. Nothing else is added at the strip level — keeping the bench overview minimal.
+- **Open component** has a tab strip on the right pane: *Chat | Tasks (in N / out M)*. The Tasks tab lists inbound (from receiver's inbox) and outbound (computed from other inboxes) with status symbols and Accept / Decline / Mark-done controls on the inbound side.
+
 ## Open questions
 
-- **Adding components:** is this a user action, a config file, or chat-driven ("add a budget component")? Likely chat-driven eventually; for the clickdummy, a static list is fine.
-- **Persistence:** for the clickdummy we can keep markdown on disk. Real version probably needs a richer store.
+- **Adding components:** is this a user action, a config file, or chat-driven ("add a budget component")? Likely chat-driven eventually; for the clickdummy, the static list in `index.json` is fine.
+- **Persistence:** for the clickdummy we keep `component.json` + markdown on disk. Real version probably needs a richer store.
 - **Ordering & grouping:** do components have categories (planning / execution / resources / …) or is it a flat list?
 - **Orchestrator shape:** is the orchestrator a normal component or a privileged construct?
-- **Tooling surface:** how do we describe per-component tooling — declarative manifest, code, or natural-language in `tooling.md`?
+- **Tooling surface:** how do we describe per-component tooling — declarative manifest, code, or natural language in `component.json`?
+- **Task creation from chat:** how does a component decide to create a task? Tool-call from the component's LLM during a conversation? Heuristic detection in the orchestrator? Currently the API exists but no automatic emission path is wired up.
+- **Task threading:** tasks today are single records. Comment threads / status notes are not yet modeled.

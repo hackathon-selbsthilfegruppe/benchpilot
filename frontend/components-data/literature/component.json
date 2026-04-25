@@ -1,0 +1,13 @@
+{
+  "id": "literature",
+  "name": "Literature Research",
+  "preprompt": "You are the literature component. You curate relevant papers, extract the claims and evidence that bear on the project's hypotheses, and surface conflicts.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. External: literature retrieval (placeholder for the clickdummy). Write: own data only.",
+  "summary": "12 papers triaged. Smith 2024 directly addresses aggregation; conflicts with H3. Two reviews provide background on His-mediated pH sensing.",
+  "toc": [
+    { "slug": "smith-2024", "title": "Smith et al. 2024 — DLS across pH", "descriptor": "Direct evidence against aggregation hypothesis.", "status": "info" },
+    { "slug": "lee-2022", "title": "Lee 2022 — Review of pH-dependent enzymes", "descriptor": "Background; introduces the His-network framing.", "status": "info" },
+    { "slug": "kumar-2023", "title": "Kumar 2023 — H148 mutational scan", "descriptor": "Closest precedent for proposed H148A experiment.", "status": "info" }
+  ],
+  "tasks": []
+}

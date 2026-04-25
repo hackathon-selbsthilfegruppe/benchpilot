@@ -1,0 +1,32 @@
+{
+  "id": "reagents",
+  "name": "Reagents",
+  "preprompt": "You are the reagents component. You track what reagents the project has, needs, and has on order, and you flag dependencies for planned experiments.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. External: inventory system (placeholder). Write: own data only.",
+  "summary": "Wild-type enzyme available. H148A mutant on order (lead time 3 weeks). Cofactor stock low — reorder pending budget approval.",
+  "toc": [
+    { "slug": "wt-enzyme", "title": "Wild-type enzyme", "descriptor": "In stock; sufficient for the next 6 weeks.", "status": "ok" },
+    { "slug": "h148a-mutant", "title": "H148A mutant", "descriptor": "On order. Required by hypothesis component for H1.", "status": "pending" },
+    { "slug": "cofactor", "title": "Cofactor X", "descriptor": "Stock low; reorder gated on budget review.", "status": "blocked" }
+  ],
+  "tasks": [
+    {
+      "id": "task-002",
+      "from": "budget",
+      "to": "reagents",
+      "title": "Confirm exact spec + vendor for the Cofactor X reorder",
+      "body": "We're about to approve the €1,800 reorder. Confirm catalog number, purity grade, and lead time before I sign off.",
+      "status": "open",
+      "created": "2026-04-23T14:30:00Z"
+    },
+    {
+      "id": "task-003",
+      "from": "experiments",
+      "to": "reagents",
+      "title": "Push for an earlier H148A delivery if possible",
+      "body": "ETA 2026-05-11 is on the critical path. Worth asking the vendor for a rush option even at +20%?",
+      "status": "accepted",
+      "created": "2026-04-21T11:15:00Z"
+    }
+  ]
+}

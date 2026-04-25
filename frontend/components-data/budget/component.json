@@ -1,0 +1,23 @@
+{
+  "id": "budget",
+  "name": "Budget",
+  "preprompt": "You are the budget component. You track committed and discretionary spend, surface upcoming decisions, and answer affordability questions from other components.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. External: finance ledger (placeholder). Write: own data only.",
+  "summary": "Q2 envelope €25k. €14.2k committed, €4.5k pending decisions (cofactor reorder, mutant). Discretionary headroom ~€6.3k.",
+  "toc": [
+    { "slug": "envelope", "title": "Q2 envelope", "descriptor": "€25,000 — fixed, set 2026-03-30.", "status": "info" },
+    { "slug": "commitments", "title": "Committed spend", "descriptor": "€14,200 already on contracts and standing orders.", "status": "ok" },
+    { "slug": "pending", "title": "Pending decisions", "descriptor": "Cofactor reorder + mutant cost — both gated on this component.", "status": "pending" }
+  ],
+  "tasks": [
+    {
+      "id": "task-005",
+      "from": "reagents",
+      "to": "budget",
+      "title": "Approve the Cofactor X reorder",
+      "body": "Stock is at 1.2 g, enough for 4–5 more cofactor-binding assays. EXP-03 cannot run cleanly without restocking. Please approve €1,800.",
+      "status": "open",
+      "created": "2026-04-19T10:00:00Z"
+    }
+  ]
+}
