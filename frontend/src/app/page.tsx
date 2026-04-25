@@ -2,33 +2,57 @@ import {
   loadAllDetails,
   loadComponent,
   loadComponentIds,
-  loadProjectHeaderId,
+  loadHypothesesIndex,
+  loadHypothesis,
   loadSupportingIds,
 } from "@/lib/components-fs";
 import type { BenchComponent } from "@/lib/components-shared";
 import Workbench from "./workbench";
 
-async function hydrate(id: string): Promise<BenchComponent> {
-  const c = await loadComponent(id);
-  return { ...c, details: await loadAllDetails(id) };
+async function hydrateComponent(
+  slug: string,
+  id: string,
+): Promise<BenchComponent> {
+  const c = await loadComponent(slug, id);
+  return { ...c, details: await loadAllDetails(slug, id) };
 }
 
-export default async function Page() {
-  const [ids, supportingIds, projectHeaderId] = await Promise.all([
-    loadComponentIds(),
-    loadSupportingIds(),
-    loadProjectHeaderId(),
+async function hydrateHypothesis(slug: string): Promise<BenchComponent> {
+  const h = await loadHypothesis(slug);
+  return { ...h, details: await loadAllDetails(slug, "hypothesis") };
+}
+
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ hypothesis?: string }>;
+}) {
+  const params = await searchParams;
+  const idx = await loadHypothesesIndex();
+  const requested = params.hypothesis;
+  const activeSlug =
+    requested && idx.hypotheses.some((h) => h.slug === requested)
+      ? requested
+      : idx.active;
+
+  const [primaryIds, supportingIds] = await Promise.all([
+    loadComponentIds(activeSlug),
+    loadSupportingIds(activeSlug),
   ]);
-  const [components, supporting, projectHeader] = await Promise.all([
-    Promise.all(ids.map(hydrate)),
-    Promise.all(supportingIds.map(hydrate)),
-    projectHeaderId ? hydrate(projectHeaderId) : Promise.resolve(null),
+
+  const [components, supporting, hypothesis] = await Promise.all([
+    Promise.all(primaryIds.map((id) => hydrateComponent(activeSlug, id))),
+    Promise.all(supportingIds.map((id) => hydrateComponent(activeSlug, id))),
+    hydrateHypothesis(activeSlug),
   ]);
+
   return (
     <Workbench
       components={components}
       supporting={supporting}
-      projectHeader={projectHeader}
+      hypothesis={hypothesis}
+      hypotheses={idx.hypotheses}
+      activeHypothesisSlug={activeSlug}
     />
   );
 }

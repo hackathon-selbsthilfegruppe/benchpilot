@@ -1,21 +1,17 @@
 import { NextResponse } from "next/server";
 import {
   loadComponent,
-  loadAllComponents,
+  loadComponentIds,
+  loadHypothesis,
+  loadSupportingIds,
   writeComponentTasks,
 } from "@/lib/components-fs";
 import type { Task } from "@/lib/components-shared";
 
 export const runtime = "nodejs";
 
-export async function GET() {
-  const all = await loadAllComponents();
-  return NextResponse.json({
-    tasks: all.flatMap((c) => c.tasks),
-  });
-}
-
 type CreateBody = {
+  hypothesis: string;
   from: string;
   to: string;
   title: string;
@@ -30,10 +26,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { from, to, title, body: text } = body;
-  if (!from || !to || !title?.trim() || !text?.trim()) {
+  const { hypothesis, from, to, title, body: text } = body;
+  if (!hypothesis || !from || !to || !title?.trim() || !text?.trim()) {
     return NextResponse.json(
-      { error: "from, to, title, body required" },
+      { error: "hypothesis, from, to, title, body required" },
       { status: 400 },
     );
   }
@@ -44,12 +40,14 @@ export async function POST(req: Request) {
     );
   }
 
-  let receiver;
-  try {
-    receiver = await loadComponent(to);
-  } catch {
+  const [primaryIds, supportingIds] = await Promise.all([
+    loadComponentIds(hypothesis),
+    loadSupportingIds(hypothesis),
+  ]);
+  const allIds = [...primaryIds, ...supportingIds, "hypothesis"];
+  if (!allIds.includes(to)) {
     return NextResponse.json(
-      { error: `unknown component: ${to}` },
+      { error: `unknown component in this hypothesis: ${to}` },
       { status: 404 },
     );
   }
@@ -64,8 +62,12 @@ export async function POST(req: Request) {
     created: new Date().toISOString(),
   };
 
-  const next = [...receiver.tasks, newTask];
-  await writeComponentTasks(to, next);
+  const owner =
+    to === "hypothesis"
+      ? await loadHypothesis(hypothesis)
+      : await loadComponent(hypothesis, to);
+  const next = [...owner.tasks, newTask];
+  await writeComponentTasks(hypothesis, to, next);
 
   return NextResponse.json({ task: newTask });
 }

@@ -1,0 +1,24 @@
+{
+  "id": "instruments",
+  "name": "Instruments",
+  "preprompt": "You are the instruments component. You track the analytical instruments the project depends on, their availability, and calibration windows. You flag instrument-driven blockers for planned analyses.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. External: shared-instrument booking calendar (placeholder). Write: own data only.",
+  "summary": "EMPA booked 2026-05-13. LA-ICP-MS in calibration through 2026-05-20. XRD freely available. Petrographic microscope routinely free.",
+  "toc": [
+    { "slug": "empa", "title": "Electron microprobe (EMPA)", "descriptor": "Booked 2026-05-13; primary tool for chlorite thermobarometry.", "status": "pending" },
+    { "slug": "la-icpms", "title": "LA-ICP-MS", "descriptor": "In calibration through 2026-05-20.", "status": "blocked" },
+    { "slug": "xrd", "title": "XRD", "descriptor": "Freely available; routine.", "status": "ok" },
+    { "slug": "petrography", "title": "Petrographic microscope", "descriptor": "Routine; no booking needed.", "status": "ok" }
+  ],
+  "tasks": [
+    {
+      "id": "geo-task-002",
+      "from": "analyses",
+      "to": "instruments",
+      "title": "Confirm EMPA standards include the relevant Mg-Fe-Si chlorite reference",
+      "body": "Before the 2026-05-13 EMPA session, please verify the chlorite working reference (Mg# ~50) is in the standards block. Without it the thermobarometry calibration is meaningless.",
+      "status": "open",
+      "created": "2026-04-23T09:00:00Z"
+    }
+  ]
+}

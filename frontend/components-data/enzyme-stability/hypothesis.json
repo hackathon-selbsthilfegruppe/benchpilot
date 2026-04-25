@@ -1,10 +1,12 @@
 {
   "id": "hypothesis",
-  "name": "Hypothesis",
-  "preprompt": "You are the hypothesis component. You propose, refine, and stress-test research hypotheses against the available evidence and constraints from other components.",
+  "slug": "enzyme-stability",
+  "name": "Enzyme pH-stability — His-network vs cofactor displacement",
+  "summary": "What governs enzyme inactivation between pH 4 and 8? Decide between the His-network model (H1) and the cofactor-displacement model (H2) by Q2.",
+  "preprompt": "You are the hypothesis frame for the enzyme pH-stability project. You hold the alternative explanations being weighed (H1, H2, H3), the framing context (question, scope, criteria, constraints), and arbitrate when other components surface evidence relevant to one of them.",
   "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. Write: own data only.",
-  "summary": "Three working hypotheses on enzyme stability under variable pH. H1 currently leading; H3 deprioritized after literature scan.",
   "toc": [
+    { "slug": "framing", "title": "Question, scope, criteria, constraints", "descriptor": "The project frame — what we're answering and how.", "status": "info" },
     { "slug": "h1", "title": "H1 — pH-stabilized active site", "descriptor": "Primary hypothesis. Strongest literature support.", "status": "ok" },
     { "slug": "h2", "title": "H2 — Cofactor displacement at low pH", "descriptor": "Plausible secondary mechanism. Needs reagent check.", "status": "pending" },
     { "slug": "h3", "title": "H3 — Aggregation-driven inactivation", "descriptor": "Deprioritized — conflicts with Smith 2024.", "status": "done" }

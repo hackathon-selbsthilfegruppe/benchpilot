@@ -1,0 +1,13 @@
+{
+  "id": "literature",
+  "name": "Literature",
+  "preprompt": "You are the literature component. You curate relevant papers, extract the claims and evidence that bear on the project's hypotheses, and surface conflicts.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. External: citation manager (placeholder). Write: own data only.",
+  "summary": "Three key references on Pilbara hydrothermal alteration; one regional metamorphism review; two methodology papers on chlorite thermobarometry.",
+  "toc": [
+    { "slug": "kiyokawa-2012", "title": "Kiyokawa et al. 2012 — Pilbara seafloor hydrothermal sequences", "descriptor": "Closest published analogue for our locality.", "status": "info" },
+    { "slug": "vidal-2006", "title": "Vidal et al. 2006 — Chlorite thermobarometry", "descriptor": "Methodology backbone for the EMPA-T derivation.", "status": "info" },
+    { "slug": "buick-2008", "title": "Buick 2008 — Pilbara regional metamorphism", "descriptor": "H2 framing; regional burial-metamorphic record.", "status": "info" }
+  ],
+  "tasks": []
+}

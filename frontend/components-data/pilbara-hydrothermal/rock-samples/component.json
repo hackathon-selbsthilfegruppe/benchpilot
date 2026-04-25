@@ -1,0 +1,14 @@
+{
+  "id": "rock-samples",
+  "name": "Rock Samples",
+  "preprompt": "You are the rock-samples component. You track the physical specimens drawn from field sites: hand specimens, sub-cores, thin sections, and polished mounts. You flag prep status and any chain-of-custody issues.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. External: thin-section lab queue (placeholder). Write: own data only.",
+  "summary": "12 hand specimens logged. 8 thin sections cut, 6 polished. Three sub-cores prepped for EMPA; LA-ICP-MS mounts pending instrument calibration.",
+  "toc": [
+    { "slug": "hand-specimens", "title": "Hand specimens", "descriptor": "12 specimens; fully cataloged.", "status": "ok" },
+    { "slug": "thin-sections", "title": "Thin sections", "descriptor": "8 cut; 6 polished and ready for EMPA.", "status": "ok" },
+    { "slug": "empa-mounts", "title": "EMPA polished mounts", "descriptor": "3 mounts ready; awaiting instrument slot.", "status": "pending" },
+    { "slug": "la-icpms-mounts", "title": "LA-ICP-MS mounts", "descriptor": "Prep gated on instrument calibration.", "status": "blocked" }
+  ],
+  "tasks": []
+}

@@ -1,0 +1,25 @@
+{
+  "id": "hypothesis",
+  "slug": "pilbara-hydrothermal",
+  "name": "Pilbara greenstone records seafloor hydrothermal alteration",
+  "summary": "Did the 3.5 Ga komatiites and chlorite-rich units of the Marble Bar greenstone belt undergo high-temperature seafloor alteration analogous to modern mid-ocean-ridge systems? Decide between a primary seafloor-hydrothermal origin and a later burial-metamorphic overprint by the end of the field season.",
+  "preprompt": "You are the hypothesis frame for the Pilbara hydrothermal alteration project. You hold the alternative explanations being weighed (H1, H2, H3) and the framing context (question, scope, criteria, constraints). Arbitrate when other components surface evidence relevant to one of them.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. Write: own data only.",
+  "toc": [
+    { "slug": "framing", "title": "Question, scope, criteria, constraints", "descriptor": "The project frame — what we're answering and how.", "status": "info" },
+    { "slug": "h1", "title": "H1 — Seafloor hydrothermal alteration", "descriptor": "Primary hypothesis. Mass-balance signatures match modern MOR analogues.", "status": "ok" },
+    { "slug": "h2", "title": "H2 — Burial metamorphic overprint", "descriptor": "Alternative; explains chlorite without a high-T fluid.", "status": "pending" },
+    { "slug": "h3", "title": "H3 — Late-stage epithermal overprint", "descriptor": "Less likely; flagged for completeness.", "status": "info" }
+  ],
+  "tasks": [
+    {
+      "id": "geo-task-001",
+      "from": "analyses",
+      "to": "hypothesis",
+      "title": "Set decision criteria for δ18O signatures",
+      "body": "Before the next batch of EMPA O-isotope analyses, define the δ18O ranges that would distinguish H1 (seafloor hydrothermal, ~+5 to +9 ‰) from H2 (burial, ~+10 to +14 ‰).",
+      "status": "open",
+      "created": "2026-04-22T08:00:00Z"
+    }
+  ]
+}

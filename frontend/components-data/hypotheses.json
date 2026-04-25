@@ -1,0 +1,15 @@
+{
+  "active": "enzyme-stability",
+  "hypotheses": [
+    {
+      "slug": "enzyme-stability",
+      "name": "Enzyme pH-stability — His-network vs cofactor displacement",
+      "domain": "biochemistry"
+    },
+    {
+      "slug": "pilbara-hydrothermal",
+      "name": "Pilbara greenstone records seafloor hydrothermal alteration",
+      "domain": "geology"
+    }
+  ]
+}

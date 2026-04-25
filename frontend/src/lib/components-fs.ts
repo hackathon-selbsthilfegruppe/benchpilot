@@ -15,6 +15,17 @@ export type BenchComponent = {
   tasks: Task[];
 };
 
+export type HypothesisSummary = {
+  slug: string;
+  name: string;
+  domain?: string;
+};
+
+export type HypothesesIndex = {
+  active: string;
+  hypotheses: HypothesisSummary[];
+};
+
 const dataRoot = path.join(process.cwd(), "components-data");
 
 async function readText(file: string): Promise<string> {
@@ -25,97 +36,131 @@ async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await readFile(file, "utf-8")) as T;
 }
 
-function componentFile(id: string): string {
-  return path.join(dataRoot, id, "component.json");
+function hypothesisRoot(slug: string): string {
+  return path.join(dataRoot, slug);
+}
+
+export async function loadHypothesesIndex(): Promise<HypothesesIndex> {
+  return readJson<HypothesesIndex>(path.join(dataRoot, "hypotheses.json"));
+}
+
+export async function loadHypothesis(slug: string): Promise<BenchComponent> {
+  return readJson<BenchComponent>(
+    path.join(hypothesisRoot(slug), "hypothesis.json"),
+  );
 }
 
 type IndexFile = {
-  projectHeader?: string;
   components: string[];
   supporting?: string[];
 };
 
-async function loadIndex(): Promise<IndexFile> {
-  return readJson<IndexFile>(path.join(dataRoot, "index.json"));
+async function loadIndex(slug: string): Promise<IndexFile> {
+  return readJson<IndexFile>(path.join(hypothesisRoot(slug), "index.json"));
+}
+
+export async function loadComponentIds(slug: string): Promise<string[]> {
+  return (await loadIndex(slug)).components;
+}
+
+export async function loadSupportingIds(slug: string): Promise<string[]> {
+  return (await loadIndex(slug)).supporting ?? [];
 }
 
 export async function writeIndex(
+  slug: string,
   components: string[],
   supporting: string[],
 ): Promise<void> {
-  const current = await loadIndex();
+  const current = await loadIndex(slug);
   const next: IndexFile = {
     ...current,
     components,
     supporting,
   };
   await writeFile(
-    path.join(dataRoot, "index.json"),
+    path.join(hypothesisRoot(slug), "index.json"),
     JSON.stringify(next, null, 2) + "\n",
     "utf-8",
   );
 }
 
-export async function loadComponentIds(): Promise<string[]> {
-  const index = await loadIndex();
-  return index.components;
+function componentFile(slug: string, id: string): string {
+  return path.join(hypothesisRoot(slug), id, "component.json");
 }
 
-export async function loadSupportingIds(): Promise<string[]> {
-  const index = await loadIndex();
-  return index.supporting ?? [];
+export async function loadComponent(
+  slug: string,
+  id: string,
+): Promise<BenchComponent> {
+  return readJson<BenchComponent>(componentFile(slug, id));
 }
 
-export async function loadProjectHeaderId(): Promise<string | null> {
-  const index = await loadIndex();
-  return index.projectHeader ?? null;
-}
-
-export async function loadComponent(id: string): Promise<BenchComponent> {
-  return readJson<BenchComponent>(componentFile(id));
-}
-
-export async function writeComponent(component: BenchComponent): Promise<void> {
+export async function writeComponent(
+  slug: string,
+  component: BenchComponent,
+): Promise<void> {
   await writeFile(
-    componentFile(component.id),
+    componentFile(slug, component.id),
     JSON.stringify(component, null, 2) + "\n",
     "utf-8",
   );
 }
 
+export async function writeHypothesis(
+  slug: string,
+  hypothesis: BenchComponent,
+): Promise<void> {
+  await writeFile(
+    path.join(hypothesisRoot(slug), "hypothesis.json"),
+    JSON.stringify(hypothesis, null, 2) + "\n",
+    "utf-8",
+  );
+}
+
 export async function writeComponentTasks(
+  slug: string,
   id: string,
   tasks: Task[],
 ): Promise<void> {
-  const component = await loadComponent(id);
-  await writeComponent({ ...component, tasks });
-}
-
-export async function loadAllComponents(): Promise<BenchComponent[]> {
-  const ids = await loadComponentIds();
-  return Promise.all(ids.map(loadComponent));
+  if (id === "hypothesis") {
+    const h = await loadHypothesis(slug);
+    await writeHypothesis(slug, { ...h, tasks });
+    return;
+  }
+  const component = await loadComponent(slug, id);
+  await writeComponent(slug, { ...component, tasks });
 }
 
 export async function loadDetail(
-  componentId: string,
   slug: string,
+  componentId: string,
+  detailSlug: string,
 ): Promise<DetailDoc> {
-  const component = await loadComponent(componentId);
-  const tocEntry = component.toc.find((t) => t.slug === slug);
+  const isHypothesis = componentId === "hypothesis";
+  const owner = isHypothesis
+    ? await loadHypothesis(slug)
+    : await loadComponent(slug, componentId);
+  const tocEntry = owner.toc.find((t) => t.slug === detailSlug);
   if (!tocEntry) {
-    throw new Error(`No TOC entry for ${componentId}/${slug}`);
+    throw new Error(`No TOC entry for ${componentId}/${detailSlug}`);
   }
-  const body = await readText(
-    path.join(dataRoot, componentId, "data", `${slug}.md`),
-  );
-  return { slug, title: tocEntry.title, body };
+  const dataDir = isHypothesis
+    ? path.join(hypothesisRoot(slug), "data")
+    : path.join(hypothesisRoot(slug), componentId, "data");
+  const body = await readText(path.join(dataDir, `${detailSlug}.md`));
+  return { slug: detailSlug, title: tocEntry.title, body };
 }
 
 export async function loadAllDetails(
+  slug: string,
   componentId: string,
 ): Promise<DetailDoc[]> {
-  const component = await loadComponent(componentId);
+  const isHypothesis = componentId === "hypothesis";
+  const owner = isHypothesis
+    ? await loadHypothesis(slug)
+    : await loadComponent(slug, componentId);
   return Promise.all(
-    component.toc.map((entry) => loadDetail(componentId, entry.slug)),
+    owner.toc.map((entry) => loadDetail(slug, componentId, entry.slug)),
   );
 }
