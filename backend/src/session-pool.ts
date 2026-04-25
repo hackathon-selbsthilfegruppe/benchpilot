@@ -10,6 +10,7 @@ import {
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 
+import { extractLatestAssistantOutcome } from "./assistant-message.js";
 import { resolvePreferredModel } from "./model-selection.js";
 import { buildRoleSystemPrompt, ensureRoleWorkspace, normalizeRoleDefinition } from "./roles.js";
 import { normalizeSessionEvent } from "./stream-events.js";
@@ -148,12 +149,24 @@ export class SessionPool {
       managed.summary.status = "idle";
       managed.summary.lastUsedAt = new Date().toISOString();
       managed.summary.modelId = managed.session.model?.id;
-      onEvent({
-        type: "message_completed",
-        sessionId,
-        roleId: managed.summary.role.id,
-        assistantText: extractLatestAssistantText(managed.session.messages),
-      });
+
+      const outcome = extractLatestAssistantOutcome(managed.session.messages);
+      if (outcome.error) {
+        managed.summary.lastError = outcome.error;
+        onEvent({
+          type: "session_error",
+          sessionId,
+          roleId: managed.summary.role.id,
+          error: outcome.error,
+        });
+      } else {
+        onEvent({
+          type: "message_completed",
+          sessionId,
+          roleId: managed.summary.role.id,
+          assistantText: outcome.text,
+        });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       managed.summary.status = "error";
@@ -203,28 +216,4 @@ export class SessionPool {
   }
 }
 
-function extractLatestAssistantText(messages: unknown[]): string | null {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index] as any;
-    if (message?.role !== "assistant") {
-      continue;
-    }
-
-    const content = message.content;
-    if (typeof content === "string") {
-      return content;
-    }
-
-    if (Array.isArray(content)) {
-      const text = content
-        .filter((part) => part?.type === "text" && typeof part.text === "string")
-        .map((part) => part.text)
-        .join("\n")
-        .trim();
-      return text || null;
-    }
-  }
-
-  return null;
-}
 

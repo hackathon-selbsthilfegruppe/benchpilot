@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  createSession,
+  prewarmSessions,
+  streamSessionPrompt,
+  type BenchpilotSessionSummary,
+  type SessionRoleInput,
+} from "@/lib/benchpilot-client";
 import type {
   BenchComponent,
   DetailDoc,
@@ -16,6 +23,17 @@ type Message = { role: "user" | "agent"; text: string };
 type ChatId = "orchestrator" | string;
 
 type Theme = "light" | "dark";
+
+type ToolActivity = {
+  name: string;
+  summary: string;
+};
+
+const DEFAULT_SESSION_ROLES: SessionRoleInput[] = [
+  { id: "orchestrator", name: "Orchestrator", description: "Routes requests across components." },
+  { id: "hypothesis", name: "Hypothesis Generator" },
+  { id: "literature", name: "Literature Research" },
+];
 
 const TASK_STATUS_SYMBOL: Record<TaskStatus, string> = {
   open: "○",
@@ -54,6 +72,9 @@ export default function Workbench({
     ],
   });
   const [pending, setPending] = useState<Record<ChatId, boolean>>({});
+  const [streamingText, setStreamingText] = useState<Record<ChatId, string>>({});
+  const [activeTool, setActiveTool] = useState<Record<ChatId, ToolActivity | undefined>>({});
+  const [sessionsByRoleId, setSessionsByRoleId] = useState<Record<string, BenchpilotSessionSummary>>({});
   const [theme, setTheme] = useState<Theme>("dark");
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
@@ -83,55 +104,118 @@ export default function Workbench({
     } catch {}
   }, [theme]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapSessions() {
+      try {
+        const sessions = await prewarmSessions(DEFAULT_SESSION_ROLES);
+        if (cancelled) return;
+        setSessionsByRoleId((prev) => mergeSessions(prev, sessions));
+      } catch (err) {
+        if (cancelled) return;
+        const message = err instanceof Error ? err.message : String(err);
+        setChats((prev) => ({
+          ...prev,
+          orchestrator: [
+            ...(prev.orchestrator ?? []),
+            {
+              role: "agent",
+              text: `[error] Failed to prewarm backend sessions: ${message}`,
+            },
+          ],
+        }));
+      }
+    }
+
+    void bootstrapSessions();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function send(chatId: ChatId, text: string) {
     if (!text.trim()) return;
     if (pending[chatId]) return;
 
-    const userMessage: Message = { role: "user", text };
-    const priorMessages = chats[chatId] ?? [];
-    const nextMessages = [...priorMessages, userMessage];
+    const trimmed = text.trim();
+    const userMessage: Message = { role: "user", text: trimmed };
 
-    setChats((prev) => ({ ...prev, [chatId]: nextMessages }));
+    setChats((prev) => ({
+      ...prev,
+      [chatId]: [...(prev[chatId] ?? []), userMessage],
+    }));
     setPending((prev) => ({ ...prev, [chatId]: true }));
+    setStreamingText((prev) => ({ ...prev, [chatId]: "" }));
+    setActiveTool((prev) => ({ ...prev, [chatId]: undefined }));
+
+    let streamedText = "";
 
     try {
-      const apiMessages = nextMessages
-        .filter((m) => m.role === "user" || m.role === "agent")
-        .map((m) => ({
-          role: m.role === "user" ? "user" : "assistant",
-          content: m.text,
-        }));
+      const session = await ensureSession(
+        chatId,
+        sessionsByRoleId,
+        components,
+        supporting,
+        hypothesisState,
+        setSessionsByRoleId,
+      );
 
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hypothesis: activeHypothesisSlug,
-          scope: chatId,
-          messages: apiMessages,
-        }),
+      await streamSessionPrompt(session.id, trimmed, (event) => {
+        if (event.type === "message_delta") {
+          streamedText += event.text;
+          setStreamingText((prev) => ({
+            ...prev,
+            [chatId]: (prev[chatId] ?? "") + event.text,
+          }));
+          return;
+        }
+
+        if (event.type === "tool_started") {
+          setActiveTool((prev) => ({
+            ...prev,
+            [chatId]: { name: event.toolName, summary: event.summary },
+          }));
+          return;
+        }
+
+        if (event.type === "tool_finished") {
+          setActiveTool((prev) => ({ ...prev, [chatId]: undefined }));
+          return;
+        }
+
+        if (event.type === "message_completed") {
+          const assistantText = event.assistantText ?? streamedText;
+          if (assistantText) {
+            setChats((prev) => ({
+              ...prev,
+              [chatId]: [...(prev[chatId] ?? []), { role: "agent", text: assistantText }],
+            }));
+          }
+          setStreamingText((prev) => ({ ...prev, [chatId]: "" }));
+          setActiveTool((prev) => ({ ...prev, [chatId]: undefined }));
+          setPending((prev) => ({ ...prev, [chatId]: false }));
+          return;
+        }
+
+        if (event.type === "session_error") {
+          setChats((prev) => ({
+            ...prev,
+            [chatId]: [...(prev[chatId] ?? []), { role: "agent", text: `[error] ${event.error}` }],
+          }));
+          setStreamingText((prev) => ({ ...prev, [chatId]: "" }));
+          setActiveTool((prev) => ({ ...prev, [chatId]: undefined }));
+          setPending((prev) => ({ ...prev, [chatId]: false }));
+        }
       });
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errBody}`);
-      }
-
-      const { reply } = (await res.json()) as { reply: string };
-      setChats((prev) => ({
-        ...prev,
-        [chatId]: [...(prev[chatId] ?? []), { role: "agent", text: reply }],
-      }));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setChats((prev) => ({
         ...prev,
-        [chatId]: [
-          ...(prev[chatId] ?? []),
-          { role: "agent", text: `[error] ${message}` },
-        ],
+        [chatId]: [...(prev[chatId] ?? []), { role: "agent", text: `[error] ${message}` }],
       }));
-    } finally {
+      setStreamingText((prev) => ({ ...prev, [chatId]: "" }));
+      setActiveTool((prev) => ({ ...prev, [chatId]: undefined }));
       setPending((prev) => ({ ...prev, [chatId]: false }));
     }
   }
@@ -242,6 +326,8 @@ export default function Workbench({
       <OrchestratorPanel
         messages={chats.orchestrator ?? []}
         pending={!!pending.orchestrator}
+        streamingText={streamingText.orchestrator}
+        activeTool={activeTool.orchestrator}
         onSend={(t) => send("orchestrator", t)}
       />
       <ComponentStrip
@@ -255,6 +341,8 @@ export default function Workbench({
         onClose={() => setActiveId(null)}
         chats={chats}
         pending={pending}
+        streamingText={streamingText}
+        activeTool={activeTool}
         sendToComponent={(id, text) => send(id, text)}
         openDetail={openDetail}
         setOpenDetail={(id, slug) =>
@@ -283,13 +371,82 @@ export default function Workbench({
   );
 }
 
+function mergeSessions(
+  current: Record<string, BenchpilotSessionSummary>,
+  sessions: BenchpilotSessionSummary[],
+) {
+  const next = { ...current };
+  for (const session of sessions) {
+    next[session.role.id] = session;
+  }
+  return next;
+}
+
+async function ensureSession(
+  chatId: ChatId,
+  sessionsByRoleId: Record<string, BenchpilotSessionSummary>,
+  components: BenchComponent[],
+  supporting: BenchComponent[],
+  hypothesis: BenchComponent,
+  setSessionsByRoleId: (
+    updater: (prev: Record<string, BenchpilotSessionSummary>) => Record<string, BenchpilotSessionSummary>,
+  ) => void,
+): Promise<BenchpilotSessionSummary> {
+  const existing = sessionsByRoleId[chatId];
+  if (existing) {
+    return existing;
+  }
+
+  const created = await createSession(
+    resolveRoleInput(chatId, components, supporting, hypothesis),
+  );
+  setSessionsByRoleId((prev) => ({ ...prev, [created.role.id]: created }));
+  return created;
+}
+
+function resolveRoleInput(
+  chatId: ChatId,
+  components: BenchComponent[],
+  supporting: BenchComponent[],
+  hypothesis: BenchComponent,
+): SessionRoleInput {
+  if (chatId === "orchestrator") {
+    return {
+      id: "orchestrator",
+      name: "Orchestrator",
+      description: "Routes requests across components.",
+    };
+  }
+
+  const component = [hypothesis, ...components, ...supporting].find(
+    (entry) => entry.id === chatId,
+  );
+
+  if (component) {
+    return {
+      id: component.id,
+      name: component.name,
+      description: component.summary,
+    };
+  }
+
+  return {
+    id: chatId,
+    name: chatId,
+  };
+}
+
 function OrchestratorPanel({
   messages,
   pending,
+  streamingText,
+  activeTool,
   onSend,
 }: {
   messages: Message[];
   pending: boolean;
+  streamingText?: string;
+  activeTool?: ToolActivity;
   onSend: (text: string) => void;
 }) {
   return (
@@ -301,7 +458,13 @@ function OrchestratorPanel({
         </h1>
         <span className="ml-auto text-xs text-subtle">always on</span>
       </header>
-      <ChatLog messages={messages} pending={pending} className="flex-1" />
+      <ChatLog
+        messages={messages}
+        pending={pending}
+        streamingText={streamingText}
+        activeTool={activeTool}
+        className="flex-1"
+      />
       <ChatInput
         placeholder="Ask the orchestrator…"
         onSend={onSend}
@@ -448,6 +611,8 @@ function ComponentStrip({
   onClose,
   chats,
   pending,
+  streamingText,
+  activeTool,
   sendToComponent,
   openDetail,
   setOpenDetail,
@@ -474,6 +639,8 @@ function ComponentStrip({
   onClose: () => void;
   chats: Record<ChatId, Message[]>;
   pending: Record<ChatId, boolean>;
+  streamingText: Record<ChatId, string>;
+  activeTool: Record<ChatId, ToolActivity | undefined>;
   sendToComponent: (id: string, text: string) => void;
   openDetail: Record<string, string>;
   setOpenDetail: (id: string, slug: string) => void;
@@ -517,6 +684,8 @@ function ComponentStrip({
         onClose={onClose}
         chatMessages={chats[c.id] ?? []}
         chatPending={!!pending[c.id]}
+        chatStreamingText={streamingText[c.id]}
+        chatActiveTool={activeTool[c.id]}
         onSendChat={(t) => sendToComponent(c.id, t)}
         detailDoc={detailDoc}
         onSelectDetail={(slug) => setOpenDetail(c.id, slug)}
@@ -563,6 +732,8 @@ function ComponentStrip({
           onClose={onClose}
           chatMessages={chats[hypothesis.id] ?? []}
           chatPending={!!pending[hypothesis.id]}
+          chatStreamingText={streamingText[hypothesis.id]}
+          chatActiveTool={activeTool[hypothesis.id]}
           onSendChat={(t) => sendToComponent(hypothesis.id, t)}
           detailDoc={detailDoc}
           onSelectDetail={(slug) => setOpenDetail(hypothesis.id, slug)}
@@ -667,6 +838,8 @@ function ComponentCard({
   onClose,
   chatMessages,
   chatPending,
+  chatStreamingText,
+  chatActiveTool,
   onSendChat,
   detailDoc,
   onSelectDetail,
@@ -694,6 +867,8 @@ function ComponentCard({
   onClose: () => void;
   chatMessages: Message[];
   chatPending: boolean;
+  chatStreamingText?: string;
+  chatActiveTool?: ToolActivity;
   onSendChat: (text: string) => void;
   detailDoc: DetailDoc | undefined;
   onSelectDetail: (slug: string) => void;
@@ -900,6 +1075,8 @@ function ComponentCard({
                       ]
                 }
                 pending={chatPending}
+                streamingText={chatStreamingText}
+                activeTool={chatActiveTool}
                 className="flex-1"
               />
               <ChatInput
@@ -1095,10 +1272,14 @@ function TaskActions({
 function ChatLog({
   messages,
   pending,
+  streamingText,
+  activeTool,
   className,
 }: {
   messages: Message[];
   pending?: boolean;
+  streamingText?: string;
+  activeTool?: ToolActivity;
   className?: string;
 }) {
   return (
@@ -1116,7 +1297,18 @@ function ChatLog({
             {m.role === "agent" ? <Markdown>{m.text}</Markdown> : m.text}
           </li>
         ))}
-        {pending && (
+        {activeTool && (
+          <li className="mr-auto max-w-[95%] rounded-lg border border-border bg-surface px-3 py-2 text-xs text-subtle">
+            using <span className="font-semibold text-foreground">{activeTool.name}</span>
+            {activeTool.summary ? `: ${activeTool.summary}` : ""}
+          </li>
+        )}
+        {streamingText && (
+          <li className="mr-auto max-w-[90%] rounded-lg bg-agent-bubble px-3 py-2 text-sm leading-relaxed text-agent-bubble-fg">
+            <Markdown>{streamingText}</Markdown>
+          </li>
+        )}
+        {pending && !streamingText && (
           <li className="mr-auto rounded-lg bg-agent-bubble px-3 py-2 text-sm text-subtle">
             <span className="inline-flex gap-1">
               <span className="animate-pulse">·</span>
