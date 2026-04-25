@@ -22,13 +22,14 @@ The product is built up in steps so we can validate each layer of structure befo
 
 ### Hypothesis intake flow (step 0 detail)
 
-The start page is a single live surface with three panels that share one orchestrator session:
+The start page is a single route (`/start` or `/`) with **two steps** behind a segmented control: `[ 1. Hypothesis ] [ 2. Protocols ]`. Both step views stay mounted so going back and forth is free and lossless. There is one shared orchestrator session for the whole intake.
 
-1. **Hypothesis** — free-form text plus a chat with the orchestrator that can suggest revisions. When the orchestrator emits a `Revised question:` line, the question textarea is updated in place.
-2. **Protocol discovery** — fans out to all configured `ProtocolSource` adapters (see *Protocol-source adapters* below) and shows candidate protocols as keep/drop cards. Default state is "keep all."
-3. **Protocol template** — the orchestrator is given the (refined) question plus the kept protocols and asked for a single fenced JSON block with the shape `{ hypothesis: { name, summary, preprompt }, components: [...], supporting?: [...] }`. The result is parsed into editable component skeletons.
+1. **Hypothesis** — a chat with the orchestrator. The agreed-upon question lives as a single editable line above the chat (not a separate textarea); when the orchestrator suggests a revision the line updates in place. There is one input surface (the chat box) so the user is never asked "type your question — but also chat about it" at the same time.
+2. **Protocols** — a search across all configured `ProtocolSource` adapters (see *Protocol-source adapters* below). Cards are keep/drop with default-keep. This step is also where **Finalize** lives.
 
-"Finalize" turns the template into a real bench: it allocates a unique slug, writes `hypothesis.json`, an `index.json`, and one `component.json` per drafted component (with empty TOC and tasks), updates `hypotheses.json`, and routes the user to `/bench/<slug>`. From there the existing bench takes over.
+There is **no preview-of-the-bench step**. The components the orchestrator drafts are not editable on a third intake screen — they are edited *on the bench*, which is the place that already has the right tools for editing components.
+
+"Finalize" runs the template-draft prompt through the same orchestrator session (showing an inline status line — "drafting template… creating bench…" — because the LLM round-trip is several seconds), parses the fenced JSON, then POSTs to `POST /api/hypotheses`. The server allocates a unique slug, writes `hypothesis.json`, an `index.json`, and one `component.json` per drafted component (with empty TOC and tasks), updates `hypotheses.json`, and the user is routed to `/bench/<slug>`. From there the existing bench takes over.
 
 ## What a component is
 

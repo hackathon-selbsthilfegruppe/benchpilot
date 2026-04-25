@@ -30,10 +30,12 @@ That keeps the product moving even if the shared data model is still evolving.
 ## Milestone 0 — Hypothesis intake (✅ shipped)
 
 Deliverables (all in the Next.js app, not the Node backend):
-- start page at `/` with three panels (hypothesis chat refinement, protocol-source search, template draft) sharing one orchestrator session
+- start page at `/` as a two-step segmented intake (`Hypothesis` view ⇄ `Protocols` view), single shared orchestrator session, both views stay mounted so back-and-forth is lossless
 - `POST /api/protocol-sources/search` over a pluggable `ProtocolSource` adapter set (currently only protocols.io)
 - JSON-fenced template parser (`frontend/src/lib/hypothesis-template.ts`) and on-disk materializer (`frontend/src/lib/hypothesis-fs.ts`)
 - `POST /api/hypotheses` writes `hypothesis.json`, `index.json`, and one `component.json` per drafted component, then routes to `/bench/<slug>`
+
+The template draft runs as a final orchestrator prompt during Finalize (no preview step on the start page — components are edited on the bench).
 
 This sits *before* Milestone A in user flow but doesn't block it: it leans on the same orchestrator session endpoint Milestone A delivers.
 

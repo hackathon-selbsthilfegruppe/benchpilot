@@ -11,13 +11,14 @@ The hypothesis switcher inside the workbench navigates to `/bench/<slug>` (no mo
 
 ## Start page
 
-The start page is the new entry point. It has three panels, all sharing one orchestrator session so the chat context carries forward:
+The start page is the new entry point. It is a single route with **two views** swapped behind a segmented control (`[ 1. Hypothesis ] [ 2. Protocols ]`). Both views stay mounted so back-and-forth is free and lossless. There is one orchestrator session shared by the whole intake.
 
-1. **Hypothesis** — a textarea plus a chat where the user can ask the orchestrator to refine the research question. When the orchestrator emits a line beginning with `Revised question:` the textarea is updated in place.
-2. **Protocol discovery** — fans out to all configured `ProtocolSource` adapters via `POST /api/protocol-sources/search` and shows candidate protocols as keep/drop cards (default: keep all).
-3. **Protocol template** — sends the kept hypothesis text plus the kept protocols to the orchestrator and asks for a single fenced-JSON template (`{ hypothesis, components, supporting? }`). The result is parsed into editable component skeletons.
+1. **Hypothesis view** — chat-only input. The current question lives as a single editable line above the chat; when the orchestrator suggests a revision (a line beginning with `Revised question:`) the line updates in place.
+2. **Protocols view** — search runs against `POST /api/protocol-sources/search` (kicks off automatically the first time the user lands here for a given question). Cards are keep/drop with default-keep. This view also owns the **Finalize** button.
 
-"Finalize" POSTs the template to `POST /api/hypotheses`, which writes the bench files on disk, then routes to `/bench/<slug>`.
+There is intentionally **no third "preview the bench" step**. Component editing happens on the bench itself.
+
+"Finalize" runs the template-draft prompt through the same orchestrator session, parses the fenced JSON, POSTs to `POST /api/hypotheses`, and routes to `/bench/<slug>`. An inline status line ("drafting template… creating bench…") covers the LLM round-trip.
 
 ## Layout: the workbench
 

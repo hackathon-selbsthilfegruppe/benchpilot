@@ -10,7 +10,6 @@ import {
 import {
   buildDraftPrompt,
   parseTemplateDraft,
-  type ProtocolTemplateDraft,
 } from "@/lib/hypothesis-template";
 import { Markdown } from "./markdown";
 
@@ -32,6 +31,8 @@ type SourceResult = {
 };
 
 type ChatTurn = { role: "user" | "agent"; text: string };
+type Step = "hypothesis" | "protocols";
+type FinalizeStage = null | "drafting" | "creating";
 
 type HypothesisOption = { slug: string; name: string; domain?: string };
 
@@ -47,11 +48,12 @@ export default function Start({
   existingHypotheses: HypothesisOption[];
 }) {
   const router = useRouter();
+  const [step, setStep] = useState<Step>("hypothesis");
   const [question, setQuestion] = useState("");
   const [chat, setChat] = useState<ChatTurn[]>([
     {
       role: "agent",
-      text: "Tell me what you want to find out. I'll help refine the question, then we'll search published protocols and sketch a protocol template together.",
+      text: "Tell me what you want to find out. I'll help refine the question. When you're happy with it, head to step 2 to pull related protocols and create the bench.",
     },
   ]);
   const [chatInput, setChatInput] = useState("");
@@ -61,13 +63,11 @@ export default function Start({
   const [error, setError] = useState<string | null>(null);
 
   const [searching, setSearching] = useState(false);
+  const [searchedQuery, setSearchedQuery] = useState<string | null>(null);
   const [sources, setSources] = useState<SourceResult[]>([]);
   const [kept, setKept] = useState<Record<string, boolean>>({});
 
-  const [drafting, setDrafting] = useState(false);
-  const [template, setTemplate] = useState<ProtocolTemplateDraft | null>(null);
-  const [rawDraft, setRawDraft] = useState<string>("");
-  const [finalizing, setFinalizing] = useState(false);
+  const [finalizeStage, setFinalizeStage] = useState<FinalizeStage>(null);
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -116,7 +116,7 @@ export default function Start({
     setChatInput("");
     try {
       const reply = await runOrchestrator(
-        `The user is iterating on their research question. Current draft:\n\n${question.trim() || "(empty)"}\n\nUser says: ${text}\n\nReply briefly. If you suggest concrete edits to the question, also restate the full revised question on its own paragraph prefixed with "Revised question:".`,
+        `The user is iterating on their research question. Current draft: "${question.trim() || "(empty)"}".\n\nUser says: ${text}\n\nReply briefly. If you suggest concrete edits to the question, also restate the full revised question on its own line prefixed with "Revised question:".`,
       );
       setChat((prev) => [...prev, { role: "agent", text: reply }]);
       const revised = extractRevisedQuestion(reply);
@@ -126,8 +126,7 @@ export default function Start({
     }
   }
 
-  async function searchProtocols() {
-    const q = question.trim();
+  async function searchProtocols(q: string) {
     if (!q || searching) return;
     setError(null);
     setSearching(true);
@@ -148,6 +147,7 @@ export default function Start({
         for (const h of src.hits) next[hitKey(h)] = true;
       }
       setKept(next);
+      setSearchedQuery(q);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -155,14 +155,21 @@ export default function Start({
     }
   }
 
-  async function draftTemplate() {
-    const q = question.trim();
-    if (!q || drafting) return;
+  function goToProtocols() {
     setError(null);
-    setDrafting(true);
-    setTemplate(null);
-    setRawDraft("");
+    setStep("protocols");
+    const q = question.trim();
+    if (q && q !== searchedQuery && !searching) {
+      void searchProtocols(q);
+    }
+  }
+
+  async function finalize() {
+    const q = question.trim();
+    if (!q || finalizeStage) return;
+    setError(null);
     try {
+      setFinalizeStage("drafting");
       const protocols = sources
         .flatMap((s) => s.hits)
         .filter((h) => kept[hitKey(h)])
@@ -172,28 +179,10 @@ export default function Start({
           url: h.url,
           description: h.description,
         }));
-      const prompt = buildDraftPrompt({ question: q, protocols });
-      const reply = await runOrchestrator(prompt);
-      setRawDraft(reply);
-      const parsed = parseTemplateDraft(reply);
-      setTemplate(parsed);
-      setChat((prev) => [
-        ...prev,
-        { role: "user", text: "(drafted protocol template)" },
-        { role: "agent", text: "Drafted a template — review it on the right and Finalize when ready." },
-      ]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setDrafting(false);
-    }
-  }
+      const reply = await runOrchestrator(buildDraftPrompt({ question: q, protocols }));
+      const template = parseTemplateDraft(reply);
 
-  async function finalize() {
-    if (!template || finalizing) return;
-    setError(null);
-    setFinalizing(true);
-    try {
+      setFinalizeStage("creating");
       const res = await fetch("/api/hypotheses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -207,22 +196,26 @@ export default function Start({
       router.push(`/bench/${body.slug}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setFinalizing(false);
+      setFinalizeStage(null);
     }
   }
 
-  function updateComponent(idx: number, patch: Partial<ProtocolTemplateDraft["components"][number]>) {
-    if (!template) return;
-    const next = { ...template, components: [...template.components] };
-    next.components[idx] = { ...next.components[idx], ...patch };
-    setTemplate(next);
-  }
+  const keptCount = sources
+    .flatMap((s) => s.hits)
+    .filter((h) => kept[hitKey(h)]).length;
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <header className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-6 py-3">
         <span className="text-sm font-semibold">BenchPilot — start</span>
-        <span className="text-xs text-subtle">Define a hypothesis, pull related protocols, draft a component template.</span>
+        <div className="ml-3 flex items-center gap-1 rounded-md border border-border-strong bg-surface p-0.5 text-xs">
+          <StepButton active={step === "hypothesis"} onClick={() => setStep("hypothesis")}>
+            1. Hypothesis
+          </StepButton>
+          <StepButton active={step === "protocols"} onClick={goToProtocols} disabled={!question.trim()}>
+            2. Protocols{keptCount > 0 ? ` (${keptCount})` : ""}
+          </StepButton>
+        </div>
         <div className="ml-auto flex items-center gap-2 text-xs">
           {existingHypotheses.length > 0 && (
             <>
@@ -251,208 +244,298 @@ export default function Start({
         </div>
       )}
 
-      <main className="flex flex-1 flex-col gap-6 p-6 lg:flex-row">
-        <section className="flex w-full flex-col gap-3 lg:w-[28rem]">
-          <Panel title="1. Hypothesis" subtitle="Refine with the orchestrator">
-            <textarea
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="What's the research question or hypothesis?"
-              className="min-h-[8rem] w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm leading-relaxed text-foreground"
+      <main className="flex flex-1 justify-center p-6">
+        <div className="flex w-full max-w-3xl flex-col gap-4">
+          <div hidden={step !== "hypothesis"} className="flex flex-1 flex-col gap-3">
+            <HypothesisView
+              question={question}
+              onQuestionChange={setQuestion}
+              chat={chat}
+              chatInput={chatInput}
+              onChatInputChange={setChatInput}
+              onSend={() => void sendChat()}
+              streaming={streaming}
+              pending={pending}
+              chatScrollRef={chatScrollRef}
+              onContinue={goToProtocols}
             />
-            <div ref={chatScrollRef} className="mt-2 max-h-72 overflow-y-auto rounded-md border border-border bg-surface px-3 py-2 text-sm">
-              {chat.map((turn, i) => (
-                <ChatBubble key={i} turn={turn} />
-              ))}
-              {streaming && <ChatBubble turn={{ role: "agent", text: streaming }} />}
-              {pending && !streaming && <span className="text-xs text-subtle">orchestrator thinking…</span>}
-            </div>
-            <div className="mt-2 flex gap-2">
-              <input
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void sendChat();
-                  }
-                }}
-                placeholder="Ask the orchestrator to refine, narrow, or sharpen…"
-                className="flex-1 rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-foreground"
-                disabled={pending}
-              />
-              <button
-                type="button"
-                onClick={() => void sendChat()}
-                disabled={pending || !chatInput.trim()}
-                className="rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-              >
-                Send
-              </button>
-            </div>
-          </Panel>
-        </section>
-
-        <section className="flex w-full flex-col gap-3 lg:w-[28rem]">
-          <Panel title="2. Protocol discovery" subtitle="Search across configured sources">
-            <button
-              type="button"
-              onClick={() => void searchProtocols()}
-              disabled={!question.trim() || searching}
-              className="self-start rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-            >
-              {searching ? "Searching…" : "Search protocols"}
-            </button>
-            <div className="mt-2 flex max-h-[32rem] flex-col gap-3 overflow-y-auto pr-1">
-              {sources.length === 0 && !searching && (
-                <p className="text-xs text-subtle">Run a search to pull candidate protocols.</p>
-              )}
-              {sources.map((src) => (
-                <div key={src.sourceId} className="rounded-md border border-border bg-surface p-2">
-                  <div className="mb-2 flex items-center justify-between text-xs font-semibold text-subtle">
-                    <span>{src.sourceId}</span>
-                    <span>{src.error ? "error" : `${src.hits.length} hits`}</span>
-                  </div>
-                  {src.error && (
-                    <p className="text-xs text-status-blocked">{src.error}</p>
-                  )}
-                  <ul className="flex flex-col gap-2">
-                    {src.hits.map((h) => {
-                      const k = hitKey(h);
-                      const keep = kept[k] ?? true;
-                      return (
-                        <li key={k} className={`rounded-md border p-2 text-xs ${keep ? "border-accent bg-accent-soft text-accent-soft-fg" : "border-border bg-surface-elev"}`}>
-                          <div className="flex items-start gap-2">
-                            <input
-                              type="checkbox"
-                              checked={keep}
-                              onChange={(e) => setKept((prev) => ({ ...prev, [k]: e.target.checked }))}
-                              className="mt-1"
-                            />
-                            <div className="flex-1">
-                              <a href={h.url} target="_blank" rel="noreferrer" className="font-semibold underline">
-                                {h.title}
-                              </a>
-                              {h.authors && <div className="text-[11px] opacity-80">{h.authors}</div>}
-                              {h.description && <div className="mt-1 leading-snug">{h.description}</div>}
-                            </div>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </Panel>
-        </section>
-
-        <section className="flex w-full flex-1 flex-col gap-3">
-          <Panel title="3. Protocol template" subtitle="Orchestrator drafts the components">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void draftTemplate()}
-                disabled={!question.trim() || drafting}
-                className="rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-              >
-                {drafting ? "Drafting…" : template ? "Re-draft" : "Draft template"}
-              </button>
-              {template && (
-                <button
-                  type="button"
-                  onClick={() => void finalize()}
-                  disabled={finalizing}
-                  className="rounded-md bg-accent-strong px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                >
-                  {finalizing ? "Creating bench…" : "Finalize → open bench"}
-                </button>
-              )}
-            </div>
-            {!template && rawDraft && (
-              <div className="mt-2 rounded-md border border-status-blocked bg-status-blocked-soft p-2 text-xs">
-                <div className="mb-1 font-semibold">Could not parse template — raw response:</div>
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-mono text-[11px]">{rawDraft}</pre>
-              </div>
-            )}
-            {template && (
-              <div className="mt-3 flex flex-col gap-3">
-                <div className="rounded-md border border-accent bg-accent-soft p-3 text-sm text-accent-soft-fg">
-                  <input
-                    value={template.hypothesis.name}
-                    onChange={(e) => setTemplate({ ...template, hypothesis: { ...template.hypothesis, name: e.target.value } })}
-                    className="w-full bg-transparent text-base font-semibold outline-none"
-                  />
-                  <textarea
-                    value={template.hypothesis.summary}
-                    onChange={(e) => setTemplate({ ...template, hypothesis: { ...template.hypothesis, summary: e.target.value } })}
-                    className="mt-2 w-full resize-y bg-transparent text-sm leading-relaxed outline-none"
-                    rows={2}
-                  />
-                </div>
-                <ol className="flex flex-col gap-2">
-                  {template.components.map((c, i) => (
-                    <li key={i} className="rounded-md border border-border bg-surface p-3">
-                      <div className="flex items-center gap-2 text-xs text-subtle">
-                        <span className="font-mono">#{i + 1}</span>
-                        <input
-                          value={c.id}
-                          onChange={(e) => updateComponent(i, { id: e.target.value })}
-                          className="rounded-sm border border-border bg-surface px-1 font-mono text-[11px]"
-                        />
-                      </div>
-                      <input
-                        value={c.name}
-                        onChange={(e) => updateComponent(i, { name: e.target.value })}
-                        className="mt-1 w-full bg-transparent text-sm font-semibold outline-none"
-                      />
-                      <textarea
-                        value={c.summary}
-                        onChange={(e) => updateComponent(i, { summary: e.target.value })}
-                        className="mt-1 w-full resize-y bg-transparent text-xs leading-snug text-muted outline-none"
-                        rows={2}
-                      />
-                    </li>
-                  ))}
-                </ol>
-                {template.supporting && template.supporting.length > 0 && (
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-subtle">Supporting</div>
-                    <ul className="mt-1 flex flex-col gap-1 text-xs">
-                      {template.supporting.map((s) => (
-                        <li key={s.id} className="rounded-md border border-border bg-surface px-2 py-1">
-                          <span className="font-mono text-subtle">{s.id}</span> — {s.name}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </Panel>
-        </section>
+          </div>
+          <div hidden={step !== "protocols"} className="flex flex-1 flex-col gap-3">
+            <ProtocolsView
+              question={question}
+              searching={searching}
+              sources={sources}
+              kept={kept}
+              setKept={setKept}
+              onResearch={() => void searchProtocols(question.trim())}
+              onBack={() => setStep("hypothesis")}
+              onFinalize={() => void finalize()}
+              finalizeStage={finalizeStage}
+            />
+          </div>
+        </div>
       </main>
     </div>
   );
 }
 
-function Panel({
-  title,
-  subtitle,
+function StepButton({
+  active,
+  disabled,
+  onClick,
   children,
 }: {
-  title: string;
-  subtitle?: string;
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-elev p-4">
-      <div>
-        <div className="text-sm font-semibold">{title}</div>
-        {subtitle && <div className="text-xs text-subtle">{subtitle}</div>}
-      </div>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`rounded px-2 py-1 font-semibold transition ${
+        active
+          ? "bg-accent text-white"
+          : "text-subtle hover:bg-surface-elev disabled:opacity-40 disabled:hover:bg-transparent"
+      }`}
+    >
       {children}
-    </div>
+    </button>
+  );
+}
+
+function HypothesisView({
+  question,
+  onQuestionChange,
+  chat,
+  chatInput,
+  onChatInputChange,
+  onSend,
+  streaming,
+  pending,
+  chatScrollRef,
+  onContinue,
+}: {
+  question: string;
+  onQuestionChange: (v: string) => void;
+  chat: ChatTurn[];
+  chatInput: string;
+  onChatInputChange: (v: string) => void;
+  onSend: () => void;
+  streaming: string;
+  pending: boolean;
+  chatScrollRef: React.RefObject<HTMLDivElement | null>;
+  onContinue: () => void;
+}) {
+  return (
+    <>
+      <div className="rounded-lg border border-accent bg-accent-soft p-4">
+        <label className="text-xs font-semibold uppercase tracking-wide text-accent-soft-fg">
+          Research question
+        </label>
+        <input
+          value={question}
+          onChange={(e) => onQuestionChange(e.target.value)}
+          placeholder="e.g. Why is enzyme X less stable below pH 5?"
+          className="mt-2 w-full bg-transparent text-lg font-semibold leading-snug text-accent-soft-fg outline-none placeholder:text-accent-soft-fg/50"
+        />
+        <p className="mt-1 text-xs text-accent-soft-fg/80">
+          The orchestrator may suggest revisions in the chat below — accepted revisions update this line in place.
+        </p>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface-elev p-4">
+        <div className="text-sm font-semibold">Chat with the orchestrator</div>
+        <div ref={chatScrollRef} className="min-h-[18rem] flex-1 overflow-y-auto rounded-md border border-border bg-surface px-3 py-2 text-sm">
+          {chat.map((turn, i) => (
+            <ChatBubble key={i} turn={turn} />
+          ))}
+          {streaming && <ChatBubble turn={{ role: "agent", text: streaming }} />}
+          {pending && !streaming && <span className="text-xs text-subtle">orchestrator thinking…</span>}
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={chatInput}
+            onChange={(e) => onChatInputChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onSend();
+              }
+            }}
+            placeholder="Ask the orchestrator to refine, narrow, or sharpen…"
+            className="flex-1 rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-foreground"
+            disabled={pending}
+          />
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={pending || !chatInput.trim()}
+            className="rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onContinue}
+          disabled={!question.trim()}
+          className="rounded-md bg-accent-strong px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          Continue → Protocols
+        </button>
+      </div>
+    </>
+  );
+}
+
+function ProtocolsView({
+  question,
+  searching,
+  sources,
+  kept,
+  setKept,
+  onResearch,
+  onBack,
+  onFinalize,
+  finalizeStage,
+}: {
+  question: string;
+  searching: boolean;
+  sources: SourceResult[];
+  kept: Record<string, boolean>;
+  setKept: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  onResearch: () => void;
+  onBack: () => void;
+  onFinalize: () => void;
+  finalizeStage: FinalizeStage;
+}) {
+  const finalizing = finalizeStage !== null;
+  return (
+    <>
+      <div className="rounded-lg border border-border bg-surface-elev p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <div className="text-xs font-semibold uppercase tracking-wide text-subtle">
+              Research question
+            </div>
+            <div className="mt-1 text-base font-semibold leading-snug">
+              {question || <span className="text-subtle">(none yet)</span>}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={finalizing}
+            className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface disabled:opacity-50"
+          >
+            ← Edit
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-border bg-surface-elev p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold">Candidate protocols</div>
+            <div className="text-xs text-subtle">
+              {searching
+                ? "Searching configured sources…"
+                : sources.length === 0
+                  ? "No search has been run yet for this question."
+                  : `${Object.values(kept).filter(Boolean).length} kept of ${sources.reduce((n, s) => n + s.hits.length, 0)} found`}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onResearch}
+            disabled={!question.trim() || searching || finalizing}
+            className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-elev disabled:opacity-50"
+          >
+            {searching ? "Searching…" : sources.length === 0 ? "Search now" : "Re-search"}
+          </button>
+        </div>
+        <div className="mt-3 flex max-h-[36rem] flex-col gap-3 overflow-y-auto pr-1">
+          {sources.map((src) => (
+            <div key={src.sourceId} className="rounded-md border border-border bg-surface p-2">
+              <div className="mb-2 flex items-center justify-between text-xs font-semibold text-subtle">
+                <span>{src.sourceId}</span>
+                <span>{src.error ? "error" : `${src.hits.length} hits`}</span>
+              </div>
+              {src.error && <p className="text-xs text-status-blocked">{src.error}</p>}
+              <ul className="flex flex-col gap-2">
+                {src.hits.map((h) => {
+                  const k = hitKey(h);
+                  const keep = kept[k] ?? true;
+                  return (
+                    <li
+                      key={k}
+                      className={`rounded-md border p-2 text-xs ${
+                        keep
+                          ? "border-accent bg-accent-soft text-accent-soft-fg"
+                          : "border-border bg-surface-elev"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={keep}
+                          onChange={(e) =>
+                            setKept((prev) => ({ ...prev, [k]: e.target.checked }))
+                          }
+                          className="mt-1"
+                          disabled={finalizing}
+                        />
+                        <div className="flex-1">
+                          <a
+                            href={h.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-semibold underline"
+                          >
+                            {h.title}
+                          </a>
+                          {h.authors && <div className="text-[11px] opacity-80">{h.authors}</div>}
+                          {h.description && (
+                            <div className="mt-1 leading-snug">{h.description}</div>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+          {!searching && sources.length === 0 && (
+            <p className="text-xs text-subtle">
+              Click “Search now” to pull candidate protocols from the configured sources.
+              Skipping is fine — the orchestrator will draft the bench from the question alone.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-subtle">
+          {finalizeStage === "drafting" && "Drafting protocol template…"}
+          {finalizeStage === "creating" && "Creating bench…"}
+        </span>
+        <button
+          type="button"
+          onClick={onFinalize}
+          disabled={!question.trim() || finalizing}
+          className="rounded-md bg-accent-strong px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {finalizing ? "Working…" : "Finalize → open bench"}
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -480,7 +563,7 @@ function hitKey(h: ProtocolHit): string {
 }
 
 function extractRevisedQuestion(text: string): string | null {
-  const match = /Revised question:\s*([\s\S]+)/i.exec(text);
+  const match = /Revised question:\s*([^\n]+)/i.exec(text);
   if (!match) return null;
-  return match[1].trim().split(/\n{2,}/)[0].trim();
+  return match[1].trim().replace(/^["“”']|["“”']$/g, "").trim();
 }
