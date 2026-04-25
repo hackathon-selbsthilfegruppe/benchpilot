@@ -9,13 +9,15 @@
 | Provider | Public API? | Practical access path | Notes |
 |---|---|---|---|
 | **IDT** | ✅ **Yes — SciTools Plus API** (OAuth) | https://www.idtdna.com/pages/tools/apidoc | Best-in-class. OligoAnalyzer, codon optimization, ordering. Use it. |
+| **Addgene** | ✅ **Yes — Developers Portal** (token, ~5d approval) | https://developers.addgene.org/ | Read-only Catalog API for plasmids, JSON, daily-updated bulk dumps. Plus an unofficial GitHub library. |
+| **NCBI / PMC** | ✅ **Yes — E-utilities + OAI-PMH + BioC** | https://pmc.ncbi.nlm.nih.gov/tools/developers/ | 3 req/s anon, 10 req/s with key. Best-in-class for literature-QC novelty checks. |
 | **Qiagen** | ✅ Partial (data APIs only) | QCI / BKB / IPA APIs | NOT a protocol/catalog API. For bioinformatics workflows. Web scrape works for protocols. |
+| **ATCC** | △ Hinted at, no public portal | Cellosaurus as alternative for cell-line metadata | Data Use Agreement mentions "APIs" but no developer docs found. |
 | **Sigma-Aldrich (Merck)** | ❌ | **Playwright MCP** or `agent-browser --headed` | Akamai blocks `curl`, `trafilatura`, and `agent-browser` *headless*. Playwright MCP gets through. No "Cell Biology" facet. |
 | **Thermo Fisher** | ❌ (catalog) | Scrape — but URL in brief 404s from EU geo-locale | Brief's `/us/en/...` URL hard-redirects to `/at/en/...` which doesn't exist. Need US VPN or different URL. |
 | **Promega** | ❌ | Trafilatura returns nav chrome only; **agent-browser headless ✓** | Loads cleanly headless. JS-rendered list, scrape via DOM. |
 | **bio-protocol.org** | ❌ | Scrape | Prefer protocols.io. |
 | **protocols.io** | ✅ Yes (OAuth 2.0) | https://www.protocols.io/developers | Already wired into the codebase. |
-| ATCC, Addgene | Unknown | TODO | Addgene rumored to have a partial API — worth checking. |
 
 For the hackathon clickdummy: **hardcode reagent → catalog-number mappings for the demo hypotheses**. Live scraping is fragile and slow, and judges won't be ordering anything Friday.
 
@@ -30,10 +32,17 @@ Tested each access method against the URLs from the challenge brief (`04_The_AI_
 | promega.com/resources/protocols | ❌ | 59 words (chrome) | ✅ | ✅ | ✅ |
 | qiagen.com/us/resources/resourcedetail?id=protocols | △ data APIs | 232 words (chrome) | ✅ | ✅ | ✅ |
 | idtdna.com/pages/tools | ✅ SciTools Plus | 0 words | ✅ | ✅ | ✅ |
+| atcc.org | △ unclear (Cellosaurus alt.) | 105 words ✅ | ✅ | ✅ | ✅ |
+| addgene.org/protocols | ✅ Developers Portal | 1040 words ✅ | ✅ | ✅ | ✅ |
+| ncbi.nlm.nih.gov/pmc/articles/PMC2737408 | ✅ E-utilities | 3000 words ✅‡ | ⚠ event-stream drop | ✅ | ⚠ reCAPTCHA after rapid hits |
 
 † Thermo Fisher's `/us/en/home/technical-resources/application-notes.html` redirects (server-side, geo-IP based) to `/at/en/...` for Austrian visitors, and the AT path returns 404. The page exists; you just can't reach it from EU IPs without locale override or VPN.
 
-**Key finding:** Playwright MCP defeats Akamai bot protection that blocks both `curl` and headless `agent-browser`. For Sigma-Aldrich (and possibly other Akamai-fronted sites), Playwright MCP is the **most reliable scraping path** — better than headed `agent-browser` because it doesn't require a visible window.
+‡ **The brief's PMC ID is wrong.** `PMC2737408` is a 2009 paper on methamphetamine in pregnancy, not the MIQE qPCR guidelines. The real MIQE paper (Bustin et al. 2009 *Clin Chem* 55:611) is **PubMed ID 19246619** and is **not** in PMC (no free full text on NCBI). Use the Oxford Academic PDF or community mirrors (e.g. gene-quantification.de) instead.
+
+**Key findings:**
+- **Playwright MCP defeats Akamai** bot protection that blocks both `curl` and headless `agent-browser`. For Sigma-Aldrich (and possibly other Akamai-fronted sites), Playwright MCP is the **most reliable scraping path** — better than headed `agent-browser` because it doesn't require a visible window.
+- **NCBI throttles aggressively.** Rapid Playwright hits on PMC triggered a reCAPTCHA. For literature work use the **E-utilities API** (3 req/s anon, 10 req/s with a free API key), not browser scraping.
 
 ---
 
@@ -297,12 +306,156 @@ For a clickdummy, you may not need the API at all — the website is freely load
 
 ---
 
-## Suppliers not yet investigated
+## ATCC — American Type Culture Collection
 
-- ATCC — `atcc.org` (cell-line protocols)
-- Addgene — `addgene.org/protocols` (cloning; *Addgene does have a partial API* — worth checking before scraping)
+### Domain & access
+
+- Root: `https://www.atcc.org/`
+- **Cell line authority** — the canonical source for authenticated human/animal cell lines and microorganisms (>4,000 cell lines).
+- **No clear public API.** The ATCC Data Use Agreement *mentions* "programmatically accessing ATCC data via our APIs," but no public developer portal or documentation is reachable. A 2018 community thread states there was no programmatic access and "none planned" — possibly outdated.
+- **Practical alternative for cell-line metadata:** [Cellosaurus](https://www.cellosaurus.org/) — a comprehensive cell-line knowledge resource that covers ATCC plus other repositories. Available as XML/OBO/text, free to use, designed for programmatic consumption.
+- **No bot protection** on the public website. Loads cleanly with all browser methods. Trafilatura returns useful content (~105 words on the homepage, more on product pages).
+
+### Recipe
+
+For cell-line metadata (preferred): use Cellosaurus dump, not ATCC scraping.
+
+For ATCC-specific data (catalog numbers, pricing, product sheets):
+
+```bash
+source ~/.cargo/env
+agent-browser open "https://www.atcc.org/products/<id>"
+agent-browser wait --load networkidle
+agent-browser snapshot -i -c
+```
+
+Or trafilatura if the page is mostly prose:
+
+```bash
+trafilatura -u "https://www.atcc.org/products/<id>" --markdown
+```
+
+### What works / does NOT
+
+- ✅ Trafilatura (some content extracted).
+- ✅ `agent-browser` headless and headed.
+- ✅ Playwright MCP.
+- ❌ No documented public REST API.
+- ❌ Bulk programmatic catalog dumps — must scrape or use Cellosaurus.
+
+---
+
+## Addgene
+
+### Domain & access
+
+- Root: `https://www.addgene.org/`
+- **Has a real public API: Addgene Developers Portal** — https://developers.addgene.org/
+- **What the API exposes:**
+  - **Catalog endpoint for plasmids** — sequences, expression info, vector type, plasmid type, genes, article references.
+  - **Bulk data downloads** — JSON, updated daily.
+  - More endpoints planned (read-only).
+- **Auth model:** access token. Requires accepting a per-scope data access license. **~5 business days for approval** — request access early if you plan to use it.
+- **Unofficial alternative:** [`moltinginstar/addgene-api`](https://github.com/moltinginstar/addgene-api) on GitHub — a community-built Python client. Useful for quick prototyping while waiting for official approval.
+- **No bot protection.** Loads cleanly with all browser methods. Trafilatura returns ~1040 words including the actual protocol table — usable directly.
+
+### Recipe (API)
+
+1. Sign up at developers.addgene.org and request access.
+2. Wait ~5 business days for approval.
+3. Accept the data-access license for the scope(s) you need.
+4. Use the access token in `Authorization: Bearer <token>` header against documented endpoints.
+5. For bulk work, download the daily JSON dumps instead of paginating the API.
+
+### Recipe (scrape `/protocols/`)
+
+Trafilatura works for the protocols index page:
+
+```bash
+trafilatura -u "https://www.addgene.org/protocols/" --markdown
+```
+
+For individual protocol pages, same approach. The protocol pages are static-rendered HTML; no JS required.
+
+### What works / does NOT
+
+- ✅ **Addgene Developers Portal API** — preferred for any plasmid/sequence work.
+- ✅ Unofficial GitHub client for quick prototyping.
+- ✅ Trafilatura on `/protocols/` and individual protocol pages.
+- ✅ `agent-browser` headless and headed.
+- ✅ Playwright MCP.
+
+---
+
+## NCBI / PubMed Central — Literature & Standards
+
+### Domain & access
+
+- Root: `https://www.ncbi.nlm.nih.gov/` (PMC at `https://pmc.ncbi.nlm.nih.gov/`)
+- **Has multiple public APIs — best-in-class for literature work:**
+  - **E-utilities** — REST-style URL API across all NCBI Entrez databases (PubMed, PMC, Gene, Protein, Nuccore, etc.). 9 utilities (esearch, efetch, elink, esummary, einfo, espell, ecitmatch, epost, egquery).
+  - **PMC OAI-PMH** — metadata harvesting + full text where licenses allow reuse.
+  - **PMC FTP** — bulk corpus downloads.
+  - **PMC Cloud Service** — for large-scale text mining.
+  - **BioC API** — structured XML/JSON of full text.
+- **Rate limits:** 3 requests/second anonymous, 10 req/s with a free API key. Get a key from your NCBI account.
+- **Update:** PMC is migrating E-utilities to a new backend in early 2026 (released Sept 2025 web version). Expect minor schema changes.
+- **No license for the API itself** — use is free for research and public use. Some content has reuse licenses (open-access subset is free to redistribute; others are read-only).
+
+### This is the right tool for the literature-QC stage
+
+The challenge brief's "Literature QC" step (novelty signal: not found / similar / exact match) **must** use NCBI E-utilities (or a wrapper like Bio.Entrez in Biopython). It's free, fast, comprehensive, and properly licensed for automated use. The alternatives (Semantic Scholar, arXiv) are fine supplements but PMC has the broadest life-sciences coverage.
+
+### Recipe (E-utilities)
+
+Find the PMC ID of a paper given its PubMed ID:
+
+```bash
+curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=pubmed&db=pmc&id=<pmid>&retmode=json&linkname=pubmed_pmc"
+```
+
+Search for novel-vs-existing on a hypothesis (very simplified):
+
+```bash
+curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=<encoded query>&retmode=json"
+```
+
+Fetch full text (open-access only):
+
+```bash
+curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id=<pmcid>&rettype=full&retmode=xml"
+```
+
+Add `&api_key=<your-key>` to lift to 10 req/s.
+
+### Brief errata: the MIQE PMC ID is wrong
+
+The challenge brief lists `ncbi.nlm.nih.gov/pmc/articles/PMC2737408` as the MIQE Guidelines for qPCR. **That PMC ID is a different paper** ("Demographic and Psychosocial Characteristics of Mothers Using Methamphetamine During Pregnancy"). The real MIQE Guidelines (Bustin et al. 2009 *Clin Chem* 55:611–622) is **PubMed ID 19246619**, **DOI 10.1373/clinchem.2008.112797**, and is **not in PMC** (no free full text on NCBI). Sources for the actual paper:
+
+- Oxford Academic (paywalled): https://academic.oup.com/clinchem/article-abstract/55/4/611/5631762
+- Community mirror (PDF, free): https://www.gene-quantification.de/miqe-bustin-review-2009.pdf
+- MIQE 2.0 (2025 revision, by the same group): PubMed 40272429 / *Clin Chem* 71:634
+
+**Action item:** if anyone is generating plans that need to *cite* MIQE compliance, point them at the DOI / PubMed ID, not the brief's PMC URL.
+
+### What works / does NOT
+
+- ✅ **E-utilities API** — preferred for everything literature-QC.
+- ✅ Trafilatura on individual PMC article pages (returns full body for open-access articles).
+- ✅ `agent-browser --headed` and Playwright MCP for one-off page loads.
+- ⚠ Headless `agent-browser` occasionally drops the connection on PMC (`Event stream closed`).
+- ⚠ Rapid scripted browser hits trigger reCAPTCHA. Use the API instead of the browser for any automation.
+- ❌ Trusting the brief's `PMC2737408` URL — it's the wrong paper.
+
+---
+
+## Suppliers / sources not yet investigated
 
 When investigating any of these, document the result here in the same shape as the existing sections: domain, access notes, what works, what doesn't, recipe.
+
+- arXiv — has a documented API (https://info.arxiv.org/help/api/index.html). Should be wired in alongside PMC for novelty checks in physics/chem/CS-leaning hypotheses.
+- Semantic Scholar — has a documented Graph API, generous rate limits. Good complement to PubMed.
+- bioRxiv / medRxiv — have an API at api.biorxiv.org for preprint metadata.
 
 ---
 
