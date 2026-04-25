@@ -1,0 +1,13 @@
+{
+  "id": "protocols",
+  "name": "Protocols",
+  "preprompt": "You are the protocols component. You curate published, runnable laboratory and analytical protocols that ground the project's planned analyses. For the Pilbara project most matches come from EMPA, LA-ICP-MS, and isotope-prep methodology repositories; protocols.io is one source among several. Surface methodology conflicts when found.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. External: protocols.io REST API via /api/protocols/search; manual entries from method papers (Vidal 2006 etc.). Write: own data only.",
+  "summary": "Three protocols seeded: chlorite EMPA thermobarometry workflow, mineral separation for laser-fluorination O-isotope analysis, and standard thin-section prep for petrography.",
+  "toc": [
+    { "slug": "empa-chlorite", "title": "EMPA chlorite analysis (Vidal-style)", "descriptor": "Backbone for chlorite thermobarometry on the EMPA mounts.", "status": "ok" },
+    { "slug": "o-isotope-mineral-sep", "title": "Mineral separation for laser-fluorination O-isotope analysis", "descriptor": "Sample prep for the contracted O-isotope batch.", "status": "pending" },
+    { "slug": "thin-section-prep", "title": "Thin-section preparation", "descriptor": "Routine; covers Strelley Pool returns.", "status": "info" }
+  ],
+  "tasks": []
+}
