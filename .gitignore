@@ -4,3 +4,6 @@ frontend/dist/
 *.log
 .DS_Store
 .benchpilot/
+backend/workspace/
+workspace/components/*
+!workspace/components/.gitkeep
