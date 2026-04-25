@@ -2,70 +2,135 @@
 
 > Status: draft. UI design notes for the clickdummy. Pairs with [`concept.md`](./concept.md).
 
+## Core frontend principle
+
+The frontend should not assume a fixed inventory of components.
+
+The frontend should present:
+
+- the current intake state
+- the current bench
+- the current set of component instances
+- the current resources / summaries / task state
+
+In other words, the frontend renders the **current problem-specific working set**, not a predefined product taxonomy.
+
 ## Routes
 
-- `/` — the **start page** (hypothesis intake). Three stacked panels sharing one orchestrator session. See *Start page* below.
-- `/bench/<slug>` — the **workbench**, the layout this document was originally about. Materialized from the start page on Finalize.
-
-The hypothesis switcher inside the workbench navigates to `/bench/<slug>` (no more `?hypothesis=` query string).
+- `/` — **intake / start page**
+- `/bench/<slug>` — **workbench** for one materialized bench
 
 ## Start page
 
-The start page is the new entry point. It is a single route with **two views** swapped behind a segmented control (`[ 1. Hypothesis ] [ 2. Protocols ]`). Both views stay mounted so back-and-forth is free and lossless. There is one orchestrator session shared by the whole intake.
+The start page is step 0 and the new entry point. It should help the user go from idea to an initial bench.
 
-1. **Hypothesis view** — chat-only input. The current question lives as a single editable line above the chat; when the orchestrator suggests a revision (a line beginning with `Revised question:`) the line updates in place.
-2. **Protocols view** — search runs against `POST /api/protocol-sources/search` (kicks off automatically the first time the user lands here for a given question). Cards are keep/drop with default-keep. This view also owns the **Finalize** button.
+The currently implemented shape is a single route with **two views** swapped behind a segmented control (`[ 1. Hypothesis ] [ 2. Protocols ]`). Both views stay mounted so back-and-forth is free and lossless. There is one orchestrator session shared by the whole intake.
+
+1. **Hypothesis view / intake**
+   - the current question lives as a single editable line above the chat
+   - the orchestrator chat helps refine the question
+   - when the orchestrator emits a revision (`Revised question:`), the line updates in place
+   - the result is the first structured intake brief
+
+2. **Protocols view / source discovery**
+   - search runs against configured source adapters
+   - candidate protocols are shown as keep/drop cards
+   - this step also owns the **Finalize** button
 
 There is intentionally **no third "preview the bench" step**. Component editing happens on the bench itself.
 
-"Finalize" runs the template-draft prompt through the same orchestrator session, parses the fenced JSON, POSTs to `POST /api/hypotheses`, and routes to `/bench/<slug>`. An inline status line ("drafting template… creating bench…") covers the LLM round-trip.
+3. **Bench draft (conceptual, not separate UI step)**
+   - the orchestrator turns the intake brief + kept sources into an initial draft
+   - that draft should not be thought of as a fixed plugin list
+   - it is the first **dynamic component working set** for this specific bench
 
-## Layout: the workbench
+### Finalize
 
-The screen has two persistent regions and one focus region:
+Finalize runs the template-draft prompt through the same orchestrator session, materializes the bench on disk, and routes to `/bench/<slug>`.
 
-- **Orchestrator chat (always visible).** The top-level chat from step 1. The user can always reach it. This is the chat with the orchestrator, not with any specific component.
-- **Component strip (always visible).** Every component is shown as a **summary card** — name + short summary + (optionally collapsed) TOC. The user can see all components at a glance, all the time. No component's data or chat is open here, just its summary surface.
-- **Active component (one at a time).** Exactly one component can be **opened** into a focus area. When opened, that component reveals its **details** (data files, drillable through its TOC) and its **own chat**. Opening a different component closes the previous one. Closing returns the user to "just summaries + orchestrator chat."
+## Workbench layout
 
-So at any moment the user sees: the orchestrator chat, every component's summary, and at most one component fully expanded with its details and its component-specific chat.
+The workbench still has three major regions:
 
-## Why this shape
+- **Orchestrator chat** — always visible
+- **Component strip** — always visible summaries of the current component instances
+- **Active component** — one open component at a time
 
-- **Summaries always visible** — the bench-of-components metaphor only works if you can take in the whole bench at once. Hiding components defeats the purpose.
-- **Only one component open** — component chats and detail views are heavy; stacking them would compete with the orchestrator chat and with each other. One-at-a-time keeps focus clear.
-- **Orchestrator chat persistent** — it is the user's home base and the entry point when no component is active or when a request spans multiple components.
+## What the component strip now represents
 
-## Visual progression
+The strip is no longer “the app’s known modules.”
 
-1. **Chat only.** Orchestrator chat fills the screen. No component strip yet.
-2. **First component appears.** Component strip shows up with one summary card.
-3. **More components.** Strip fills with cards; orchestrator chat stays put.
-4. **Open a component.** Clicking a card opens that component into the focus area: details + its own chat. Other cards remain as summaries; orchestrator chat remains visible.
-5. **Cross-component awareness.** Open component can surface "see also" links into other components' TOCs (clicking switches which component is open).
+It is the current bench’s **runtime-instantiated component set**.
 
-## Card anatomy (summary state)
+Examples:
 
-Each summary card shows:
+- one bench may have `literature-crp-biosensor`, `reagents-whole-blood-crp`, `validation-elisa-comparison`
+- another bench may have `literature-co2-fixation`, `protocol-bioelectrochemistry`, `equipment-bioreactor`
 
-- **Header** — component name.
-- **Summary** — rendered from the component's `summary.md`. One paragraph.
-- **TOC peek** — top entries from `toc.md`, collapsible once cards multiply.
-- **Open** affordance — turns this card into the active component.
+The strip should therefore:
+
+- tolerate different component sets per bench
+- avoid assumptions about stable global component names
+- communicate role and current state through summary text rather than position alone
+
+## Why this shape still works
+
+The bench metaphor remains strong because the user still benefits from:
+
+- always seeing the current working set
+- opening one component deeply at a time
+- keeping the orchestrator as the persistent coordination surface
+
+The only change is that the bench is now **assembled dynamically** from the problem rather than predetermined.
+
+## Component card anatomy (summary state)
+
+Each summary card should show:
+
+- **Header** — component instance name
+- **Summary** — current short state
+- **TOC preview** — top resource summaries
+- **Open affordance**
+- optional small indicators for:
+  - blocked / waiting state
+  - inbound task count
+  - requirement hints later
 
 ## Open component anatomy (focus state)
 
-When a component is opened, the focus area shows:
+When opened, the focus area shows:
 
-- **Header** — component name + close affordance.
-- **Component chat** — chat scoped to this component's preprompt and tooling.
-- **Details** — data files, navigated via the TOC. Renders the selected `data/<slug>.md`.
+- component header
+- component chat
+- details / resources selected from the TOC
+- task panel if relevant
 
-How exactly the focus area is positioned relative to the orchestrator chat and the summary strip is the main remaining layout question (see below).
+This is still valid in the dynamic model.
+
+## Resource and detail behavior
+
+The UI should continue to follow the TOC-first rule:
+
+- show summaries and TOCs cheaply
+- load full resource bodies only when requested
+
+That means the open component can navigate resources without forcing all component detail into the page at once.
+
+## Future requirement visibility
+
+The UI will probably need to surface requirements later, but it should do so carefully.
+
+Recommended approach:
+
+- do not make requirements a first-class visible pane immediately
+- first use them to justify component summaries and tasks
+- later consider lightweight displays such as:
+  - “addresses: novelty check, reagent sourcing, validation”
+  - blocked requirement indicators
 
 ## Open questions
 
-- **Where does the focus area live?** Three candidates: (a) center column between orchestrator chat (left) and component strip (right); (b) overlay/drawer on top of the strip when a card is opened; (c) the strip itself expands the active card in place and demotes the others to slim tiles. (c) feels most native to the "bench" metaphor.
-- **Component chat vs. orchestrator chat visibility.** Both visible side-by-side, or does the component chat take focus and the orchestrator chat collapse to a dock? Probably both visible, but smaller orchestrator when a component is open.
-- **Card density** — how much summary/TOC do we show before requiring expansion? Summary always; TOC collapsible once cards multiply.
-- **Empty state** — what does the workbench look like before any component exists? Pure orchestrator chat, no strip.
+- should users ever manually add/remove component instances, or is that always orchestrator-driven?
+- how visibly should dynamic instantiation be explained to the user?
+- should requirements be visible in the strip, only in component headers, or hidden entirely at first?
+- how much of the intake brief should remain visible after entering the bench?

@@ -1,236 +1,313 @@
 # BenchPilot — Concept
 
-> Status: draft / evolving. This is the north-star document for the clickdummy, not a final architecture spec.
+> Status: draft / evolving. This is the north-star document for the clickdummy, not a frozen architecture spec.
 
 ## What it is
 
-BenchPilot is a **bench for scientific engineers** — a workspace that helps a researcher run and reason about an experimental project end-to-end. The bench is composed of **components** (hypothesis generation, literature research, reagents, budget, experiments, …) that the researcher uses, inspects, and extends over time.
+BenchPilot is an **AI Scientist OS**: a workspace that helps a researcher go from a scientific question to a **runnable experiment plan**.
 
-The set of components is **not fixed**. New components can be introduced, retired, or re-ordered as the project evolves. Both the surface the user interacts with and the underlying content model must treat components as a flexible, growing list rather than a hard-coded structure.
+The important shift is this:
 
-## How we get there (progression)
+- BenchPilot is **not** a fixed set of modules
+- BenchPilot is a system that **derives the work that must be done** from the question at hand
+- It then instantiates the right working set of agents, lets them produce durable artifacts, and iterates until the plan is good enough to hand to a real lab
 
-The product is built up in steps so we can validate each layer of structure before adding the next:
+## The core workflow
 
-0. **Hypothesis intake & protocol discovery.** Before there is any bench, the researcher arrives at a start page, defines a research question (refining it in dialogue with the orchestrator), pulls candidate protocols from external sources (currently protocols.io, with more sources slotted in behind a pluggable adapter), and asks the orchestrator to draft a *protocol template*. The template is an ordered list of component skeletons that becomes the bench in step 3. This step seeds the bench instead of the bench being hand-authored.
-1. **Chat only.** A single chatbox. The researcher talks to BenchPilot; nothing else is in play.
-2. **Chat + first component.** Introduce one component (e.g. *hypothesis generation*). Establish the idiom for what a component looks and behaves like.
-3. **Chat + multiple components.** Add more components (literature, reagents, budget, …). Validate that the model scales.
-4. **Drill-down.** Each component can expand from summary into details.
-5. **Cross-component awareness.** Components see each other's tables of contents and can request details from one another (read-only).
-6. **Cross-component tasks.** Components can send explicit tasks to other components, wait for result documents, and then continue their own work.
+The challenge brief implies three visible stages:
 
-### Hypothesis intake flow (step 0 detail)
+1. **Input** — a natural-language scientific question or hypothesis
+2. **Literature QC** — a fast novelty / exact-match / similar-work signal
+3. **Experiment Plan** — the real deliverable
 
-The start page is a single route (`/start` or `/`) with **two steps** behind a segmented control: `[ 1. Hypothesis ] [ 2. Protocols ]`. Both step views stay mounted so going back and forth is free and lossless. There is one shared orchestrator session for the whole intake.
+But internally we should think of the process in a more agent-native way:
 
-1. **Hypothesis** — a chat with the orchestrator. The agreed-upon question lives as a single editable line above the chat (not a separate textarea); when the orchestrator suggests a revision the line updates in place. There is one input surface (the chat box) so the user is never asked "type your question — but also chat about it" at the same time.
-2. **Protocols** — a search across all configured `ProtocolSource` adapters (see *Protocol-source adapters* below). Cards are keep/drop with default-keep. This step is also where **Finalize** lives.
+1. **Intake brief** — turn the user input into a structured brief
+2. **Requirement derivation** — identify what must be resolved to produce a credible plan
+3. **Component instantiation** — create the right specialist components for those requirements
+4. **Resource production** — components create durable resources and summaries
+5. **Delegation and iteration** — components task one another and refine the plan
+6. **Convergence** — the system assembles a complete plan the scientist could actually use
 
-There is **no preview-of-the-bench step**. The components the orchestrator drafts are not editable on a third intake screen — they are edited *on the bench*, which is the place that already has the right tools for editing components.
+This process is **iterative**, not strictly linear.
 
-"Finalize" runs the template-draft prompt through the same orchestrator session (showing an inline status line — "drafting template… creating bench…" — because the LLM round-trip is several seconds), parses the fenced JSON, then POSTs to `POST /api/hypotheses`. The server allocates a unique slug, writes `hypothesis.json`, an `index.json`, and one `component.json` per drafted component (with empty TOC and tasks), updates `hypotheses.json`, and the user is routed to `/bench/<slug>`. From there the existing bench takes over.
+## Intake brief
+
+Before the bench exists, the user starts on an intake surface.
+
+The currently implemented start page is a single route (`/start` or `/`) with **two steps** behind a segmented control: `[ 1. Hypothesis ] [ 2. Protocols ]`. Both step views stay mounted so going back and forth is free and lossless. There is one shared orchestrator session for the whole intake.
+
+1. **Hypothesis** — a chat with the orchestrator. The agreed-upon question lives as a single editable line above the chat (not a separate textarea); when the orchestrator suggests a revision the line updates in place. There is one input surface so the user is never asked to type the question in one place and discuss it in another.
+2. **Protocols** — a search across all configured `ProtocolSource` adapters (see *Protocol-source adapters* below). Cards are keep/drop with default-keep. This step also owns **Finalize**.
+
+There is **no preview-of-the-bench step**. The components the orchestrator drafts are not edited on a third intake screen — they are edited *on the bench*, which is already the right place for that work.
+
+"Finalize" runs the template-draft prompt through the same orchestrator session (showing an inline status line such as `drafting template… creating bench…`), parses the fenced JSON, then POSTs to `POST /api/hypotheses`. The server allocates a unique slug, writes `hypothesis.json`, an `index.json`, and one `component.json` per drafted component (with empty TOC and tasks), updates `hypotheses.json`, and routes the user to `/bench/<slug>`.
+
+The intake step should produce a structured brief, not just a raw string. A useful brief may include:
+
+- the user’s scientific question
+- an edited / clarified research question
+- the target outcome
+- constraints or success thresholds
+- candidate protocols or source material
+- obvious unknowns and ambiguities
+- a first-pass domain classification
+
+The brief is the seed for everything that follows.
+
+## Requirements
+
+The backend should derive **requirements** from the intake brief.
+
+Examples:
+
+- find out whether very similar work already exists
+- identify a protocol family that is closest to the desired experiment
+- determine what reagents and suppliers are needed
+- estimate a plausible timeline with dependencies
+- define how success or failure will be measured
+- identify open uncertainties that need specialist review
+
+Requirements are the units of work that drive the system.
+
+### Requirements should become first-class artifacts
+
+A requirement is not just hidden planner state. It should be visible and durable, because:
+
+- components need to know which requirement they are serving
+- requirements may change over time
+- new requirements may emerge during execution
+- the UI will eventually need to show why a component exists
+
+For hackathon simplicity, requirements can initially be represented as a resource kind.
+
+## Components are dynamic
+
+BenchPilot still uses **components** as the main working units, but components are no longer best thought of as a fixed list or plugin inventory.
+
+### Component template
+
+A component template is a reusable archetype such as:
+
+- literature review
+- protocol design
+- reagent sourcing
+- budget planning
+- validation design
+- equipment / samples / compliance support
+
+A template defines:
+
+- role prompt shape
+- expected input/output style
+- tool policy
+- workspace skeleton
+- maybe UI hints
+
+### Component instance
+
+A component instance is a runtime-created specialist for one bench.
+
+Examples:
+
+- `literature-crp-biosensor`
+- `protocol-paper-electrochemistry`
+- `reagents-whole-blood-crp`
+- `validation-elisa-comparison`
+
+A component instance exists because one or more requirements made it necessary.
+
+### Important consequence
+
+The visible bench for one question may have a different set of components than the visible bench for another question.
+
+That is expected and desirable.
 
 ## What a component is
 
-A component is a small, self-contained agent for one slice of the project. Each component bundles:
+A component is a small self-contained agent for one slice of the current scientific planning problem.
 
-- **Preprompt** — the instructions that define the component's role, tone, and scope (e.g. "you are the literature research component; you summarize papers and surface conflicts with current hypotheses").
-- **Tooling** — how this component accesses data. What can it read, what can it write, what external services or retrieval methods is it allowed to use? Tooling is per-component because a *reagents* component needs different capabilities than a *hypothesis* component.
-- **Summary** — a short abstract of the component's current state, used as cheap cross-component context.
-- **Table of contents (TOC)** — a structured list of the component's data entries (slug, title, descriptor, status). The TOC is what other components see; it is the component's public surface.
-- **Tasks** — the inbox: tasks other components have sent *to* this component (see *Cross-component tasks* below).
-- **Data** — long-form markdown files (one per TOC entry) holding the substantive content the component is producing.
+Each component bundles:
 
-The component's structure (everything except the long-form data bodies) lives in a single `component.json`. Long-form data lives as markdown files. This keeps the structure machine-editable and the prose human-editable:
+- **Role prompt** — who it is and what requirement(s) it addresses
+- **Tooling policy** — what it may read, write, or call externally
+- **Summary** — cheap public state for other components and the user
+- **TOC** — a structured list of resources this component exposes
+- **Tasks** — inbound delegated work from other components
+- **Resources** — durable artifacts it owns and produces
 
-```
-component/
-  component.json       # id, name, preprompt, tooling, summary, toc, tasks
-  data/
-    <slug>.md          # one file per TOC entry — the substantive content
-    ...
-```
+## Resource-oriented shared memory
 
-### Protocol components
+This part of the concept remains strong and largely unchanged.
 
-Components seeded by the start-page template are *protocol components*: they share the same shape as any other component (preprompt, tooling, summary, TOC, tasks, data) but are born from a protocol template rather than from chat. Concretely:
+A component owns **resources**.
+Every resource has:
 
-- `id`, `name`, `preprompt`, and `summary` are taken straight from the orchestrator's draft.
-- `toc` and `tasks` start empty — the bench fills them in over time.
-- `tooling` defaults to "read own data + sibling TOCs/summaries; write own data only," with `protocols` getting an extra line granting it the protocols.io live-search tool.
-- The kept external protocols are referenced in the supporting `protocols` component's preprompt so the bench retains its provenance.
+- an ID
+- a title
+- a short summary
+- a kind
+- optional tags / metadata
+- a full body
 
-Protocol components are not a separate type — they are ordinary components. The label is just a reminder of how they entered the bench.
+Each component additionally exposes:
 
-A top-level `index.json` lists the component IDs in display order:
+- a **component summary**
+- a **TOC** of resource summaries
 
-```
-components-data/
-  index.json           # { "components": ["hypothesis", "literature", …] }
-  hypothesis/
-    component.json
-    data/
-      h1.md
-      h2.md
-      h3.md
-  literature/ …
-  reagents/ …
-  experiments/ …
-  budget/ …
-```
+### Why this model matters
 
-### TOC entry status
+It gives us a good balance between:
 
-Each TOC entry carries a `status` field — one of:
+- durable artifacts
+- cheap cross-component context
+- detailed reads only when necessary
+- inspectability for humans
 
-- `ok` — active, going well
-- `pending` — waiting on something
-- `blocked` — actively blocked
-- `done` — finished, no further work
-- `info` — purely informational (no work attached)
+### Cross-component visibility rule
 
-Status drives the symbol shown next to each entry inside the open component (`○ ◷ ⊘ ✓ ·`). Component-level status (e.g. for global rollups) is intentionally *not* displayed on summary rows — only the per-entry status is surfaced.
+Every component always sees:
+
+- summaries of all other components
+- TOCs of all other components
+
+A component does **not** automatically see:
+
+- the full body of every other resource
+
+Instead, it requests the full body only when it actually needs it.
+
+This is the same spirit as lazy skill loading: cheap overview by default, detailed context on demand.
+
+## Resources should carry more metadata now
+
+Because the system is dynamic, resources should eventually carry stronger metadata such as:
+
+- which component instance produced them
+- which requirement(s) they support
+- provenance / derived-from links
+- status
+- confidence
+- relations to other resources
+
+We do not need the final metadata schema immediately, but the concept should allow it.
 
 ## Each component has its own chat
 
-Because each component has its own preprompt, tooling, and data, **each component runs its own chat**. The user can talk directly to the *budget* component about budget, to the *literature* component about papers, etc. This keeps each conversation focused and lets each component's preprompt and tooling stay tight.
+Every component runs its own chat/session.
 
-This raises a coordination question: when the user's request spans components ("does the proposed hypothesis fit our reagent inventory and budget?"), who routes it? We expect to need an **orchestrator**:
+The user can:
 
-- A top-level chat (the original chatbox from step 1) that the user always has access to.
-- It knows the TOCs and summaries of all components.
-- It decides which component(s) to consult, asks them, and synthesizes a reply.
-- Components can also reach each other through the orchestrator rather than directly, which keeps the read-only-across-components rule easy to enforce.
+- talk to the top-level orchestrator
+- talk to one open component directly
 
-Open: is the orchestrator a "real" component (with its own preprompt/tooling/data), or a separate construct? Leaning toward "real component" for uniformity, with `data/` being a thin log of routing decisions.
+A component chat is scoped to that component’s role, requirements, tools, and resources.
+
+## The orchestrator
+
+The orchestrator remains central, but its role becomes clearer in the dynamic model.
+
+It is responsible for:
+
+- understanding the intake brief
+- deriving or revising requirements
+- deciding which component instances should exist
+- delegating work between components
+- reading results and synthesizing the overall plan
+
+The orchestrator should think in terms of requirements and component instances, not a fixed module list.
 
 ## Cross-component tasking model
 
-Cross-component reads are useful, but they are not enough for the main orchestration use case. We also want one component to be able to **ask another component to do work asynchronously**.
+Cross-component reads are not enough. Components must also be able to **ask other components to do work asynchronously**.
 
-The main example is the orchestrator:
+### Main example
 
-- the orchestrator sees summaries and TOCs of all components
-- it decides that the *literature* component should investigate one question and the *reagents* component should investigate another
-- it sends each of them a task
-- each target component fulfills its task in a fresh task-specific chat/session
-- each task produces a durable result document
-- the orchestrator waits until all requested task results exist, then reads them and continues
+The orchestrator may:
 
-### Properties of a task
+- ask a literature component to investigate novelty or prior work
+- ask a reagent component to source materials
+- ask a validation component to define success metrics
+- wait for those results
+- then synthesize the next version of the plan
 
-A task is file-backed and explicit. It should contain at least:
+### Task properties
 
-- **target component**
-- **sender component**
-- **structured metadata** (ID, timestamps, status, maybe kind/priority)
-- **request text** in normal written language
-- later: optional references to relevant resources or task dependencies
+A task should contain at least:
+
+- sender component instance
+- target component instance
+- structured metadata (ID, timestamps, status)
+- written request text
+- optional references to relevant resources or requirements
 
 ### Task execution rule
 
-Each submitted task creates a **new session** in the target component. That session is not the same as the target component's standing interactive session. It is a dedicated task-run session that exists to fulfill that one request.
+Each task creates a **fresh task-run session** in the target component.
 
-For the hackathon we want a very simple guarantee:
+That task-run session:
 
-- every accepted task eventually finishes with a **result document**
-- task state is tracked through files
-- polling is enough; no queues or message brokers required
+- is separate from the long-lived interactive session
+- exists only to fulfill that task
+- must end with a durable **result resource/document**
 
-### Why file-backed tasks
+### Why this model works
 
-Using files keeps this hackathon-friendly:
+- task context stays scoped
+- results are inspectable on disk
+- sender can fan out to multiple specialists
+- sender can poll until all expected results exist
+- result documents fit the same resource-oriented model as everything else
 
-- backend can write task files directly
-- workers can discover tasks by polling
-- sender components can poll for completion
-- every request/result is inspectable on disk
-- failures are easier to debug than with hidden in-memory state
+## Concurrency and iteration
 
-### Concurrency model
+A component may create multiple tasks in parallel.
 
-A component can send **multiple tasks** to other components. In that case it should wait until all expected results are available, then continue its own session using those results.
+Typical pattern:
 
-This gives us a simple map/reduce style pattern:
+1. create N tasks
+2. wait for N result resources
+3. read those results
+4. continue reasoning
 
-- sender creates N tasks
-- sender polls until N results exist
-- sender reads those result documents
-- sender continues and synthesizes
+This is a simple and effective fan-out / wait / synthesize loop.
 
-## Cross-component context rules (reads)
+The wider process remains iterative:
 
-- Every component has, in its working context, the **TOCs of all other components** plus their **summaries**. This is cheap and always available.
-- A component can **request** the full body of another component's data file on demand (read).
-- A component can also **submit a task** to another component, which creates a separate task-run session in that target component.
-- A component **cannot write** into another component's data directly. Each component owns its own files exclusively.
-- Cross-component reads and task submissions should happen through the orchestrator/backend surface rather than by directly editing another component's files.
+- task results can create new requirements
+- new requirements can cause new component instances to appear
+- some components may be retired when no longer needed
+- convergence, not a rigid pipeline, is the correct mental model
 
-This gives us a model of: "everyone sees the table of contents, anyone can ask to read a chapter, anyone can request work from another component through an explicit task, nobody edits another component's chapters directly." Write isolation isn't enforced in code yet — it's a design constraint we'll honor and revisit when this becomes a real system.
+## Cross-component rules
 
-## Cross-component tasks (writes, structured)
+- every component sees summaries + TOCs of other components
+- full resource bodies are fetched only when needed
+- direct writes into another component’s resources are not allowed
+- cross-component work happens through explicit tasks
+- task results return as resources
 
-Reads aren't enough. Components also need to *ask each other to do things*: budget asks reagents to confirm a vendor before approving the spend; hypothesis asks experiments to sequence EXP-02 the moment a reagent arrives. To support this without breaking the "no component writes another's data" rule, we introduce **tasks**.
-
-A task is a small structured record:
-
-```json
-{
-  "id": "task-001",
-  "from": "experiments",
-  "to": "hypothesis",
-  "title": "Restate the falsifiable prediction for H1 vs H2",
-  "body": "Before we run EXP-02 (H148A pH curve), spell out the exact pH-curve shapes you'd expect …",
-  "status": "open",
-  "created": "2026-04-22T09:00:00Z"
-}
-```
-
-Status moves through `open → accepted → done`, or `open → declined`.
-
-### Storage: receiver-owned inbox
-
-Each component owns its **inbox** — the `tasks` array inside its own `component.json`. A task addressed to *reagents* is appended to `reagents/component.json#tasks`. Receivers manage status transitions on their own file; nobody else writes to it.
-
-Senders never have their own outbound store; the outbound view is computed by scanning all *other* components' inboxes for entries where `from === self`.
-
-This keeps the strict rule — *components only write their own data* — intact, with one acknowledged carve-out: a sender appends to a receiver's inbox at task creation time. We treat the inbox as conceptually belonging to the receiver (like email), and the sender's "send" as a privileged primitive operation rather than a direct write to data the receiver owns.
-
-### How tasks are created
-
-Tasks are **not** created by the user filling out a form. They are created by a component (running through its chat / preprompt) when the conversation calls for it — the component decides "this is a request for another component" and emits a structured task to that component's inbox.
-
-For the clickdummy, the API to do this exists at `POST /api/tasks` (server appends to the receiver's `component.json#tasks`), but the UI doesn't expose a manual create form. Status transitions go through `PATCH /api/tasks/:componentId/:taskId`.
-
-### How tasks are surfaced
-
-- **Strip rows** show `→ N` next to a component's name when it has open inbound tasks. Nothing else is added at the strip level — keeping the bench overview minimal.
-- **Open component** has a tab strip on the right pane: *Chat | Tasks (in N / out M)*. The Tasks tab lists inbound (from receiver's inbox) and outbound (computed from other inboxes) with status symbols and Accept / Decline / Mark-done controls on the inbound side.
+This preserves ownership boundaries while still enabling collaboration.
 
 ## Protocol-source adapters
 
-External protocol corpora are pluggable. Each source implements:
+External protocol corpora should remain pluggable behind a source-adapter layer.
 
-```ts
-interface ProtocolSource {
-  id: string;            // stable identifier, e.g. "protocols-io"
-  label: string;         // human-readable
-  isConfigured(): boolean;
-  search(query: string, pageSize: number): Promise<ProtocolHit[]>;
-}
-```
+Examples:
 
-A `ProtocolHit` is a normalized record (`sourceId`, `externalId`, `title`, `authors?`, `url`, `doi?`, `description?`, `publishedAt?`). `POST /api/protocol-sources/search` fans out to every registered source in parallel and returns one result block per source (including per-source errors so one broken adapter doesn't break the page).
+- protocols.io
+- other protocol repositories
+- supplier documentation sources
+- literature APIs
 
-Today only `protocols-io` is implemented. Adding a new source is a single new file plus one entry in the registry; the start page picks it up automatically.
+The backend should not assume one universal source shape. Different sources may need different adapters and access methods.
 
 ## Open questions
 
-- **Adding components:** is this a user action, a config file, or chat-driven ("add a budget component")? Likely chat-driven eventually; for the clickdummy, the static list in `index.json` is fine.
-- **Persistence:** for the clickdummy we keep `component.json` + markdown on disk. Real version probably needs a richer store.
-- **Ordering & grouping:** do components have categories (planning / execution / resources / …) or is it a flat list?
-- **Orchestrator shape:** is the orchestrator a normal component or a privileged construct?
-- **Tooling surface:** how do we describe per-component tooling — declarative manifest, code, or natural language in `component.json`?
-- **Task creation from chat:** how does a component decide to create a task? Tool-call from the component's LLM during a conversation? Heuristic detection in the orchestrator? Currently the API exists but no automatic emission path is wired up.
-- **Task threading:** tasks today are single records. Comment threads / status notes are not yet modeled.
+- How explicitly should requirements be surfaced in the UI?
+- Should requirements be a distinct entity or just a resource kind at first?
+- When should a new component instance be created versus reusing an existing one?
+- How do we retire or merge component instances cleanly?
+- How much provenance/confidence metadata is enough for the hackathon?
+- How much of component creation is heuristic vs LLM-driven?

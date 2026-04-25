@@ -1,466 +1,378 @@
-# BenchPilot — Backend Components and API Proposal
+# BenchPilot — Backend Dynamic Components and API Proposal
 
-Status: proposal for the second implementation step after live chats are working.
+Status: proposal for the next backend phase.
 
-This document proposes the backend-side model for components, resources, summaries, TOCs, lazy loading, and the supporting API/CLI structure.
+This document replaces the older fixed-component mental model with a dynamic one.
 
-> Scope note: components are no longer hand-curated — they are seeded by the start-page hypothesis intake flow, which writes them under `frontend/components-data/<slug>/`. The proposal below describes how the Node backend would serve those components once they exist on disk. See `docs/concept.md` ("Hypothesis intake & protocol discovery") and `docs/frontend-backend-contract.md` (Phase 0) for how the bench is created in the first place.
+## 1. Core idea
 
-## 1. Design goals
+BenchPilot should be modeled around five main entities:
 
-The backend model should:
+- **Bench**
+- **Requirement**
+- **Component Template**
+- **Component Instance**
+- **Resource**
 
-- keep components flexible and easy to add
-- make resource discovery cheap
-- make full resource loading explicit and on demand
-- support cross-component awareness without prompt bloat
-- support file-backed task delegation between components
-- be simple enough for a hackathon implementation
+Tasks remain important, but they sit on top of this state model rather than replacing it.
 
-## 2. Core idea
+## 2. Bench
 
-Each component owns a set of **resources**.
+A bench is the materialized workspace for one scientific planning problem.
 
-Every resource has:
-- an ID
-- a title
-- a kind
-- a short summary
-- optional tags
-- a full body
+It is created from an intake brief and becomes the container for:
 
-Each component also exposes:
-- a component-level summary
-- a TOC composed of resource summaries
+- the original question
+- derived requirements
+- component instances
+- resources
+- tasks
 
-### Prompt-loading rule
-
-- all components get summaries + TOCs for all components in cheap context
-- full resource bodies are fetched only when needed
-- cross-component work requests are expressed as explicit tasks, not direct writes into another component's files
-
-This is the most important behavior to preserve.
-
-## 3. Proposed storage layout
-
-```text
-workspace/components/<component-id>/
-  component.json
-  preprompt.md
-  tooling.md
-  summary.md
-  toc.json
-  resources/
-    <resource-id>.md
-    <resource-id>.meta.json
-  tasks/
-    pending/
-      <task-id>/
-        task.json
-        request.md
-    running/
-      <task-id>/
-        task.json
-        request.md
-    completed/
-      <task-id>/
-        task.json
-        request.md
-        result.md
-        result.meta.json
-```
-
-### Why this is good enough for now
-
-- easy to inspect manually
-- easy for agents to read and edit locally
-- easy for backend to index
-- easy to poll for tasks without extra infrastructure
-- easy to turn into a richer store later if needed
-
-## 4. Proposed component metadata
-
-### `component.json`
+### Bench metadata example
 
 ```json
 {
-  "id": "literature",
-  "name": "Literature Research",
-  "description": "Finds and summarizes relevant papers",
-  "version": 1
-}
-```
-
-Keep this minimal for the hackathon.
-
-## 5. Proposed resource metadata
-
-### `<resource-id>.meta.json`
-
-```json
-{
-  "id": "lit-0007",
-  "componentId": "literature",
-  "title": "Cas9 off-target mitigation strategies review",
-  "kind": "paper-note",
-  "summary": "Review of guide design, enzyme engineering, and delivery constraints relevant to off-target reduction.",
-  "tags": ["crispr", "off-target", "review"],
+  "id": "bench-crp-biosensor",
+  "title": "CRP biosensor",
+  "question": "Can we build a paper-based electrochemical biosensor for CRP?",
+  "status": "active",
   "createdAt": "2026-04-25T19:00:00.000Z",
   "updatedAt": "2026-04-25T19:10:00.000Z"
 }
 ```
 
-### Summary rules
+## 3. Requirement
 
-Resource summaries should be:
-- short
-- specific
-- informative enough for routing
-- stable enough to appear in prompt context
+A requirement is a unit of necessary work or constraint.
 
-Recommended length:
-- 1 sentence
-- ideally 80 to 180 characters
+Examples:
 
-## 6. TOC shape
+- assess novelty and prior art
+- identify a viable protocol family
+- source materials and suppliers
+- build a realistic budget
+- define validation criteria
 
-### `toc.json`
+### Requirement example
 
 ```json
 {
-  "componentId": "literature",
-  "updatedAt": "2026-04-25T19:10:00.000Z",
-  "entries": [
-    {
-      "id": "lit-0007",
-      "title": "Cas9 off-target mitigation strategies review",
-      "kind": "paper-note",
-      "summary": "Review of guide design, enzyme engineering, and delivery constraints relevant to off-target reduction.",
-      "tags": ["crispr", "off-target", "review"],
-      "updatedAt": "2026-04-25T19:10:00.000Z"
-    }
-  ]
+  "id": "req-001",
+  "benchId": "bench-crp-biosensor",
+  "title": "Assess novelty and close prior work",
+  "summary": "Determine whether closely similar CRP paper-biosensor protocols already exist and what that implies for novelty.",
+  "status": "open"
 }
 ```
 
-`toc.json` is the cheap public surface of a component.
+For hackathon speed, requirements can initially be implemented as a special resource kind, but the concept should treat them as first-class.
 
-## 7. Task model
+## 4. Component templates
 
-Tasks are the asynchronous delegation primitive between components.
+A component template is a reusable archetype.
 
-### Task file model
+Examples:
+- `literature-review`
+- `protocol-design`
+- `reagent-sourcing`
+- `budget-planning`
+- `validation-design`
 
-Each task should have:
+### Template should describe
 
-- a structured `task.json`
-- a human-readable `request.md`
-- later, a durable `result.md`
+- template ID
+- display name
+- prompt skeleton
+- tool policy
+- default workspace/resource conventions
+- maybe UI hints
 
-### `task.json`
+## 5. Component instances
+
+A component instance is a runtime-created agent for one bench.
+
+Examples:
+- `literature-crp-biosensor`
+- `reagents-whole-blood-crp`
+- `validation-elisa-comparison`
+
+A component instance exists because one or more requirements made it necessary.
+
+### Component instance example
+
+```json
+{
+  "id": "literature-crp-biosensor",
+  "benchId": "bench-crp-biosensor",
+  "templateId": "literature-review",
+  "name": "Literature — CRP biosensor",
+  "summary": "Tracks prior work, novelty signal, and references relevant to the CRP biosensor hypothesis.",
+  "requirementIds": ["req-001"],
+  "status": "active"
+}
+```
+
+## 6. Resource model
+
+This remains one of the strongest parts of the architecture and does not need a conceptual rewrite.
+
+Every component instance owns resources.
+
+### Resource metadata
+
+A resource should carry at least:
+
+- `id`
+- `componentInstanceId`
+- `title`
+- `kind`
+- `summary`
+- optional `tags`
+- `contentType`
+- full body stored separately
+
+### Recommended metadata extensions
+
+To support the dynamic model, resources should also be able to carry:
+
+- `supportsRequirementIds`
+- `derivedFromResourceIds`
+- `producedByComponentInstanceId`
+- `status`
+- `confidence`
+
+### Resource summary example
+
+```json
+{
+  "id": "lit-0007",
+  "componentInstanceId": "literature-crp-biosensor",
+  "title": "CRP paper sensor prior art",
+  "kind": "paper-note",
+  "summary": "Summary of prior work on CRP paper sensors and likely overlap with the current hypothesis.",
+  "tags": ["diagnostics", "crp"],
+  "supportsRequirementIds": ["req-001"]
+}
+```
+
+## 7. TOC-first shared memory
+
+Each component instance exposes:
+- a component summary
+- a TOC of resource summaries
+
+Other components always get:
+- summaries
+- TOCs
+
+Other components only fetch:
+- full resource bodies on demand
+
+This remains the correct default.
+
+## 8. Proposed storage layout
+
+The exact filesystem layout can evolve, but conceptually it should support benches and dynamic component instances.
+
+One possible shape:
+
+```text
+workspace/
+  benches/
+    <bench-id>/
+      bench.json
+      requirements/
+        <requirement-id>.json
+      components/
+        <component-instance-id>/
+          component.json
+          summary.md
+          toc.json
+          resources/
+            <resource-id>.md
+            <resource-id>.meta.json
+          tasks/
+            pending/
+            running/
+            completed/
+```
+
+This is only a proposal, but the key point is:
+- benches contain component instances
+- component instances contain resources and tasks
+
+## 9. Task model
+
+Tasks now exist between component instances.
+
+### Task example
 
 ```json
 {
   "id": "task-0003",
-  "fromComponentId": "orchestrator",
-  "toComponentId": "literature",
-  "title": "Review evidence for delivery constraints",
+  "benchId": "bench-crp-biosensor",
+  "fromComponentInstanceId": "orchestrator-bench-crp-biosensor",
+  "toComponentInstanceId": "literature-crp-biosensor",
+  "title": "Review prior work overlap",
   "status": "pending",
   "createdAt": "2026-04-25T19:20:00.000Z",
   "updatedAt": "2026-04-25T19:20:00.000Z"
 }
 ```
 
-### Task execution rule
+### Task rule
 
-Every accepted task should:
+Each accepted task:
+- spawns a fresh pi task-run session
+- is fulfilled in the target component instance
+- ends with a durable result resource/document
 
-- spawn a **fresh pi session** in the target component
-- be fulfilled in that task-run session
-- end with a durable result document
+## 10. Backend services proposal
 
-The result document can also be treated as a normal resource of the target component so it can appear in TOCs and be loaded on demand.
-
-### Why task files instead of direct orchestration state
-
-- sender components can poll cheaply
-- task state is visible on disk
-- debugging is straightforward
-- the orchestrator can fan out to multiple specialists without extra infrastructure
-
-## 8. Backend services proposal
-
-## 8.1 Component Registry
+### 1. Bench Registry
 
 Responsibilities:
-- discover all components
-- read component metadata
-- expose component summary + TOC
+- discover benches
+- read bench metadata
 
-## 8.2 Resource Indexer
-
-Responsibilities:
-- read resource metadata files
-- verify every resource has a summary
-- generate or refresh `toc.json`
-
-## 8.3 Resource Store
+### 2. Requirement Store
 
 Responsibilities:
-- create/read/update resource bodies
-- read/write metadata sidecars
-- expose cheap vs full resource views
+- read/write requirements
+- show which requirements are open/resolved
 
-## 8.4 Context Assembler
-
-Responsibilities:
-- build prompt context for a component
-- inject all component summaries and TOCs
-- avoid loading full resource bodies by default
-
-## 8.5 Session Integrator
+### 3. Component Instance Registry
 
 Responsibilities:
-- let warm pi sessions access the component model indirectly
-- later refresh role prompt context when summaries/TOCs change
-- spawn fresh task-run sessions for delegated tasks
+- discover component instances for one bench
+- read summaries and TOCs
+- expose template linkage
 
-## 8.6 Task Service
+### 4. Resource Store
 
 Responsibilities:
-- create task files
-- move tasks between `pending`, `running`, and `completed`
-- track task/result metadata
-- let sender components poll for completion
-- support many outstanding tasks from one sender
+- list TOC entries
+- fetch full resource bodies
+- read/write resource metadata
 
-## 9. API proposal
+### 5. Context Assembler
 
-## 9.1 Component reads
+Responsibilities:
+- assemble cheap cross-component context
+- inject summaries + TOCs
+- keep full bodies out until requested
 
-### `GET /api/components`
+### 6. Session Integrator
 
-Returns all components with summary and TOC preview.
+Responsibilities:
+- keep warm sessions for active component instances
+- prompt them
+- stream normalized events
+- spawn fresh task-run sessions
 
-### `GET /api/components/:componentId`
+### 7. Task Service
 
-Returns one component with summary and full TOC.
+Responsibilities:
+- create file-backed tasks
+- move them between statuses
+- attach result resources
+- support polling and fan-out
 
-### `GET /api/context/components/:componentId`
+## 11. API proposal
 
-Returns cheap cross-component context for one component:
+## 11.1 Bench reads
+
+- `GET /api/benches`
+- `GET /api/benches/:benchId`
+
+## 11.2 Requirement reads
+
+- `GET /api/benches/:benchId/requirements`
+
+## 11.3 Component instance reads
+
+- `GET /api/benches/:benchId/components`
+- `GET /api/benches/:benchId/components/:componentInstanceId`
+
+## 11.4 Resource reads
+
+- `GET /api/benches/:benchId/components/:componentInstanceId/resources`
+- `GET /api/benches/:benchId/components/:componentInstanceId/resources/:resourceId`
+
+## 11.5 Context read
+
+- `GET /api/benches/:benchId/context/components/:componentInstanceId`
+
+Returns:
 - self summary
-- all other component summaries
-- all other TOCs
+- other component summaries
+- other TOCs
 - no full resource bodies
 
-This endpoint is designed for prompt assembly and debugging.
+## 11.6 Task endpoints
 
-## 9.2 Resource reads
+- `POST /api/tasks`
+- `GET /api/tasks`
+- `GET /api/tasks/:taskId`
+- `GET /api/tasks/:taskId/result`
 
-### `GET /api/components/:componentId/resources`
+Polling remains the intended hackathon strategy.
 
-Returns the full TOC list only.
+## 12. CLI proposal
 
-### `GET /api/components/:componentId/resources/:resourceId`
+The CLI should reflect the new model.
 
-Returns the full resource body and metadata.
-
-This is the lazy-loading endpoint.
-
-## 9.3 Resource writes
-
-### `POST /api/components/:componentId/resources`
-
-Creates a resource.
-
-Request:
-
-```json
-{
-  "title": "Cas9 off-target mitigation strategies review",
-  "kind": "paper-note",
-  "summary": "Review of guide design, enzyme engineering, and delivery constraints relevant to off-target reduction.",
-  "tags": ["crispr", "off-target", "review"],
-  "contentType": "text/markdown",
-  "content": "# Notes\n\n..."
-}
-```
-
-### `PATCH /api/components/:componentId/resources/:resourceId`
-
-Updates metadata and/or content.
-
-### `POST /api/components/:componentId/summary`
-
-Sets or regenerates component summary.
-
-### `POST /api/components/:componentId/toc/rebuild`
-
-Rebuilds `toc.json` from resource metadata.
-
-## 9.4 Task endpoints
-
-### `POST /api/tasks`
-
-Creates a delegated task.
-
-Request:
-
-```json
-{
-  "fromComponentId": "orchestrator",
-  "toComponentId": "literature",
-  "title": "Review evidence for delivery constraints",
-  "request": "Review the literature we already collected and summarize delivery-related off-target constraints."
-}
-```
-
-### `GET /api/tasks`
-
-Supports filters like:
-- `forComponent=<id>`
-- `fromComponent=<id>`
-- `status=pending|running|completed|failed`
-
-### `GET /api/tasks/:taskId`
-
-Returns task metadata plus request text.
-
-### `GET /api/tasks/:taskId/result`
-
-Returns the result document or the equivalent result resource reference.
-
-### Polling expectation
-
-For the hackathon, polling is the intended access pattern:
-- sender creates one or many tasks
-- sender polls until all expected tasks are complete
-- sender loads the result documents and continues its own session
-
-## 10. CLI proposal
-
-The CLI should be a very thin wrapper over the API.
-
-### Read commands first
+Examples:
 
 ```bash
-benchpilot components list --json
-benchpilot components get literature --json
-benchpilot components context --for reagents --json
-benchpilot resources list literature --json
-benchpilot resources get literature lit-0007 --json
-benchpilot tasks list --for orchestrator --status pending --json
-benchpilot tasks get task-0003 --json
+benchpilot benches list --json
+benchpilot benches get bench-crp-biosensor --json
+benchpilot requirements list bench-crp-biosensor --json
+benchpilot components list bench-crp-biosensor --json
+benchpilot resources list bench-crp-biosensor literature-crp-biosensor --json
+benchpilot resources get bench-crp-biosensor literature-crp-biosensor lit-0007 --json
+benchpilot tasks create --bench bench-crp-biosensor --from orchestrator-bench-crp-biosensor --to literature-crp-biosensor --stdin --json
 ```
 
-### Write commands second
+## 13. Agent behavior in this model
 
-```bash
-benchpilot resources create literature --title "..." --summary "..." --stdin --json
-benchpilot resources update literature lit-0007 --summary "..." --stdin --json
-benchpilot components summary set literature --stdin --json
-benchpilot components toc rebuild literature --json
-benchpilot tasks create --from orchestrator --to literature --title "Review evidence" --stdin --json
-```
+### Always visible
 
-## 11. Agent behavior proposal
-
-### What is always visible
-
-Each agent should have in context:
-- all component summaries
-- all component TOCs
-
-### What is fetched only when needed
-
-Full resource bodies.
-
-### Example flow
-
-1. `reagents` agent sees in `literature` TOC an entry called `Off-target CRISPR reagent constraints`
-2. it decides the entry is relevant
-3. it runs:
-
-```bash
-benchpilot resources get literature lit-0012 --json
-```
-
-4. it reads the full details only then
-5. it uses the result in its own reasoning or writes a local resource
-
-This is the exact TOC-first, details-on-demand behavior we want.
-
-### Task delegation flow
-
-1. `orchestrator` creates a task for `literature`
-2. `orchestrator` creates another task for `reagents`
-3. backend writes both task files
-4. each task starts a fresh pi session in the target component
-5. each target writes a result document
-6. `orchestrator` polls until both tasks are complete
-7. `orchestrator` reads both result documents and synthesizes
-
-This is the main coordinator use case we want to support.
-
-## 12. Skills proposal for this model
-
-Role skills should explicitly teach the above pattern.
-
-Example instruction fragment:
-
-- You always see summaries and TOCs of other components.
-- Do not fetch full resources from another component unless you need the details.
-- When you need details, use the BenchPilot CLI via `bash`.
-- Prefer reading the smallest relevant resource rather than loading many resources at once.
-- When another component should do the work itself, create a task instead of trying to do that work in its place.
-- If you create multiple tasks, wait until all required results exist before continuing your synthesis.
-
-## 13. Minimal implementation slice
-
-If time is tight, the minimum useful slice is:
-
-1. file-based component registry
-2. file-based resources with `.meta.json` sidecars
-3. file-based tasks with `task.json` + `request.md`
-4. `GET /api/components`
-5. `GET /api/components/:componentId/resources`
-6. `GET /api/components/:componentId/resources/:resourceId`
-7. `POST /api/tasks`
-8. `GET /api/tasks/:taskId`
-9. `GET /api/tasks/:taskId/result`
-10. `benchpilot components list --json`
-11. `benchpilot resources get <component> <resource> --json`
-12. `benchpilot tasks create --from <sender> --to <target> --stdin --json`
-
-That is enough to demonstrate:
-- summaries
+- component summaries
 - TOCs
-- on-demand detail loading
-- agent-accessible cross-component reads
-- orchestrator-style delegated work
+- requirement-aware cheap context
 
-## 14. Recommended future evolution
+### Only when needed
 
-### After hackathon
+- full resource bodies
 
-- consider moving metadata into sqlite while keeping markdown bodies on disk
-- add resource relations / links
-- add validation for resource kinds
-- add ownership and mutation policies
-- add prompt-context compaction rules for large TOCs
-- add task retries, cancellation, and optional concurrency limits
+### When another component should do the work
+
+- create a task
+- wait for result resources
+- continue synthesis
+
+## 14. Minimal next implementation slice
+
+The next backend slice should not try to do everything at once.
+
+Recommended minimum:
+
+1. `GET /api/benches`
+2. `GET /api/benches/:benchId/components`
+3. `GET /api/benches/:benchId/components/:componentInstanceId/resources`
+4. `GET /api/benches/:benchId/components/:componentInstanceId/resources/:resourceId`
+5. optional `GET /api/benches/:benchId/requirements`
+
+That is enough to make the dynamic bench legible to both UI and agents.
 
 ## 15. Final recommendation
 
-Keep the backend model simple:
+The major backend concept change is real:
+- fixed components are no longer the right primary abstraction
 
-- markdown bodies
-- JSON metadata sidecars
-- generated TOCs
-- file-backed tasks
-- summary-first prompt context
-- detail loading on demand through API/CLI
-- polling-based task completion checks
+The resource-oriented data model, however, is still correct.
 
-This is powerful enough for the hackathon and aligned with how the agents should think across components.
+So the right move is:
+- adopt dynamic benches, requirements, and component instances
+- keep summaries/TOCs/resources/tasks as the durable collaboration substrate

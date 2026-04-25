@@ -1,141 +1,141 @@
 # BenchPilot — User Stories
 
-> Companion document to `concept.md` and `04_The_AI_Scientist.md`. Personas to ground design decisions for the hackathon submission, plus a design map and a recommendation for clickdummy scope.
+> Companion document to `concept.md` and `04_The_AI_Scientist.docx.md`.
 >
-> **What BenchPilot does in this challenge:** takes a scientific hypothesis as input → runs a literature QC novelty check → generates an operationally realistic experiment plan (protocol, materials with catalog numbers, budget, timeline, validation). Stretch: structured scientist review feeds a learning loop so future plans of the same type improve.
+> Updated framing: BenchPilot should dynamically assemble the right working set of component instances for each scientific question, rather than assuming one fixed bench layout for every domain.
 
----
+## What BenchPilot must actually do
 
-## How the personas split
+The challenge is still:
 
-Three groups around the workflow:
+- take a scientific question
+- check whether similar work already exists
+- generate a runnable experiment plan
 
-- **Plan requesters** — people who hold a hypothesis and need a plan. The primary users.
-- **Plan reviewers** — domain experts whose corrections feed the learning loop (stretch goal).
-- **Plan consumers** — the lab/CRO that has to actually execute what BenchPilot produces. They are not users of the tool, but the plan must hold up to their scrutiny.
+But operationally, different questions should create different benches.
 
-The challenge brief calls out four sample fields — **Diagnostics, Gut Health, Cell Biology, Climate**. The personas below are anchored to those fields plus a few field-agnostic roles, so the demo can credibly span more than one domain.
+That means the personas below should not just test the quality of the plan — they should also stress whether the system creates the **right working set of components** for their problem.
 
----
+## Persona groups
+
+- **Plan requesters** — people who need the plan
+- **Plan reviewers** — domain experts who correct it
+- **Plan consumers** — the lab/CRO that has to execute it
+
+## Key user story framing
+
+For every persona below, the implicit question is:
+
+> Does BenchPilot derive the right requirements and instantiate the right specialist components for this problem?
 
 ## Personas
 
-### 1. Maya — 1st-year PhD, gut health / aging biology *(plan requester, junior — Gut Health)*
-- 1st-year PhD student in a mouse aging lab, working on the gut–senescence axis.
-- **Hypothesis she'd type in (sample-input style):** *"Supplementing C57BL/6 mice with Lactobacillus rhamnosus GG for 4 weeks will reduce intestinal permeability by at least 30% compared to controls, measured by FITC-dextran assay, due to upregulation of tight junction proteins claudin-1 and occludin."*
-- **Current setup:** paper notebook, messy PDFs, Sunday-night panic before lab meeting.
-- **Pain:** she can write the hypothesis but has no idea what dose, what controls, what reagents to order, or what 4 weeks looks like in calendar weeks once IACUC and acclimatization are factored in. Her PI doesn't have time to walk her through it.
-- **What she needs from BenchPilot:** a plan that shows her what a senior scientist would have done — including the parts she didn't know to ask about ("you'll need IACUC approval, typical lead time 6–10 weeks").
-- **Stake:** the spine of the next 4 years.
+### 1. Sebastian — CRO scientist scoping client briefs
 
-### 2. Jonas — Postdoc, climate / environmental microbiology *(plan requester, reproducer — Climate)*
-- Postdoc reproducing a CO₂-fixation experiment from his PhD in his new lab.
-- **Hypothesis he'd type in (sample-input style):** *"Introducing Sporomusa ovata into a bioelectrochemical system at a cathode potential of −400 mV vs SHE will fix CO₂ into acetate at a rate of at least 150 mmol/L/day, outperforming current biocatalytic carbon capture benchmarks by at least 20%."*
-- **Pain:** the original protocol lives across an ex-institute wiki, his laptop, and email threads with his old advisor. Reagent catalog numbers have changed, suppliers have merged. He wants a *clean* plan he can compare against his old protocol to spot drift.
-- **What he needs from BenchPilot:** materials list with *current* catalog numbers, plus literature QC explicitly surfacing his old paper as "exact match found" so reviewers don't think he's claiming novelty.
-- **Stake:** credibility in the new lab and the validity of all downstream work.
+- field: varies week to week
+- role: primary requestor
+- need: fast first-pass plan with protocol, budget, materials, timeline, and novelty check
+- architectural pressure: dynamic component creation matters a lot because client briefs vary wildly
 
-### 3. Dr. Park — Engineer-turned-scientist, point-of-care diagnostics *(plan requester, cross-disciplinary — Diagnostics)*
-- Mid-career researcher with an EE background, now leading a point-of-care diagnostics group.
-- **Hypothesis she'd type in (sample-input style):** *"A paper-based electrochemical biosensor functionalized with anti-CRP antibodies will detect C-reactive protein in whole blood at concentrations below 0.5 mg/L within 10 minutes, matching laboratory ELISA sensitivity without requiring sample preprocessing."*
-- **Pain:** her team has the device-fabrication side covered but not the antibody chemistry, validation panel design, or the ELISA comparator. She needs a plan that bridges electrochemistry and immunoassay competently — exactly the cross-disciplinary scope where a single human expert is rare.
-- **What she needs from BenchPilot:** a plan that doesn't quietly default to one discipline; surfacing both supplier classes (electrodes *and* antibodies) and a side-by-side validation against ELISA.
-- **Stake:** a translational grant deadline; the diagnostic only matters if it's validated against the gold standard.
-- **Architectural pressure:** cross-domain plans are where weak generation shows. Good test case for the quality bar.
+BenchPilot should not hand Sebastian the same fixed bench every time. It should create the right specialist workers for the brief in front of it.
 
-### 4. Dr. Patel — PI submitting an exploratory grant *(plan requester, senior — field-agnostic)*
-- Mid-career PI at a research university, 12-person lab.
-- **Hypothesis she'd type in:** something at the edge of her expertise — a cross-disciplinary idea where she has the biology but not the assay experience.
-- **Pain:** writing the methods + budget section of an R21 takes a postdoc a week. Half of that is sourcing realistic costs and timelines for techniques she's never run.
-- **What she needs from BenchPilot:** a defensible draft of methods + budget + timeline she can edit, not start from scratch. Bonus: catalog numbers and supplier names she can hand to grants admin.
-- **Stake:** grant deadlines that don't move.
+### 2. Maya — junior PhD in gut health / aging biology
 
-### 5. Sebastian — CRO scientist scoping client briefs *(plan requester, professional — field-agnostic)*
-- Senior scientist at a contract research organisation (CRO).
-- **Hypothesis he'd type in:** whatever a pharma client just emailed in a one-paragraph brief — and the field changes week to week.
-- **Pain:** a senior scientist can scope a proposal in hours; a junior one takes days, and the quality varies. Bad scoping = lost deals or under-priced contracts.
-- **What he needs from BenchPilot:** a first-pass plan he can edit and quote against, plus literature QC so he can flag to the client whether the work has already been done.
-- **Stake:** turnaround time on proposals = win rate.
-- **Why he's the demo persona:** matches the brief's framing word-for-word ("the lab's scientists scope the work… a senior scientist who's run a similar experiment can do this in hours; one who hasn't may take days").
+- field: gut health
+- role: junior requestor
+- need: a plan that includes the things she did not know to ask for
+- architectural pressure: requirement derivation must surface hidden operational work
 
-### 6. Hanna — Master's student, first independent project *(plan requester, novice — Gut Health)*
-- 6-month master's project, loosely supervised by Maya, working on a probiotic side-arm.
-- **Hypothesis she'd type in:** something her supervisor handed her, only half understood.
-- **Pain:** doesn't know what she doesn't know. A blank chatbox terrifies her. Needs scaffolding — example hypotheses, fill-in-the-blanks, a clear "what a good plan looks like" before she's asked to evaluate one.
-- **What she needs from BenchPilot:** structured input help (templates, the four sample-input examples from the brief), output explained at a level she can actually learn from.
-- **Stake:** passing her thesis, learning how science is planned.
-- **Architectural pressure:** does the input UX assume an expert-written hypothesis, or does it help the user *write* one? Different products.
+BenchPilot should likely spin up components for:
+- literature
+- animal-study design
+- reagents
+- timeline / approvals
+- validation
 
-### 7. Prof. Okonkwo — Senior reviewer, cell biology *(plan reviewer — Cell Biology, stretch goal)*
-- 25-year veteran in cell biology, runs a 20-person lab.
-- **Plan he'd be reviewing (sample-input style):** *"Replacing sucrose with trehalose as a cryoprotectant in the freezing medium will increase post-thaw viability of HeLa cells by at least 15 percentage points compared to the standard DMSO protocol, due to trehalose's superior membrane stabilization at low temperatures."*
-- **Role with BenchPilot:** doesn't generate plans — corrects them. He flags "wrong concentration", "this catalog number was discontinued", "this control is missing", "the timeline ignores cell-culture doubling time".
-- **Pain:** he'd happily teach the system once if it remembered — but won't waste time correcting the same mistake on every plan.
-- **What BenchPilot needs to give him:** a structured review interface (annotate sections, rate steps, suggest replacements) and visible evidence that his prior corrections actually changed the next plan in his domain.
-- **Stake:** his time. If corrections don't compound, he stops reviewing.
-- **Architectural pressure:** the stretch goal lives or dies on whether feedback is *visibly* incorporated. Few-shot replay tagged by experiment type is the minimum demo.
+not merely “general chat + budget”.
 
-### 8. Aisha — Lab manager at the executing lab *(plan consumer, not a user — field-agnostic)*
-- Runs day-to-day operations at the wet lab that receives the plan.
-- **Role with BenchPilot:** never opens it. But the plan she receives must be executable — real reagents, real catalog numbers, realistic lead times, equipment her lab actually owns.
-- **Pain:** plans that look good on paper but assume she has a flow cytometer she doesn't, or list a reagent that's been on backorder for six months.
-- **What BenchPilot needs to do for her:** prefer canonical suppliers, surface lead times where known, flag equipment assumptions explicitly so she can sanity-check before starting.
-- **Stake:** weeks of wasted lab time when an unrunnable plan gets started.
-- **Architectural pressure:** the *quality bar* in the brief — "would a real scientist trust this enough to order materials and start Friday" — is really about Aisha. Build for her trust even though she never touches the UI.
+### 3. Dr. Park — diagnostics / cross-disciplinary researcher
 
-### 9. Dr. Aydin — Industry scientist at a regulated biotech *(plan requester, constrained — out of scope for hackathon)*
-- Senior scientist at a 30-person biotech; results feed IP filings.
-- **Hypothesis she'd type in:** can't — her hypotheses contain unpublished compound structures she's not allowed to send to external LLM APIs.
-- **Pain:** she'd love the tool but can't legally use it without on-prem inference and a clear data-flow diagram.
-- **What BenchPilot needs to acknowledge:** for the hackathon, she's out of scope. Naming her now keeps the architecture honest about what "self-hostable" would later require.
-- **Stake:** IP exposure, regulatory audit.
-- **Architectural pressure:** data residency + model choice. Park, don't preclude.
+- field: diagnostics
+- role: senior requestor
+- need: cross-domain plan quality
+- architectural pressure: dynamic benches must bridge multiple domains cleanly
 
----
+Her problem likely needs a working set spanning:
+- literature / novelty
+- assay / protocol design
+- reagent sourcing
+- validation against ELISA
+- maybe device-specific support
 
-## Persona-driven design map
+The bench should be assembled accordingly.
 
-| Persona | Field | Role | What they need from BenchPilot | Architectural pressure |
-|---|---|---|---|---|
-| Maya | Gut Health | Plan requester (junior) | Plan + the parts she didn't know to ask | Output must be self-explaining |
-| Jonas | Climate | Plan requester (reproducer) | Current catalog numbers + "exact match" QC | Literature QC accuracy |
-| Park | Diagnostics | Plan requester (cross-disciplinary) | Bridges device + assay competently | Cross-domain quality |
-| Patel | (any) | Plan requester (senior, grant) | Defensible methods/budget/timeline draft | Citation quality, budget realism |
-| Sebastian | (any) | Plan requester (CRO, professional) | Fast scoping draft | Turnaround speed, edit-friendliness |
-| Hanna | Gut Health | Plan requester (novice) | Scaffolded input, learnable output | Input UX assumes expertise — or doesn't |
-| Okonkwo | Cell Biology | Plan reviewer (stretch) | Structured review + visible learning | Feedback store + replay loop |
-| Aisha | (any) | Plan consumer (not a user) | Executable, equipment-aware plans | Quality bar — "Friday-runnable" |
-| Aydin | (any, regulated) | Constrained requester (out of scope) | On-prem inference | Data residency (defer) |
+### 4. Jonas — climate / environmental microbiology postdoc
 
-### Field coverage check
+- field: climate
+- role: reproducer
+- need: exact-match signal and updated operational details
+- architectural pressure: reproduction vs novelty is a meaningful requirement difference
 
-| Sample-input field | Persona that exercises it |
-|---|---|
-| Diagnostics | Park (primary), Sebastian (any client brief) |
-| Gut Health | Maya (primary), Hanna (novice variant) |
-| Cell Biology | Okonkwo (reviewer), Sebastian (any client brief) |
-| Climate | Jonas (primary) |
+For Jonas, the system may need fewer novelty components and more protocol/material/equipment detail.
 
-Every sample-input field has at least one persona anchored to it — useful when picking which sample input to drive the live demo.
+### 5. Prof. Okonkwo — senior cell-biology reviewer
 
----
+- field: cell biology
+- role: reviewer / stretch-goal signal source
+- need: structured correction loop
+- architectural pressure: feedback should attach to resources, requirements, and maybe templates/component archetypes over time
 
-## Recommendation for the clickdummy
+### 6. Aisha — lab manager at the executing lab
 
-The challenge brief defines the deliverable; personas just sharpen *who you're building for*.
+- field: field-agnostic
+- role: consumer of the final plan
+- need: realistic materials, timing, and dependencies
+- architectural pressure: resource quality is the real trust signal
 
-- **Primary persona:** **Sebastian (CRO scientist)** — closest to the brief's framing, professional enough to demand operational realism, most dramatic before/after demo.
-- **Secondary persona:** **Maya (junior PhD)** — proves the tool isn't just for experts. Her hypothesis is the kind of thing a judge can imagine themselves typing.
-- **Cross-disciplinary stress test:** **Park (diagnostics)** — use her hypothesis to show the plan doesn't collapse to a single discipline.
-- **Stretch-goal persona:** **Prof. Okonkwo** — only matters if you build the review/learning loop. Don't add him to the demo unless that loop visibly works.
-- **Quality-bar persona:** **Aisha** — invisible in the UI, but the plan you generate must satisfy her. Use her as the evaluation lens: "would Aisha's lab actually start this on Friday?"
-- **Defer:** Hanna (novice scaffolding) and Aydin (compliance) — name them so the architecture stays honest, but don't build for them now.
+The bench can be as dynamic as it wants internally; Aisha only cares that the resulting resources are actionable.
 
-### Mapping personas to the three stages of the brief
+## Dynamic bench implications
 
-| Stage | Who tests it | What "good" looks like for them |
-|---|---|---|
-| 1. Hypothesis input | Maya, Sebastian, Park, Hanna | Sebastian pastes a client brief; Maya types her PhD hypothesis; Park tests a cross-domain one; Hanna refines hers in dialogue with the orchestrator on the start page. All accepted without reformatting. The start page also pulls candidate protocols from configured sources and asks the orchestrator to draft a protocol template (= the bench's components) before finalize. |
-| 2. Literature QC | Jonas, Patel | Jonas sees his old paper as "exact match"; Patel sees 2 prior papers as "similar work exists". |
-| 3. Experiment plan | Aisha (quality bar), Sebastian (turnaround) | Aisha would order the materials. Sebastian would send the plan to the client. |
-| Stretch: review loop | Okonkwo | His correction to plan #1 visibly changes plan #2 in the same domain. |
+The same user should not always see the same internal workbench shape.
+
+Examples:
+
+- a diagnostics problem may need a stronger validation and assay branch
+- a microbiology problem may need a stronger culture/protocol/equipment branch
+- a grant-scoping problem may need a stronger budget/timeline branch
+
+So the user stories now support a backend that:
+- derives requirements from the brief
+- creates component instances from templates
+- lets that set evolve during planning
+
+## Quality-bar lens
+
+For all personas, the internal architecture only matters if it improves the final deliverable.
+
+The plan still needs to answer:
+- what protocol should be run?
+- what materials should be ordered?
+- what will it cost?
+- how long will it take?
+- how will success be measured?
+
+The dynamic component system is justified only insofar as it makes those outputs better.
+
+## Recommendation for scope
+
+For the hackathon:
+
+- keep **Sebastian** as the main demo persona
+- use **Maya** and **Park** as stress tests for dynamic bench assembly
+- use **Aisha** as the silent quality-bar persona
+- treat **Okonkwo** as later/stretch pressure on structured feedback and learning
+
+## Final takeaway
+
+The personas still matter, but their architectural role has shifted.
+
+They are no longer just examples of users for a fixed bench.
+They are examples of why the bench must be **assembled dynamically from the problem**.
