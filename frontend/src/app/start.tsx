@@ -306,6 +306,60 @@ function StepButton({
   );
 }
 
+const EXAMPLE_QUESTIONS = [
+  "Why is enzyme X less stable below pH 5?",
+  "Does Lactobacillus rhamnosus GG reduce intestinal permeability in C57BL/6 mice?",
+  "Can a paper-based electrochemical biosensor detect CRP below 0.5 mg/L in whole blood?",
+  "Does Sporomusa ovata fix CO2 to acetate at >150 mmol/L/day at −400 mV vs SHE?",
+  "Does trehalose outperform sucrose as a HeLa cryoprotectant for post-thaw viability?",
+];
+
+function useTypewriterPlaceholder(examples: string[], paused: boolean): string {
+  const [text, setText] = useState("");
+  const indexRef = useRef(0);
+  const charRef = useRef(0);
+  const phaseRef = useRef<"typing" | "holding" | "erasing">("typing");
+
+  useEffect(() => {
+    if (paused) return;
+    let cancelled = false;
+
+    function tick() {
+      if (cancelled) return;
+      const target = examples[indexRef.current % examples.length];
+      let delay = 55;
+      if (phaseRef.current === "typing") {
+        charRef.current = Math.min(charRef.current + 1, target.length);
+        setText(target.slice(0, charRef.current));
+        if (charRef.current === target.length) {
+          phaseRef.current = "holding";
+          delay = 1800;
+        }
+      } else if (phaseRef.current === "holding") {
+        phaseRef.current = "erasing";
+        delay = 35;
+      } else {
+        charRef.current = Math.max(charRef.current - 1, 0);
+        setText(target.slice(0, charRef.current));
+        if (charRef.current === 0) {
+          phaseRef.current = "typing";
+          indexRef.current = (indexRef.current + 1) % examples.length;
+          delay = 350;
+        }
+      }
+      timeoutId = window.setTimeout(tick, delay);
+    }
+
+    let timeoutId = window.setTimeout(tick, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [examples, paused]);
+
+  return text;
+}
+
 function HypothesisView({
   question,
   onQuestionChange,
@@ -329,6 +383,7 @@ function HypothesisView({
   chatScrollRef: React.RefObject<HTMLDivElement | null>;
   onContinue: () => void;
 }) {
+  const placeholder = useTypewriterPlaceholder(EXAMPLE_QUESTIONS, question.length > 0);
   return (
     <>
       <div className="rounded-lg border border-accent bg-accent-soft p-4">
@@ -338,12 +393,9 @@ function HypothesisView({
         <input
           value={question}
           onChange={(e) => onQuestionChange(e.target.value)}
-          placeholder="e.g. Why is enzyme X less stable below pH 5?"
+          placeholder={placeholder}
           className="mt-2 w-full bg-transparent text-lg font-semibold leading-snug text-accent-soft-fg outline-none placeholder:text-accent-soft-fg/50"
         />
-        <p className="mt-1 text-xs text-accent-soft-fg/80">
-          The orchestrator may suggest revisions in the chat below — accepted revisions update this line in place.
-        </p>
       </div>
 
       <div className="flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface-elev p-4">
