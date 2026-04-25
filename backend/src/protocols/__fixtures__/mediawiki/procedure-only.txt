@@ -1,0 +1,5 @@
+'''Minimal procedure'''
+
+== Procedure ==
+# Wash plates twice with PBS.
+# Add fresh medium and incubate.

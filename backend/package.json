@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest --run"
+    "test": "vitest --run",
+    "test:coverage": "vitest --run --coverage --coverage.include='src/protocols/**' --coverage.exclude='**/*.test.ts' --coverage.exclude='**/__fixtures__/**'"
   },
   "dependencies": {
     "@mariozechner/pi-coding-agent": "^0.70.2",
@@ -21,6 +22,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^24.7.2",
+    "@vitest/coverage-v8": "^3.2.4",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

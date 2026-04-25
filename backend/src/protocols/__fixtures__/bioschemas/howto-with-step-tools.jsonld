@@ -1,0 +1,19 @@
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "HowTo with per-step tools and supplies",
+  "step": [
+    {
+      "@type": "HowToStep",
+      "position": "1",
+      "text": "Pre-warm reagents.",
+      "supply": { "@type": "DefinedTerm", "name": "buffer A" },
+      "tool": { "@type": "DefinedTerm", "name": "water bath" }
+    },
+    {
+      "@type": "HowToStep",
+      "position": 2,
+      "name": "Without text — uses name as fallback"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   bioschemasToCanonical,
@@ -11,10 +11,13 @@ import {
   canonicalToMediawiki,
   canonicalToProtocolsIo,
   crossrefMessageToEnvelope,
+  fetchCrossref,
+  fetchProtocolIo,
   jatsToCanonical,
   mediawikiToCanonical,
   protocolsIoToCanonical,
   protocolsIoToEnvelope,
+  searchProtocolsIo,
   type CanonicalProtocol,
 } from "./index.js";
 
@@ -310,5 +313,222 @@ describe("crossref reverse mapper", () => {
     expect(back.abstract).toBe(orig.abstract);
     expect(back.publishedAt).toBe(orig.publishedAt);
     expect(back.license).toBe(orig.license);
+  });
+});
+
+/* ---------------------------- edge cases ------------------------------ */
+
+describe("bioschemas edge cases", () => {
+  it("handles bare-string license and array-typed tools", () => {
+    const json = readText("bioschemas/array-tool-and-string-license.jsonld");
+    const proto = bioschemasToCanonical(json);
+    expect(proto.license).toBe("CC-BY-4.0");
+    expect(proto.tools.map((t) => t.name)).toEqual([
+      "centrifuge",
+      "vortex mixer",
+    ]);
+  });
+
+  it("merges per-step tools/supplies and falls back to step.name when text is missing", () => {
+    const json = readText("bioschemas/howto-with-step-tools.jsonld");
+    const proto = bioschemasToCanonical(json);
+    // step 1 supply pulled up to top-level supplies
+    expect(proto.supplies.map((s) => s.name)).toEqual(["buffer A"]);
+    expect(proto.tools.map((t) => t.name)).toEqual(["water bath"]);
+    // step 2 has no `text` — should fall through to `name`
+    expect(proto.steps[1]?.text).toBe(
+      "Without text — uses name as fallback",
+    );
+    // string position "1" coerces to number 1
+    expect(proto.steps[0]?.position).toBe(1);
+  });
+});
+
+describe("jats edge cases", () => {
+  it("reads references from <mixed-citation> when <element-citation> is absent", () => {
+    const xml = readText("jats/mixed-citation.xml");
+    const proto = jatsToCanonical(xml);
+    expect(proto.references).toHaveLength(1);
+    expect(proto.references[0]?.doi).toBe("10.1016/older");
+    expect(proto.references[0]?.title).toContain("Older mixed-citation");
+  });
+
+  it("supports <string-name> in contrib instead of <name><surname/>", () => {
+    const xml = readText("jats/mixed-citation.xml");
+    const proto = jatsToCanonical(xml);
+    expect(proto.authors).toEqual(["Vera Marsh"]);
+  });
+
+  it("falls back to procedure section paragraphs when there is no ordered list", () => {
+    const xml = `<?xml version="1.0"?><article>
+      <front><article-meta>
+        <title-group><article-title>Para procedure</article-title></title-group>
+      </article-meta></front>
+      <body>
+        <sec sec-type="procedure">
+          <title>Procedure</title>
+          <p>First paragraph step.</p>
+          <p>Second paragraph step.</p>
+        </sec>
+      </body>
+    </article>`;
+    const proto = jatsToCanonical(xml);
+    expect(proto.steps).toHaveLength(2);
+    expect(proto.steps[0]?.text).toMatch(/First paragraph step/);
+  });
+});
+
+describe("mediawiki edge cases", () => {
+  it("returns empty steps/supplies/tools when sections are missing", () => {
+    const wikitext = readText("mediawiki/no-headings.txt");
+    const proto = mediawikiToCanonical({
+      pageTitle: "Free-form lab note",
+      pageUrl: "https://example.org/owsample",
+      wikitext,
+    });
+    expect(proto.steps).toEqual([]);
+    expect(proto.supplies).toEqual([]);
+    expect(proto.tools).toEqual([]);
+  });
+
+  it("handles a procedure-only page with no Materials/Equipment headings", () => {
+    const wikitext = readText("mediawiki/procedure-only.txt");
+    const proto = mediawikiToCanonical({
+      pageTitle: "Minimal procedure",
+      pageUrl: "https://example.org/min",
+      wikitext,
+    });
+    expect(proto.steps.map((s) => s.text)).toEqual([
+      "Wash plates twice with PBS.",
+      "Add fresh medium and incubate.",
+    ]);
+    expect(proto.supplies).toEqual([]);
+    expect(proto.tools).toEqual([]);
+  });
+});
+
+/* ---------------------------- network mocks --------------------------- */
+
+const ORIGINAL_FETCH = global.fetch;
+const ORIGINAL_TOKEN = process.env.PROTOCOLS_IO_TOKEN;
+
+function mockFetchOnce(body: unknown, init: ResponseInit = { status: 200 }) {
+  const fn = vi.fn(async () =>
+    new Response(JSON.stringify(body), {
+      ...init,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+  global.fetch = fn as unknown as typeof fetch;
+  return fn;
+}
+
+describe("network wrappers (mocked fetch)", () => {
+  beforeEach(() => {
+    process.env.PROTOCOLS_IO_TOKEN = "test-token";
+  });
+  afterEach(() => {
+    global.fetch = ORIGINAL_FETCH;
+    if (ORIGINAL_TOKEN === undefined) delete process.env.PROTOCOLS_IO_TOKEN;
+    else process.env.PROTOCOLS_IO_TOKEN = ORIGINAL_TOKEN;
+  });
+
+  it("searchProtocolsIo: sends Bearer token and converts hits to envelopes", async () => {
+    const fetchSpy = mockFetchOnce({
+      items: [
+        {
+          id: 1,
+          uri: "demo-uri",
+          title: "Demo",
+          authors: [{ name: "A B" }],
+          url: "https://www.protocols.io/view/demo-uri",
+        },
+      ],
+      status_code: 0,
+    });
+
+    const hits = await searchProtocolsIo("PCR", 5);
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.id).toBe("protocols.io:demo-uri");
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const callArgs = fetchSpy.mock.calls[0]!;
+    const url = callArgs[0] as URL;
+    expect(url.searchParams.get("key")).toBe("PCR");
+    expect(url.searchParams.get("page_size")).toBe("5");
+    const init = callArgs[1] as RequestInit;
+    const headers = init.headers as Record<string, string>;
+    expect(headers.Authorization).toBe("Bearer test-token");
+  });
+
+  it("searchProtocolsIo: throws on non-zero status_code", async () => {
+    mockFetchOnce({ status_code: 1, error_message: "boom" });
+    await expect(searchProtocolsIo("PCR")).rejects.toThrow(/status_code 1/);
+  });
+
+  it("searchProtocolsIo: throws on HTTP non-2xx with body excerpt", async () => {
+    mockFetchOnce({ error: "rate limited" }, { status: 429 });
+    await expect(searchProtocolsIo("PCR")).rejects.toThrow(/HTTP 429/);
+  });
+
+  it("fetchProtocolIo: returns canonical from a detail response", async () => {
+    mockFetchOnce({
+      protocol: {
+        id: 99,
+        uri: "demo-detail",
+        title: "Detail demo",
+        authors: [{ name: "Z" }],
+        steps: [
+          { number: 1, step: "<p>do thing</p>", components: [] },
+        ],
+      },
+      status_code: 0,
+    });
+    const proto = await fetchProtocolIo("demo-detail");
+    expect(proto.id).toBe("protocols.io:demo-detail");
+    expect(proto.steps[0]?.text).toBe("do thing");
+  });
+
+  it("fetchProtocolIo: throws when the API omits the protocol field", async () => {
+    mockFetchOnce({ status_code: 0 });
+    await expect(fetchProtocolIo("nope")).rejects.toThrow(/missing `protocol`/);
+  });
+
+  it("token(): missing PROTOCOLS_IO_TOKEN propagates a clear error", async () => {
+    delete process.env.PROTOCOLS_IO_TOKEN;
+    await expect(searchProtocolsIo("PCR")).rejects.toThrow(
+      /PROTOCOLS_IO_TOKEN is not set/,
+    );
+  });
+
+  it("fetchCrossref: maps `message` to envelope; passes Accept header", async () => {
+    const fetchSpy = mockFetchOnce({
+      message: {
+        DOI: "10.1234/example",
+        URL: "https://doi.org/10.1234/example",
+        title: ["Mocked work"],
+        author: [{ given: "First", family: "Last" }],
+        issued: { "date-parts": [[2024, 6, 1]] },
+      },
+    });
+    const env = await fetchCrossref("10.1234/example");
+    expect(env.title).toBe("Mocked work");
+    expect(env.doi).toBe("10.1234/example");
+    expect(env.authors).toEqual(["First Last"]);
+    const headers = (fetchSpy.mock.calls[0]![1] as RequestInit).headers as Record<string, string>;
+    expect(headers.Accept).toBe("application/json");
+    expect(headers["User-Agent"]).toContain("BenchPilot");
+  });
+
+  it("fetchCrossref: rejects on HTTP failure", async () => {
+    mockFetchOnce({ status: "fail" }, { status: 404 });
+    await expect(fetchCrossref("10.0/missing")).rejects.toThrow(/HTTP 404/);
+  });
+
+  it("fetchCrossref: rejects when message is missing", async () => {
+    mockFetchOnce({ status: "ok" });
+    await expect(fetchCrossref("10.0/empty")).rejects.toThrow(
+      /missing `message`/,
+    );
   });
 });

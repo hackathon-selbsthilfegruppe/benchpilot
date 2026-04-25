@@ -1,0 +1,3 @@
+'''Free-form lab note'''
+
+This page has no section headings. Just a wall of text describing what we did, with no formal procedure list.

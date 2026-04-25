@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<article xmlns:xlink="http://www.w3.org/1999/xlink" article-type="protocol">
+  <front>
+    <article-meta>
+      <article-id pub-id-type="doi">10.21769/BioProtoc.demo.0003</article-id>
+      <title-group>
+        <article-title>Mixed-citation reference style protocol</article-title>
+      </title-group>
+      <contrib-group>
+        <contrib contrib-type="author">
+          <string-name>Vera Marsh</string-name>
+        </contrib>
+      </contrib-group>
+    </article-meta>
+  </front>
+  <body>
+    <sec sec-type="procedure">
+      <title>Procedure</title>
+      <list list-type="order">
+        <list-item><p>Step one.</p></list-item>
+      </list>
+    </sec>
+  </body>
+  <back>
+    <ref-list>
+      <ref id="r1">
+        <mixed-citation>
+          <article-title>Older mixed-citation paper</article-title>
+          <ext-link xlink:href="https://example.org/older">link</ext-link>
+          <pub-id pub-id-type="doi">10.1016/older</pub-id>
+        </mixed-citation>
+      </ref>
+    </ref-list>
+  </back>
+</article>

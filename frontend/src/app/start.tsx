@@ -408,10 +408,14 @@ function HypothesisView({
   return (
     <>
       <div className="rounded-lg border border-accent bg-accent-soft p-4">
-        <label className="text-xs font-semibold uppercase tracking-wide text-accent-soft-fg">
+        <label
+          htmlFor="research-question"
+          className="text-xs font-semibold uppercase tracking-wide text-accent-soft-fg"
+        >
           Research question
         </label>
         <textarea
+          id="research-question"
           ref={questionRef}
           value={question}
           onChange={(e) => onQuestionChange(e.target.value)}

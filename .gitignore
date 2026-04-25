@@ -1,6 +1,8 @@
 node_modules/
 backend/dist/
+backend/coverage/
 frontend/dist/
+frontend/coverage/
 *.log
 .DS_Store
 .benchpilot/

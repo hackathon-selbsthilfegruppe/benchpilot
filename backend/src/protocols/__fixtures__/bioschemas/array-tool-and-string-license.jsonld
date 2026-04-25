@@ -1,0 +1,15 @@
+{
+  "@context": "https://schema.org",
+  "@type": "LabProtocol",
+  "name": "Array tool / bare-string license",
+  "description": "Exercises the licence-as-string and array-of-tools shapes.",
+  "license": "CC-BY-4.0",
+  "tool": [
+    { "@type": "DefinedTerm", "name": "centrifuge" },
+    { "@type": "DefinedTerm", "name": "vortex mixer" }
+  ],
+  "step": [
+    { "@type": "HowToStep", "text": "Load samples." },
+    { "@type": "HowToStep", "text": "Run for 10 minutes." }
+  ]
+}

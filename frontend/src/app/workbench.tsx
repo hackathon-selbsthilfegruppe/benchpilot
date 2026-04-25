@@ -84,6 +84,10 @@ export default function Workbench({
   const [activeHeightPx, setActiveHeightPx] = useState<number | null>(null);
 
   useEffect(() => {
+    // Synchronise initial theme with the user's localStorage / OS
+    // preference. SSR can't read either, so this has to land in an
+    // effect; suppressing the new react-hooks/set-state-in-effect rule
+    // for this specific external-system sync.
     const saved =
       (typeof window !== "undefined" &&
         (localStorage.getItem("theme") as Theme | null)) ||
@@ -92,6 +96,7 @@ export default function Workbench({
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches;
     const initial: Theme = saved ?? (prefersDark ? "dark" : "light");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(initial);
   }, []);
 
@@ -695,7 +700,6 @@ function ComponentStrip({
         rightTab={activeRightTab[c.id] ?? "chat"}
         setRightTab={(tab) => setActiveRightTab(c.id, tab)}
         onChangeTaskStatus={onChangeTaskStatus}
-        group={group}
         isDragging={dragId === c.id}
         isDropTarget={dropTarget?.id === c.id && dropTarget.group === group}
         onDragStart={() => onDragStart(c.id)}
@@ -849,7 +853,6 @@ function ComponentCard({
   rightTab,
   setRightTab,
   onChangeTaskStatus,
-  group,
   isDragging,
   isDropTarget,
   onDragStart,
@@ -878,7 +881,6 @@ function ComponentCard({
   rightTab: "chat" | "tasks";
   setRightTab: (tab: "chat" | "tasks") => void;
   onChangeTaskStatus: (task: Task, status: TaskStatus) => Promise<void>;
-  group?: "primary" | "supporting";
   isDragging?: boolean;
   isDropTarget?: boolean;
   onDragStart?: () => void;
@@ -888,6 +890,10 @@ function ComponentCard({
   activeHeightPx?: number | null;
   setActiveHeightPx?: (px: number | null) => void;
 }) {
+  // Hooks must run in the same order on every render — keep useRef
+  // before any early return so the rules-of-hooks invariant holds.
+  const articleRef = useRef<HTMLElement>(null);
+
   if (state !== "active") {
     const supporting = variant === "supporting";
     return (
@@ -960,8 +966,6 @@ function ComponentCard({
 
   const inboundOpenCount = component.tasks.filter((t) => t.status === "open").length;
   const outboundOpenCount = outboundTasks.filter((t) => t.status === "open").length;
-
-  const articleRef = useRef<HTMLElement>(null);
 
   function startResize(e: React.MouseEvent) {
     if (!setActiveHeightPx) return;
@@ -1096,12 +1100,37 @@ function ComponentCard({
         </div>
       </div>
       {setActiveHeightPx && (
+        // WAI-ARIA window-splitter pattern — a focusable separator
+        // with aria-orientation drives keyboard resize.
+        // https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/
+        // The element-interactions rule's interactive-role allowlist
+        // doesn't expose `separator`, so disable it here only.
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
         <div
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize component (use arrow keys; Home resets)"
+          tabIndex={0}
           onMouseDown={startResize}
           onDoubleClick={() => setActiveHeightPx(null)}
-          title="Drag to resize · double-click to reset"
-          className="group flex h-2 cursor-row-resize items-center justify-center border-t border-border hover:bg-surface-elev"
-          aria-label="Resize"
+          onKeyDown={(e) => {
+            const article = articleRef.current;
+            if (!article) return;
+            const cur = article.offsetHeight;
+            const step = e.shiftKey ? 80 : 20;
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setActiveHeightPx(Math.max(320, cur + step));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActiveHeightPx(Math.max(320, cur - step));
+            } else if (e.key === "Home") {
+              e.preventDefault();
+              setActiveHeightPx(null);
+            }
+          }}
+          title="Drag, or use arrow keys, to resize · double-click to reset"
+          className="group flex h-2 cursor-row-resize items-center justify-center border-t border-border hover:bg-surface-elev focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
           <span className="h-0.5 w-10 rounded bg-border-strong group-hover:bg-accent" />
         </div>
