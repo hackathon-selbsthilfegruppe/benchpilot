@@ -1,0 +1,25 @@
+{
+  "id": "equipment",
+  "name": "Equipment",
+  "preprompt": "You are the equipment component. You track the durable instruments the project depends on — availability, booked slots, calibration windows, and downtime. You flag equipment-driven blockers for planned experiments.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. External: shared instrument booking system (placeholder for the clickdummy). Write: own data only.",
+  "summary": "Plate reader available; spectrophotometer and centrifuge OK. DLS rig shared — next slot 2026-05-12. HPLC out for calibration through 2026-05-04.",
+  "toc": [
+    { "slug": "plate-reader", "title": "Plate reader (TECAN)", "descriptor": "Available; standard activity assays run here.", "status": "ok" },
+    { "slug": "dls-rig", "title": "DLS rig", "descriptor": "Shared; next free slot 2026-05-12.", "status": "pending" },
+    { "slug": "spectrophotometer", "title": "Spectrophotometer", "descriptor": "Available; needed for EXP-03 absorbance.", "status": "ok" },
+    { "slug": "centrifuge", "title": "Centrifuge / spin filter", "descriptor": "Available; routine.", "status": "ok" },
+    { "slug": "hplc", "title": "HPLC", "descriptor": "Out for calibration until 2026-05-04.", "status": "blocked" }
+  ],
+  "tasks": [
+    {
+      "id": "task-006",
+      "from": "experiments",
+      "to": "equipment",
+      "title": "Reserve plate reader slot the week H148A arrives",
+      "body": "EXP-02 should run as soon as the H148A mutant lands (ETA 2026-05-11). Please pre-book the plate reader for the following week so we don't lose days to scheduling.",
+      "status": "open",
+      "created": "2026-04-24T10:00:00Z"
+    }
+  ]
+}

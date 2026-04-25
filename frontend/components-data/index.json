@@ -1,3 +1,14 @@
 {
-  "components": ["hypothesis", "literature", "reagents", "experiments", "budget"]
+  "projectHeader": "research-topic",
+  "components": [
+    "hypothesis",
+    "reagents",
+    "samples",
+    "equipment",
+    "budget",
+    "experiments"
+  ],
+  "supporting": [
+    "literature"
+  ]
 }

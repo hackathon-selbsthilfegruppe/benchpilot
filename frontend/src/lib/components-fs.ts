@@ -29,11 +29,46 @@ function componentFile(id: string): string {
   return path.join(dataRoot, id, "component.json");
 }
 
-export async function loadComponentIds(): Promise<string[]> {
-  const index = await readJson<{ components: string[] }>(
+type IndexFile = {
+  projectHeader?: string;
+  components: string[];
+  supporting?: string[];
+};
+
+async function loadIndex(): Promise<IndexFile> {
+  return readJson<IndexFile>(path.join(dataRoot, "index.json"));
+}
+
+export async function writeIndex(
+  components: string[],
+  supporting: string[],
+): Promise<void> {
+  const current = await loadIndex();
+  const next: IndexFile = {
+    ...current,
+    components,
+    supporting,
+  };
+  await writeFile(
     path.join(dataRoot, "index.json"),
+    JSON.stringify(next, null, 2) + "\n",
+    "utf-8",
   );
+}
+
+export async function loadComponentIds(): Promise<string[]> {
+  const index = await loadIndex();
   return index.components;
+}
+
+export async function loadSupportingIds(): Promise<string[]> {
+  const index = await loadIndex();
+  return index.supporting ?? [];
+}
+
+export async function loadProjectHeaderId(): Promise<string | null> {
+  const index = await loadIndex();
+  return index.projectHeader ?? null;
 }
 
 export async function loadComponent(id: string): Promise<BenchComponent> {

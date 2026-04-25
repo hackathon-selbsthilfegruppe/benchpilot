@@ -1,0 +1,24 @@
+{
+  "id": "samples",
+  "name": "Samples",
+  "preprompt": "You are the samples component. You track the physical specimens prepared from reagents — the actual aliquots and preps that go on instruments — and their state (prepped, in use, archived, lost). You flag sample-driven blockers and link prep status to experiments.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. External: sample log / freezer index (placeholder). Write: own data only.",
+  "summary": "WT-2026-04 in active use. EXP-01 aliquots archived. H148A prep awaiting mutant delivery. Cofactor displacement prep gated on cofactor reorder.",
+  "toc": [
+    { "slug": "wt-2026-04", "title": "WT-2026-04 (working stock)", "descriptor": "Active stock for current experiments.", "status": "ok" },
+    { "slug": "exp-01-aliquots", "title": "EXP-01 aliquots", "descriptor": "Used in EXP-01; archived.", "status": "done" },
+    { "slug": "h148a-2026-05", "title": "H148A-2026-05 (incoming)", "descriptor": "To be prepped on mutant arrival (~2026-05-11).", "status": "pending" },
+    { "slug": "cofactor-displacement-prep", "title": "Cofactor displacement prep", "descriptor": "Multi-pH aliquots for EXP-03; gated on cofactor reorder.", "status": "blocked" }
+  ],
+  "tasks": [
+    {
+      "id": "task-007",
+      "from": "experiments",
+      "to": "samples",
+      "title": "Prep H148A aliquots the day the mutant arrives",
+      "body": "We want EXP-02 to start within 24 h of H148A delivery. Please QC and aliquot immediately on arrival rather than batching with other intake.",
+      "status": "open",
+      "created": "2026-04-24T11:30:00Z"
+    }
+  ]
+}
