@@ -24,6 +24,7 @@ More detail:
 - [`docs/pi-integration-concept.md`](docs/pi-integration-concept.md)
 - [`docs/pi-integration-plan.md`](docs/pi-integration-plan.md)
 - [`docs/frontend-backend-contract.md`](docs/frontend-backend-contract.md)
+- [`docs/frontend-integration-quickstart.md`](docs/frontend-integration-quickstart.md)
 - [`docs/implementation-plan.md`](docs/implementation-plan.md)
 - [`docs/backend-components-api-proposal.md`](docs/backend-components-api-proposal.md)
 
