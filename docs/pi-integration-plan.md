@@ -68,6 +68,20 @@ That gives us:
 - zero custom pi tool work up front
 - an easy path to later wrap stable commands as custom tools if we want
 
+### Rule 4: keep cross-component delegation file-backed
+
+When one component asks another component to do work, the backend should first model that as a **task file**, not as an in-memory orchestration primitive.
+
+For the hackathon, that task should:
+
+- be written to disk by the backend
+- include sender, target, status, and written request text
+- spawn a fresh pi session in the target component
+- always end with a durable result document
+- be discoverable by polling
+
+This is the simplest path to an orchestrator component that can delegate work to multiple other components.
+
 ## Recommended bridge: Backend API + CLI
 
 ### Pattern
@@ -109,6 +123,9 @@ benchpilot components context --for reagents --json
 benchpilot resources list literature --json
 benchpilot resources get literature lit-0001 --json
 benchpilot resources create literature --title "Paper note" --summary "..." --stdin --json
+benchpilot tasks create --from orchestrator --to literature --title "Review evidence" --stdin --json
+benchpilot tasks list --for orchestrator --status open --json
+benchpilot tasks get task-0003 --json
 ```
 
 ## Resource loading strategy
@@ -141,6 +158,43 @@ This is similar to how skills are loaded on demand rather than always injected i
 - preserves role focus
 - allows cross-component awareness without dumping everything into context
 - fits the BenchPilot workbench model well
+
+## Task delegation strategy
+
+This is the key addition for orchestration.
+
+### Main idea
+
+A component should be able to send a task to another component.
+
+For the hackathon, task delegation should be:
+
+- asynchronous
+- file-backed
+- polled, not pushed
+- fulfilled by a fresh pi session in the target component
+
+### Task lifecycle
+
+1. sender component submits a task to target component
+2. backend writes task files
+3. backend or a task worker notices the task and starts a new pi session for the target component
+4. target component fulfills the request
+5. target component writes a result document
+6. task status becomes complete
+7. sender component polls until all expected tasks are complete
+8. sender component reads the result documents and continues its own session
+
+### Why this is the right hackathon trade-off
+
+- no broker or job system needed
+- easy to inspect and debug on disk
+- easy to support one-to-many orchestration
+- aligns with the same summary-first resource model as the rest of the app
+
+### Important guarantee
+
+For now, every accepted task should complete with a **result document**. That gives the sender something durable to read and lets task results show up as normal component resources if we want.
 
 ## Online comparison snapshot
 
@@ -190,8 +244,9 @@ For the hackathon:
 3. **Use built-in tools first**.
 4. **Use skills for role behavior and cross-component conventions**.
 5. **Expose BenchPilot backend operations through an HTTP API plus a thin CLI**.
-6. Re-evaluate later whether stable CLI operations should become custom pi tools.
-7. Re-evaluate later whether some roles should drop down to `@mariozechner/pi-agent-core` for lighter-weight specialized agents.
+6. **Use file-backed tasks for cross-component delegation and orchestrator fan-out work**.
+7. Re-evaluate later whether stable CLI operations should become custom pi tools.
+8. Re-evaluate later whether some roles should drop down to `@mariozechner/pi-agent-core` for lighter-weight specialized agents.
 
 That gives us capability now without locking the entire architecture to pi internals.
 
@@ -231,7 +286,13 @@ benchpilot CLI
    |
    | HTTP/JSON
    v
-backend component/resource API
+backend component/resource/task API
+
+backend task files
+   |
+   | polling
+   v
+fresh task-run pi sessions per delegated task
 ```
 
 ## Working model for roles
@@ -245,9 +306,12 @@ workspace/components/<role-id>/
   summary.md
   toc.md
   data/
+  tasks/
 ```
 
 The backend seeds that structure when a role session is first created.
+
+Later, the `tasks/` area should hold incoming/running/completed delegated work in a simple file-backed form.
 
 ## API shape for the UI
 
@@ -320,7 +384,8 @@ If later we need process isolation per agent, we can still move selected roles t
 
 1. Let the UI create/list/prompt warm sessions.
 2. Add a small `benchpilot` CLI that talks to the backend API.
-3. Add role skills that teach agents how to use the CLI and maintain role workspaces.
+3. Add role skills that teach agents how to use the CLI, submit tasks, and maintain role workspaces.
 4. Introduce the first component/resource backend endpoints.
-5. Add on-demand resource loading across components via TOC-first context.
-6. Only then decide whether any CLI operations deserve promotion into first-class pi custom tools.
+5. Add file-backed task creation, polling, and result documents.
+6. Add on-demand resource loading across components via TOC-first context.
+7. Only then decide whether any CLI operations deserve promotion into first-class pi custom tools.

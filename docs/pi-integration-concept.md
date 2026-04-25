@@ -12,11 +12,13 @@ BenchPilot is not a generic chat app. It is an **AI Scientist OS** with:
 - durable role workspaces on disk
 - a shared scientific project structure later on
 - an orchestrator view plus component-specific chats
+- asynchronous task delegation between components
 - agents that can use real tools and leave behind inspectable artifacts
 
 That means the runtime must optimize for:
 
 - long-lived sessions
+- task-run child sessions
 - tool use
 - file-backed working memory
 - role-specific prompting
@@ -128,11 +130,11 @@ frontend UI
   v
 backend runtime
   |
-  | SessionPool / component registry / domain tools
+  | SessionPool / component registry / task queue / domain tools
   v
 pi-coding-agent sessions
   |
-  | filesystem + shell + future BenchPilot tools
+  | interactive component sessions + task-run sessions
   v
 workspace/components/<component-id>/
 ```
@@ -144,6 +146,8 @@ The backend is responsible for:
 - creating standby sessions
 - prewarming multiple sessions
 - prompting sessions
+- spawning task-run sessions when components delegate work to other components
+- writing and polling file-backed task state
 - streaming session events to the UI
 - selecting the correct cwd per component
 - constructing system prompts from role resources
@@ -175,6 +179,8 @@ It should not own:
 
 Each component maps to a long-lived backend-managed pi session.
 
+In addition, delegated work creates **task-run sessions**. Those are fresh pi sessions scoped to one incoming task for a target component.
+
 ### Session states
 
 - `idle`
@@ -187,12 +193,17 @@ Each component maps to a long-lived backend-managed pi session.
 - create one standby session
 - prewarm many standby sessions
 - list sessions
-- prompt a specific session
+- prompt a specific interactive session
+- create a task for another component
+- poll task state until the result exists
+- load the result document and continue the sender session
 - dispose a session
 
 ### Transport shape
 
 Prompt responses should stream as NDJSON so the frontend can render incrementally while staying runtime-agnostic.
+
+Task state can remain polling-based for the hackathon because tasks are file-backed and durable.
 
 ## 10. Role workspace model
 
@@ -217,7 +228,51 @@ workspace/components/<role-id>/
 
 This filesystem-first model is a strong fit for pi because the coding harness is already good at operating on files and directories.
 
-## 11. Component model
+## 11. Task delegation model
+
+Components need two cross-component capabilities:
+
+1. cheap awareness through summaries and TOCs
+2. explicit asynchronous delegation through task files
+
+### Main use case
+
+The orchestrator should be able to ask other components to do work.
+
+Example:
+- orchestrator creates one task for `literature`
+- orchestrator creates another task for `reagents`
+- backend writes those task files into the target component task inboxes
+- each task spawns a fresh pi session in the target component
+- each task-run session writes a result document
+- orchestrator polls until both results exist, then reads them and continues its own reasoning
+
+### Task semantics
+
+For the hackathon, tasks should be deliberately simple:
+
+- backend writes the task as files
+- a target task creates a new pi session
+- that session always ends by writing a result document
+- sender components may create multiple tasks and wait for all of them
+- polling is sufficient; no event bus or broker required
+
+### Why separate task sessions
+
+Using a fresh pi session per task is helpful because it:
+
+- keeps task context scoped to the request
+- leaves the standing interactive session uncluttered
+- makes result documents easier to audit
+- makes polling/status tracking simple
+
+### Result model
+
+A task result should become a durable document that can be listed in a component TOC and loaded in full only when needed.
+
+That keeps the task system aligned with the same summary-first / details-on-demand resource model used elsewhere.
+
+## 12. Component model
 
 A BenchPilot component should become a **discoverable manifest-backed unit**, not a hardcoded app enum.
 
@@ -258,7 +313,7 @@ This makes components:
 - easy to discover automatically
 - easier to publish later outside the repo
 
-## 12. Pluggability goal
+## 13. Pluggability goal
 
 Future contributors should be able to add components without patching the main application logic.
 
@@ -277,7 +332,7 @@ If third-party components can ship executable tools/extensions, they can run arb
 - declarative-only components
 - or fully programmable components
 
-## 13. Tooling strategy
+## 14. Tooling strategy
 
 ### Phase 1: use pi built-ins
 
@@ -312,7 +367,7 @@ Use general coding tools for role-local exploration and drafting.
 
 Use explicit BenchPilot domain tools for mutations of the shared project model.
 
-## 14. Resource loading policy
+## 15. Resource loading policy
 
 For deterministic hackathon behavior, backend sessions should:
 
@@ -322,7 +377,7 @@ For deterministic hackathon behavior, backend sessions should:
 
 This prevents accidental dependence on one contributor's local pi setup.
 
-## 15. Recommended evolution path
+## 16. Recommended evolution path
 
 ### Now
 
@@ -335,17 +390,18 @@ This prevents accidental dependence on one contributor's local pi setup.
 
 - component manifest discovery
 - prewarmed default component set
-- first domain-specific shared-state tools
+- file-backed task submission and polling
+- first read-oriented backend API + CLI for components/resources/tasks
 - better session summaries for the UI
 
 ### Later
 
 - move some agents to `pi-agent-core` where tighter control is beneficial
 - allow component packages from outside the repo
-- add orchestrator-specific routing tools
+- add orchestrator-specific routing and task-management tools
 - add permission and policy gates around shared state mutation
 
-## 16. Non-goals for the hackathon
+## 17. Non-goals for the hackathon
 
 Do not spend hackathon time on:
 
@@ -355,7 +411,7 @@ Do not spend hackathon time on:
 - replacing the current backend contract with direct frontend-to-provider access
 - rebuilding a full chat framework from scratch
 
-## 17. Final position
+## 18. Final position
 
 The recommended integration is:
 

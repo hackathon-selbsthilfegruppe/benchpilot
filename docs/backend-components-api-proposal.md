@@ -12,6 +12,7 @@ The backend model should:
 - make resource discovery cheap
 - make full resource loading explicit and on demand
 - support cross-component awareness without prompt bloat
+- support file-backed task delegation between components
 - be simple enough for a hackathon implementation
 
 ## 2. Core idea
@@ -34,6 +35,7 @@ Each component also exposes:
 
 - all components get summaries + TOCs for all components in cheap context
 - full resource bodies are fetched only when needed
+- cross-component work requests are expressed as explicit tasks, not direct writes into another component's files
 
 This is the most important behavior to preserve.
 
@@ -49,6 +51,21 @@ workspace/components/<component-id>/
   resources/
     <resource-id>.md
     <resource-id>.meta.json
+  tasks/
+    pending/
+      <task-id>/
+        task.json
+        request.md
+    running/
+      <task-id>/
+        task.json
+        request.md
+    completed/
+      <task-id>/
+        task.json
+        request.md
+        result.md
+        result.meta.json
 ```
 
 ### Why this is good enough for now
@@ -56,6 +73,7 @@ workspace/components/<component-id>/
 - easy to inspect manually
 - easy for agents to read and edit locally
 - easy for backend to index
+- easy to poll for tasks without extra infrastructure
 - easy to turn into a richer store later if needed
 
 ## 4. Proposed component metadata
@@ -125,45 +143,98 @@ Recommended length:
 
 `toc.json` is the cheap public surface of a component.
 
-## 7. Backend services proposal
+## 7. Task model
 
-## 7.1 Component Registry
+Tasks are the asynchronous delegation primitive between components.
+
+### Task file model
+
+Each task should have:
+
+- a structured `task.json`
+- a human-readable `request.md`
+- later, a durable `result.md`
+
+### `task.json`
+
+```json
+{
+  "id": "task-0003",
+  "fromComponentId": "orchestrator",
+  "toComponentId": "literature",
+  "title": "Review evidence for delivery constraints",
+  "status": "pending",
+  "createdAt": "2026-04-25T19:20:00.000Z",
+  "updatedAt": "2026-04-25T19:20:00.000Z"
+}
+```
+
+### Task execution rule
+
+Every accepted task should:
+
+- spawn a **fresh pi session** in the target component
+- be fulfilled in that task-run session
+- end with a durable result document
+
+The result document can also be treated as a normal resource of the target component so it can appear in TOCs and be loaded on demand.
+
+### Why task files instead of direct orchestration state
+
+- sender components can poll cheaply
+- task state is visible on disk
+- debugging is straightforward
+- the orchestrator can fan out to multiple specialists without extra infrastructure
+
+## 8. Backend services proposal
+
+## 8.1 Component Registry
 
 Responsibilities:
 - discover all components
 - read component metadata
 - expose component summary + TOC
 
-## 7.2 Resource Indexer
+## 8.2 Resource Indexer
 
 Responsibilities:
 - read resource metadata files
 - verify every resource has a summary
 - generate or refresh `toc.json`
 
-## 7.3 Resource Store
+## 8.3 Resource Store
 
 Responsibilities:
 - create/read/update resource bodies
 - read/write metadata sidecars
 - expose cheap vs full resource views
 
-## 7.4 Context Assembler
+## 8.4 Context Assembler
 
 Responsibilities:
 - build prompt context for a component
 - inject all component summaries and TOCs
 - avoid loading full resource bodies by default
 
-## 7.5 Session Integrator
+## 8.5 Session Integrator
 
 Responsibilities:
 - let warm pi sessions access the component model indirectly
 - later refresh role prompt context when summaries/TOCs change
+- spawn fresh task-run sessions for delegated tasks
 
-## 8. API proposal
+## 8.6 Task Service
 
-## 8.1 Component reads
+Responsibilities:
+- create task files
+- move tasks between `pending`, `running`, and `completed`
+- track task/result metadata
+- let sender components poll for completion
+- support many outstanding tasks from one sender
+
+## 9. API proposal
+
+## 9.1 Component reads
 
 ### `GET /api/components`
 
@@ -183,7 +254,7 @@ Returns cheap cross-component context for one component:
 
 This endpoint is designed for prompt assembly and debugging.
 
-## 8.2 Resource reads
+## 9.2 Resource reads
 
 ### `GET /api/components/:componentId/resources`
 
@@ -195,7 +266,7 @@ Returns the full resource body and metadata.
 
 This is the lazy-loading endpoint.
 
-## 8.3 Resource writes
+## 9.3 Resource writes
 
 ### `POST /api/components/:componentId/resources`
 
@@ -226,7 +297,46 @@ Sets or regenerates component summary.
 
 Rebuilds `toc.json` from resource metadata.
 
-## 9. CLI proposal
+## 9.4 Task endpoints
+
+### `POST /api/tasks`
+
+Creates a delegated task.
+
+Request:
+
+```json
+{
+  "fromComponentId": "orchestrator",
+  "toComponentId": "literature",
+  "title": "Review evidence for delivery constraints",
+  "request": "Review the literature we already collected and summarize delivery-related off-target constraints."
+}
+```
+
+### `GET /api/tasks`
+
+Supports filters like:
+- `forComponent=<id>`
+- `fromComponent=<id>`
+- `status=pending|running|completed|failed`
+
+### `GET /api/tasks/:taskId`
+
+Returns task metadata plus request text.
+
+### `GET /api/tasks/:taskId/result`
+
+Returns the result document or the equivalent result resource reference.
+
+### Polling expectation
+
+For the hackathon, polling is the intended access pattern:
+- sender creates one or many tasks
+- sender polls until all expected tasks are complete
+- sender loads the result documents and continues its own session
+
+## 10. CLI proposal
 
 The CLI should be a very thin wrapper over the API.
 
@@ -238,6 +348,8 @@ benchpilot components get literature --json
 benchpilot components context --for reagents --json
 benchpilot resources list literature --json
 benchpilot resources get literature lit-0007 --json
+benchpilot tasks list --for orchestrator --status pending --json
+benchpilot tasks get task-0003 --json
 ```
 
 ### Write commands second
@@ -247,9 +359,10 @@ benchpilot resources create literature --title "..." --summary "..." --stdin --j
 benchpilot resources update literature lit-0007 --summary "..." --stdin --json
 benchpilot components summary set literature --stdin --json
 benchpilot components toc rebuild literature --json
+benchpilot tasks create --from orchestrator --to literature --title "Review evidence" --stdin --json
 ```
 
-## 10. Agent behavior proposal
+## 11. Agent behavior proposal
 
 ### What is always visible
 
@@ -276,7 +389,19 @@ benchpilot resources get literature lit-0012 --json
 
 This is the exact TOC-first, details-on-demand behavior we want.
 
-## 11. Skills proposal for this model
+### Task delegation flow
+
+1. `orchestrator` creates a task for `literature`
+2. `orchestrator` creates another task for `reagents`
+3. backend writes both task files
+4. each task starts a fresh pi session in the target component
+5. each target writes a result document
+6. `orchestrator` polls until both tasks are complete
+7. `orchestrator` reads both result documents and synthesizes
+
+This is the main coordinator use case we want to support.
+
+## 12. Skills proposal for this model
 
 Role skills should explicitly teach the above pattern.
 
@@ -286,26 +411,34 @@ Example instruction fragment:
 - Do not fetch full resources from another component unless you need the details.
 - When you need details, use the BenchPilot CLI via `bash`.
 - Prefer reading the smallest relevant resource rather than loading many resources at once.
+- When another component should do the work itself, create a task instead of trying to do that work in its place.
+- If you create multiple tasks, wait until all required results exist before continuing your synthesis.
 
-## 12. Minimal implementation slice
+## 13. Minimal implementation slice
 
 If time is tight, the minimum useful slice is:
 
 1. file-based component registry
 2. file-based resources with `.meta.json` sidecars
-3. `GET /api/components`
-4. `GET /api/components/:componentId/resources`
-5. `GET /api/components/:componentId/resources/:resourceId`
-6. `benchpilot components list --json`
-7. `benchpilot resources get <component> <resource> --json`
+3. file-based tasks with `task.json` + `request.md`
+4. `GET /api/components`
+5. `GET /api/components/:componentId/resources`
+6. `GET /api/components/:componentId/resources/:resourceId`
+7. `POST /api/tasks`
+8. `GET /api/tasks/:taskId`
+9. `GET /api/tasks/:taskId/result`
+10. `benchpilot components list --json`
+11. `benchpilot resources get <component> <resource> --json`
+12. `benchpilot tasks create --from <sender> --to <target> --stdin --json`
 
 That is enough to demonstrate:
 - summaries
 - TOCs
 - on-demand detail loading
 - agent-accessible cross-component reads
+- orchestrator-style delegated work
 
-## 13. Recommended future evolution
+## 14. Recommended future evolution
 
 ### After hackathon
 
@@ -314,15 +447,18 @@ That is enough to demonstrate:
 - add validation for resource kinds
 - add ownership and mutation policies
 - add prompt-context compaction rules for large TOCs
+- add task retries, cancellation, and optional concurrency limits
 
-## 14. Final recommendation
+## 15. Final recommendation
 
 Keep the backend model simple:
 
 - markdown bodies
 - JSON metadata sidecars
 - generated TOCs
+- file-backed tasks
 - summary-first prompt context
 - detail loading on demand through API/CLI
+- polling-based task completion checks
 
 This is powerful enough for the hackathon and aligned with how the agents should think across components.

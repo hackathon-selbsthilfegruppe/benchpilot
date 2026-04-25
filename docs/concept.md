@@ -17,7 +17,7 @@ The product is built up in steps so we can validate each layer of structure befo
 3. **Chat + multiple components.** Add more components (literature, reagents, budget, …). Validate that the model scales.
 4. **Drill-down.** Each component can expand from summary into details.
 5. **Cross-component awareness.** Components see each other's tables of contents and can request details from one another (read-only).
-6. **Cross-component tasks.** Components can send tasks to each other; receivers accept / decline / mark them done.
+6. **Cross-component tasks.** Components can send explicit tasks to other components, wait for result documents, and then continue their own work.
 
 ## What a component is
 
@@ -82,14 +82,69 @@ This raises a coordination question: when the user's request spans components ("
 
 Open: is the orchestrator a "real" component (with its own preprompt/tooling/data), or a separate construct? Leaning toward "real component" for uniformity, with `data/` being a thin log of routing decisions.
 
+## Cross-component tasking model
+
+Cross-component reads are useful, but they are not enough for the main orchestration use case. We also want one component to be able to **ask another component to do work asynchronously**.
+
+The main example is the orchestrator:
+
+- the orchestrator sees summaries and TOCs of all components
+- it decides that the *literature* component should investigate one question and the *reagents* component should investigate another
+- it sends each of them a task
+- each target component fulfills its task in a fresh task-specific chat/session
+- each task produces a durable result document
+- the orchestrator waits until all requested task results exist, then reads them and continues
+
+### Properties of a task
+
+A task is file-backed and explicit. It should contain at least:
+
+- **target component**
+- **sender component**
+- **structured metadata** (ID, timestamps, status, maybe kind/priority)
+- **request text** in normal written language
+- later: optional references to relevant resources or task dependencies
+
+### Task execution rule
+
+Each submitted task creates a **new session** in the target component. That session is not the same as the target component's standing interactive session. It is a dedicated task-run session that exists to fulfill that one request.
+
+For the hackathon we want a very simple guarantee:
+
+- every accepted task eventually finishes with a **result document**
+- task state is tracked through files
+- polling is enough; no queues or message brokers required
+
+### Why file-backed tasks
+
+Using files keeps this hackathon-friendly:
+
+- backend can write task files directly
+- workers can discover tasks by polling
+- sender components can poll for completion
+- every request/result is inspectable on disk
+- failures are easier to debug than with hidden in-memory state
+
+### Concurrency model
+
+A component can send **multiple tasks** to other components. In that case it should wait until all expected results are available, then continue its own session using those results.
+
+This gives us a simple map/reduce style pattern:
+
+- sender creates N tasks
+- sender polls until N results exist
+- sender reads those result documents
+- sender continues and synthesizes
+
 ## Cross-component context rules (reads)
 
 - Every component has, in its working context, the **TOCs of all other components** plus their **summaries**. This is cheap and always available.
 - A component can **request** the full body of another component's data file on demand (read).
-- A component **cannot write** into another component's data. Each component owns its own files exclusively.
-- Cross-component reads happen through the orchestrator, not directly between components.
+- A component can also **submit a task** to another component, which creates a separate task-run session in that target component.
+- A component **cannot write** into another component's data directly. Each component owns its own files exclusively.
+- Cross-component reads and task submissions should happen through the orchestrator/backend surface rather than by directly editing another component's files.
 
-This gives us a "everyone sees the table of contents, anyone can ask to read a chapter, nobody edits another component's chapters" model. Write isolation isn't enforced in code yet — it's a design constraint we'll honor and revisit when this becomes a real system.
+This gives us a model of: "everyone sees the table of contents, anyone can ask to read a chapter, anyone can request work from another component through an explicit task, nobody edits another component's chapters directly." Write isolation isn't enforced in code yet — it's a design constraint we'll honor and revisit when this becomes a real system.
 
 ## Cross-component tasks (writes, structured)
 

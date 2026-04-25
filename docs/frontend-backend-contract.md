@@ -12,6 +12,7 @@ The contract should:
 - stay stable if backend runtime details change
 - expose component/resource concepts without leaking pi internals
 - support cheap context by default and detailed loading on demand
+- support file-backed task delegation between components
 
 ## 2. Design principles
 
@@ -32,12 +33,13 @@ Not:
 
 ### Progressive integration
 
-The contract has two layers:
+The contract has three layers:
 
 - **Phase 1:** chat/session contract
 - **Phase 2:** component/resource contract
+- **Phase 3:** task delegation contract
 
-The UI should be able to ship against Phase 1 before Phase 2 exists.
+The UI should be able to ship against Phase 1 before Phase 2 and Phase 3 exist.
 
 ### Stream normalization
 
@@ -233,6 +235,12 @@ Response:
 
 This layer should be added after the UI is already connected to live chats.
 
+## 4.1 Phase 3 — Task delegation contract
+
+This layer should be added after the basic component/resource model exists.
+
+The purpose is to let one component ask another component to do work asynchronously.
+
 ## 5. Core data model
 
 ### Component summary
@@ -369,7 +377,74 @@ Example response:
 
 This is what should be injected into component prompts as cheap context.
 
-## 8. CLI contract over the backend API
+## 8. Task delegation endpoints
+
+Tasks are file-backed on the backend, but the UI and CLI should see them through an API contract.
+
+### Task summary
+
+```json
+{
+  "id": "task-0003",
+  "fromComponentId": "orchestrator",
+  "toComponentId": "literature",
+  "title": "Review evidence for delivery constraints",
+  "status": "completed",
+  "createdAt": "2026-04-25T19:20:00.000Z",
+  "updatedAt": "2026-04-25T19:24:00.000Z",
+  "resultResourceId": "lit-task-0003-result"
+}
+```
+
+### Task detail
+
+```json
+{
+  "id": "task-0003",
+  "fromComponentId": "orchestrator",
+  "toComponentId": "literature",
+  "title": "Review evidence for delivery constraints",
+  "status": "completed",
+  "request": "Review the literature we already collected and summarize delivery-related off-target constraints.",
+  "createdAt": "2026-04-25T19:20:00.000Z",
+  "updatedAt": "2026-04-25T19:24:00.000Z",
+  "resultResourceId": "lit-task-0003-result"
+}
+```
+
+### `POST /api/tasks`
+
+Create a new delegated task.
+
+```json
+{
+  "fromComponentId": "orchestrator",
+  "toComponentId": "literature",
+  "title": "Review evidence for delivery constraints",
+  "request": "Review the literature we already collected and summarize delivery-related off-target constraints."
+}
+```
+
+### `GET /api/tasks`
+
+Supports filters such as:
+- `forComponent=<id>`
+- `fromComponent=<id>`
+- `status=open|running|completed|failed`
+
+### `GET /api/tasks/:taskId`
+
+Returns the task detail.
+
+### `GET /api/tasks/:taskId/result`
+
+Returns the result document metadata and body, or a redirect/reference to the result resource endpoint.
+
+### Polling rule
+
+For the hackathon, clients should assume polling. A sender component can create one or many tasks, poll until all expected tasks are complete, and then load the result documents.
+
+## 9. CLI contract over the backend API
 
 The CLI should map 1:1 to the backend concepts.
 
@@ -381,18 +456,21 @@ benchpilot components get literature --json
 benchpilot components context --for reagents --json
 benchpilot resources list literature --json
 benchpilot resources get literature lit-0007 --json
+benchpilot tasks list --for orchestrator --status open --json
+benchpilot tasks get task-0003 --json
 ```
 
-### Write commands for hackathon phase 2
+### Write commands for hackathon phase 2/3
 
 ```bash
 benchpilot resources create literature --title "..." --summary "..." --stdin --json
 benchpilot resources update literature lit-0007 --summary "..." --stdin --json
 benchpilot components summary set literature --stdin --json
 benchpilot components toc rebuild literature --json
+benchpilot tasks create --from orchestrator --to literature --title "Review evidence" --stdin --json
 ```
 
-## 9. Contract stability rules
+## 10. Contract stability rules
 
 The frontend should depend on:
 
@@ -400,17 +478,20 @@ The frontend should depend on:
 - component summary shape
 - TOC entry shape
 - full resource shape
+- task summary/detail shape
 
 The frontend should not depend on:
 
 - raw pi event schemas
 - local filesystem layout
 - specific provider/model details
+- how the backend maps tasks onto pi sessions internally
 
-## 10. Recommended implementation order
+## 11. Recommended implementation order
 
 1. Ship the Phase 1 chat/session contract first.
 2. Let the UI connect to live chats immediately.
 3. Add the component/resource endpoints second.
-4. Add the CLI on top of the component/resource endpoints.
-5. Teach agents to use the CLI via skills.
+4. Add the task endpoints third.
+5. Add the CLI on top of the component/resource/task endpoints.
+6. Teach agents to use the CLI via skills.
