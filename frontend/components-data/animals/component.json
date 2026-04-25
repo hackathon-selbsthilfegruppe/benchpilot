@@ -1,0 +1,23 @@
+{
+  "id": "animals",
+  "name": "Laboratory Animals",
+  "preprompt": "You are the Laboratory Animals component. You track laboratory animals available to the project: cohorts, ethics approvals (animal-experiment applications), husbandry status, and which experiments are gated on animal availability or approval. You flag welfare and compliance constraints other components must respect.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. External: animal house management system + ethics committee tracker (placeholders). Write: own data only.",
+  "summary": "No in-vivo work this quarter. Existing C57BL/6 cohort held in reserve for follow-on. Animal-experiment application for in-vivo activity study under preparation; submission target Q3.",
+  "toc": [
+    { "slug": "c57bl6-cohort", "title": "C57BL/6 reserve cohort", "descriptor": "12 animals, 8 weeks old; held for potential follow-on.", "status": "info" },
+    { "slug": "tva-q3", "title": "Animal-experiment application — in-vivo activity study", "descriptor": "Under preparation; submission target 2026-09.", "status": "pending" },
+    { "slug": "husbandry", "title": "Husbandry status", "descriptor": "Health monitoring up to date; no incidents.", "status": "ok" }
+  ],
+  "tasks": [
+    {
+      "id": "task-008",
+      "from": "hypothesis",
+      "to": "animals",
+      "title": "Sketch the in-vivo readout for the H1/H2 follow-on",
+      "body": "Once H1 vs H2 is decided in vitro, we'll want a tight in-vivo confirmation. Please draft what the activity readout would look like in animals so the animal-experiment application has the right scope.",
+      "status": "open",
+      "created": "2026-04-22T15:00:00Z"
+    }
+  ]
+}

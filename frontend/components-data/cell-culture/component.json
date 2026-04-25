@@ -1,0 +1,14 @@
+{
+  "id": "cell-culture",
+  "name": "Cell Culture",
+  "preprompt": "You are the Cell Culture component. You track cell lines maintained for the project, their passage status, cryostocks, and routine compliance (mycoplasma, authentication). You flag dependencies for any cell-based assays planned by other components.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. External: cell-line authentication service, mycoplasma testing log (placeholders). Write: own data only.",
+  "summary": "HEK293-Enzyme stable line maintained at low passage. Cryobank well-stocked. Last mycoplasma test clear (2026-04-08). No active cell-based assays this quarter.",
+  "toc": [
+    { "slug": "hek293-line", "title": "HEK293-Enzyme stable line", "descriptor": "Recombinant expression line; passage 14.", "status": "ok" },
+    { "slug": "cryobank", "title": "Cryobank inventory", "descriptor": "8 vials at low passage; sufficient for ≥1 year.", "status": "info" },
+    { "slug": "mycoplasma", "title": "Mycoplasma testing", "descriptor": "Last clear 2026-04-08; monthly cadence.", "status": "ok" },
+    { "slug": "in-cell-validation", "title": "In-cell H1/H2 validation (planned)", "descriptor": "Follow-on assay once EXP-02 decides H1 vs H2.", "status": "pending" }
+  ],
+  "tasks": []
+}

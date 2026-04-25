@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   BenchComponent,
   DetailDoc,
@@ -53,6 +53,7 @@ export default function Workbench({
     id: string;
     group: "primary" | "supporting";
   } | null>(null);
+  const [activeHeightPx, setActiveHeightPx] = useState<number | null>(null);
 
   useEffect(() => {
     const saved =
@@ -274,6 +275,8 @@ export default function Workbench({
           setDragId(null);
           setDropTarget(null);
         }}
+        activeHeightPx={activeHeightPx}
+        setActiveHeightPx={setActiveHeightPx}
       />
       </div>
     </div>
@@ -400,6 +403,8 @@ function ComponentStrip({
   onDragLeaveStrip,
   onDropCard,
   onDragEnd,
+  activeHeightPx,
+  setActiveHeightPx,
 }: {
   components: BenchComponent[];
   supporting: BenchComponent[];
@@ -422,6 +427,8 @@ function ComponentStrip({
   onDragLeaveStrip: () => void;
   onDropCard: (id: string, group: "primary" | "supporting") => void;
   onDragEnd: () => void;
+  activeHeightPx: number | null;
+  setActiveHeightPx: (px: number | null) => void;
 }) {
   const allComponentsForRefs = [...components, ...supporting];
 
@@ -466,6 +473,8 @@ function ComponentStrip({
         onDragOverCard={() => onDragOverCard(c.id, group)}
         onDropCard={() => onDropCard(c.id, group)}
         onDragEnd={onDragEnd}
+        activeHeightPx={activeHeightPx}
+        setActiveHeightPx={setActiveHeightPx}
       />
     );
   }
@@ -495,6 +504,8 @@ function ComponentStrip({
         rightTab={activeRightTab[projectHeader.id] ?? "chat"}
         setRightTab={(tab) => setActiveRightTab(projectHeader.id, tab)}
         onChangeTaskStatus={onChangeTaskStatus}
+        activeHeightPx={activeHeightPx}
+        setActiveHeightPx={setActiveHeightPx}
       />
     );
   };
@@ -559,6 +570,8 @@ function ComponentCard({
   onDragOverCard,
   onDropCard,
   onDragEnd,
+  activeHeightPx,
+  setActiveHeightPx,
 }: {
   component: BenchComponent;
   allComponents: BenchComponent[];
@@ -584,6 +597,8 @@ function ComponentCard({
   onDragOverCard?: () => void;
   onDropCard?: () => void;
   onDragEnd?: () => void;
+  activeHeightPx?: number | null;
+  setActiveHeightPx?: (px: number | null) => void;
 }) {
   if (state !== "active") {
     const supporting = variant === "supporting";
@@ -655,11 +670,40 @@ function ComponentCard({
     );
   }
 
-  const inboundTotal = component.tasks.length;
-  const outboundTotal = outboundTasks.length;
+  const inboundOpenCount = component.tasks.filter((t) => t.status === "open").length;
+  const outboundOpenCount = outboundTasks.filter((t) => t.status === "open").length;
+
+  const articleRef = useRef<HTMLElement>(null);
+
+  function startResize(e: React.MouseEvent) {
+    if (!setActiveHeightPx) return;
+    const article = articleRef.current;
+    if (!article) return;
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = article.offsetHeight;
+    function onMove(ev: MouseEvent) {
+      setActiveHeightPx?.(Math.max(320, startH + (ev.clientY - startY)));
+    }
+    function onUp() {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+
+  const heightStyle: React.CSSProperties = {
+    height: activeHeightPx != null ? `${activeHeightPx}px` : "60vh",
+    minHeight: "320px",
+  };
 
   return (
-    <article className="flex min-h-0 flex-1 flex-col rounded-xl border border-accent bg-surface ring-1 ring-accent-ring">
+    <article
+      ref={articleRef}
+      style={heightStyle}
+      className="flex shrink-0 flex-col rounded-xl border border-accent bg-surface ring-1 ring-accent-ring"
+    >
       <button
         type="button"
         onClick={onClose}
@@ -726,7 +770,7 @@ function ComponentCard({
             <RightTab
               active={rightTab === "tasks"}
               onClick={() => setRightTab("tasks")}
-              label={`Tasks (in ${inboundTotal} / out ${outboundTotal})`}
+              label={`Tasks (in ${inboundOpenCount} / out ${outboundOpenCount})`}
             />
           </header>
           {rightTab === "chat" ? (
@@ -761,6 +805,17 @@ function ComponentCard({
           )}
         </div>
       </div>
+      {setActiveHeightPx && (
+        <div
+          onMouseDown={startResize}
+          onDoubleClick={() => setActiveHeightPx(null)}
+          title="Drag to resize · double-click to reset"
+          className="group flex h-2 cursor-row-resize items-center justify-center border-t border-border hover:bg-surface-elev"
+          aria-label="Resize"
+        >
+          <span className="h-0.5 w-10 rounded bg-border-strong group-hover:bg-accent" />
+        </div>
+      )}
     </article>
   );
 }

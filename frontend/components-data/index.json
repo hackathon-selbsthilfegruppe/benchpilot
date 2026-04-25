@@ -1,12 +1,14 @@
 {
   "projectHeader": "research-topic",
   "components": [
-    "hypothesis",
     "reagents",
+    "hypothesis",
     "samples",
+    "animals",
+    "cell-culture",
     "equipment",
-    "budget",
-    "experiments"
+    "experiments",
+    "budget"
   ],
   "supporting": [
     "literature"
