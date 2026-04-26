@@ -3,7 +3,7 @@
 - ID: `03_000`
 - Type: `Epic`
 - Area: `Backend`
-- Status: `Open`
+- Status: `Closed`
 
 ## Goal
 
@@ -48,3 +48,13 @@ Resources need to be created and updated, and component-owned metadata must be w
 - components can persist resource outputs through backend APIs
 - backend enforces consistent writes and ownership rules
 - resources remain readable through the read API after mutation
+
+## Resolution
+
+Closed after implementing and testing:
+
+- `03_001` write-actor contract and ownership enforcement
+- `03_002` resource create endpoint and ingestion-backed writes
+- `03_003` resource metadata and file update endpoints
+- `03_004` component summary update endpoint
+- `03_005` write API integration tests and read-after-write verification
