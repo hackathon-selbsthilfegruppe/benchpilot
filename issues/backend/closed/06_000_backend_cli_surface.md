@@ -3,7 +3,7 @@
 - ID: `06_000`
 - Type: `Epic`
 - Area: `Backend`
-- Status: `Open`
+- Status: `Closed`
 
 ## Goal
 
@@ -48,3 +48,12 @@ It also reduces pressure to invent custom tool integrations too early.
 - CLI output is stable enough for session prompts and automation
 - read commands do not require a custom pi tool
 - task commands can be added incrementally once task APIs exist
+
+## Resolution
+
+Closed after implementing and testing:
+
+- `06_001` cli skeleton and backend endpoint resolution
+- `06_002` bench requirement component and resource read commands
+- `06_003` task cli commands for create poll and result
+- `06_004` cli smoke tests and json contract verification
