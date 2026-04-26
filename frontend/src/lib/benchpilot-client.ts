@@ -59,6 +59,11 @@ export type SessionRoleInput = {
   description?: string;
 };
 
+export type ComponentSessionInput = {
+  benchId: string;
+  componentInstanceId: string;
+};
+
 const API_PREFIX = "/api/benchpilot";
 
 export async function prewarmSessions(roles: SessionRoleInput[]): Promise<BenchpilotSessionSummary[]> {
@@ -82,6 +87,44 @@ export async function createSession(role: SessionRoleInput): Promise<BenchpilotS
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ role }),
   });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  const body = (await response.json()) as { session: BenchpilotSessionSummary };
+  return body.session;
+}
+
+export async function prewarmComponentSessions(
+  components: ComponentSessionInput[],
+): Promise<BenchpilotSessionSummary[]> {
+  const response = await fetch(`${API_PREFIX}/component-sessions/prewarm`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ components }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  const body = (await response.json()) as { sessions: BenchpilotSessionSummary[] };
+  return body.sessions;
+}
+
+export async function createComponentSession(
+  benchId: string,
+  componentInstanceId: string,
+): Promise<BenchpilotSessionSummary> {
+  const response = await fetch(
+    `${API_PREFIX}/benches/${encodeURIComponent(benchId)}/components/${encodeURIComponent(componentInstanceId)}/session`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    },
+  );
 
   if (!response.ok) {
     throw new Error(await readErrorMessage(response));
