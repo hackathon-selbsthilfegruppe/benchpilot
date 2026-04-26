@@ -157,6 +157,46 @@ describe("createApp", () => {
         createdAt: "2026-04-25T19:10:00.000Z",
         updatedAt: "2026-04-25T19:12:00.000Z",
       }),
+      listComponentResources: async () => [
+        {
+          id: "lit-0007",
+          benchId: "bench-crp-biosensor",
+          componentInstanceId: "literature-crp-biosensor",
+          title: "CRP paper sensor prior art",
+          kind: "paper-note",
+          description: "Prior-art note",
+          summary: "Summary of prior work on CRP paper sensors and likely overlap with the current hypothesis.",
+          tags: ["diagnostics", "crp"],
+          updatedAt: "2026-04-25T19:10:00.000Z",
+        },
+      ],
+      getComponentResource: async () => ({
+        id: "lit-0007",
+        benchId: "bench-crp-biosensor",
+        componentInstanceId: "literature-crp-biosensor",
+        producedByComponentInstanceId: "literature-crp-biosensor",
+        title: "CRP paper sensor prior art",
+        kind: "paper-note",
+        description: "Prior-art note",
+        summary: "Summary of prior work on CRP paper sensors and likely overlap with the current hypothesis.",
+        tags: ["diagnostics", "crp"],
+        files: [
+          {
+            filename: "prior-art.md",
+            mediaType: "text/markdown",
+            description: "Markdown notes",
+            role: "primary",
+          },
+        ],
+        primaryFile: "prior-art.md",
+        contentType: "text/markdown",
+        supportsRequirementIds: ["req-assess-novelty"],
+        derivedFromResourceIds: [],
+        status: "ready",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:10:00.000Z",
+        content: "# Notes\n\nFull markdown body here...",
+      }),
     });
 
     const app = createApp(createFakePool({}), benchReadService);
@@ -242,6 +282,56 @@ describe("createApp", () => {
         status: "active",
         createdAt: "2026-04-25T19:10:00.000Z",
         updatedAt: "2026-04-25T19:12:00.000Z",
+      },
+    });
+
+    const resourcesResponse = await request(app, "/api/benches/bench-crp-biosensor/components/literature-crp-biosensor/resources", { method: "GET" });
+    expect(resourcesResponse.status).toBe(200);
+    expect(await resourcesResponse.json()).toEqual({
+      resources: [
+        {
+          id: "lit-0007",
+          benchId: "bench-crp-biosensor",
+          componentInstanceId: "literature-crp-biosensor",
+          title: "CRP paper sensor prior art",
+          kind: "paper-note",
+          description: "Prior-art note",
+          summary: "Summary of prior work on CRP paper sensors and likely overlap with the current hypothesis.",
+          tags: ["diagnostics", "crp"],
+          updatedAt: "2026-04-25T19:10:00.000Z",
+        },
+      ],
+    });
+
+    const resourceResponse = await request(app, "/api/benches/bench-crp-biosensor/components/literature-crp-biosensor/resources/lit-0007", { method: "GET" });
+    expect(resourceResponse.status).toBe(200);
+    expect(await resourceResponse.json()).toEqual({
+      resource: {
+        id: "lit-0007",
+        benchId: "bench-crp-biosensor",
+        componentInstanceId: "literature-crp-biosensor",
+        producedByComponentInstanceId: "literature-crp-biosensor",
+        title: "CRP paper sensor prior art",
+        kind: "paper-note",
+        description: "Prior-art note",
+        summary: "Summary of prior work on CRP paper sensors and likely overlap with the current hypothesis.",
+        tags: ["diagnostics", "crp"],
+        files: [
+          {
+            filename: "prior-art.md",
+            mediaType: "text/markdown",
+            description: "Markdown notes",
+            role: "primary",
+          },
+        ],
+        primaryFile: "prior-art.md",
+        contentType: "text/markdown",
+        supportsRequirementIds: ["req-assess-novelty"],
+        derivedFromResourceIds: [],
+        status: "ready",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:10:00.000Z",
+        content: "# Notes\n\nFull markdown body here...",
       },
     });
   });
