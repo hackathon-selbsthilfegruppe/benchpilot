@@ -138,6 +138,8 @@ This layer is already partially implemented and should remain stable.
 
 The frontend should continue to depend on these normalized events only.
 
+For debugging/development, the backend may additionally emit structured logs and `x-request-id` response headers, but those are observability aids rather than core product contract.
+
 ## 6. Phase 2 — Dynamic bench state contract
 
 This is the big conceptual update.

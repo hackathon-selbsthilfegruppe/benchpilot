@@ -83,6 +83,11 @@ npm run dev
 Backend default URL:
 - `http://localhost:8787`
 
+Backend logging:
+- `BENCHPILOT_LOG_LEVEL=debug|info|warn|error` controls backend structured log verbosity
+- default is `info`
+- HTTP requests now emit `x-request-id` headers and matching structured request logs for correlation
+
 ## Frontend intake + compatibility API
 
 These routes live in the Next.js app as either thin backend proxies for the guided intake flow or compatibility support for existing local benches under `frontend/components-data/`.
@@ -159,6 +164,12 @@ curl -X POST http://localhost:8787/api/agent-sessions/prewarm \
 curl -N -X POST http://localhost:8787/api/agent-sessions/<session-id>/prompt \
   -H 'content-type: application/json' \
   -d '{ "message": "Draft three strong hypotheses for CRISPR off-target reduction." }'
+```
+
+### Read session history
+
+```bash
+curl http://localhost:8787/api/agent-sessions/<session-id>/history
 ```
 
 The prompt endpoint streams `application/x-ndjson` so the UI can consume incremental events.
