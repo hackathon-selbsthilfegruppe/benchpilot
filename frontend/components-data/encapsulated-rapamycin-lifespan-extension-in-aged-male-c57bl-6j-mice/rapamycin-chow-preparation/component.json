@@ -1,0 +1,9 @@
+{
+  "id": "rapamycin-chow-preparation",
+  "name": "Encapsulated Rapamycin Chow Preparation",
+  "preprompt": "Draft the formulation protocol for encapsulated rapamycin chow at 14 ppm and the matched eudragit-only control chow. Include ingredient sourcing, mixing/encapsulation steps, batch labeling, storage conditions, stability considerations, and quality-control checks for dose consistency.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
+  "summary": "Defines how to prepare and verify the treatment and control diets.",
+  "toc": [],
+  "tasks": []
+}

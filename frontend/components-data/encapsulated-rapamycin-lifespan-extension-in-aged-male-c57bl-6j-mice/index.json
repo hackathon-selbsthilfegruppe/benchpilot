@@ -1,0 +1,13 @@
+{
+  "components": [
+    "animal-cohort-and-randomization",
+    "rapamycin-chow-preparation",
+    "treatment-initiation-and-dosing",
+    "longitudinal-monitoring",
+    "humane-endpoints-and-necropsy",
+    "data-management-and-analysis"
+  ],
+  "supporting": [
+    "component"
+  ]
+}

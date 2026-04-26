@@ -1,0 +1,9 @@
+{
+  "id": "lifespan-endpoint-and-necropsy",
+  "name": "Survival Endpoint, Humane Endpoints, and Necropsy",
+  "preprompt": "Define the primary survival endpoint, censoring rules, humane endpoint criteria, and procedures for documenting date and cause of death. Include necropsy workflow, tissue collection if applicable, and standardized data capture for all deaths and censored animals.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
+  "summary": "Provides the definitive lifespan outcome definition and standardized endpoint handling.",
+  "toc": [],
+  "tasks": []
+}

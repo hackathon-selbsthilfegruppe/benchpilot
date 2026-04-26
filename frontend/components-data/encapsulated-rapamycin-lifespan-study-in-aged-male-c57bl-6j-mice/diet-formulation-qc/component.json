@@ -1,0 +1,9 @@
+{
+  "id": "diet-formulation-qc",
+  "name": "Rapamycin Chow Formulation and Quality Control",
+  "preprompt": "Define how encapsulated rapamycin chow at 14 ppm and eudragit-only control chow are prepared, labeled, stored, and verified. Include batch documentation, stability/QC checks, blinding of diet identity, and procedures for replacing or discarding compromised chow.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
+  "summary": "Ensures the intervention and control diets are compositionally matched except for rapamycin and remain stable throughout the study.",
+  "toc": [],
+  "tasks": []
+}

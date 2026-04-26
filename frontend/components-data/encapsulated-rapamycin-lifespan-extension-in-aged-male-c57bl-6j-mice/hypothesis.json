@@ -1,0 +1,10 @@
+{
+  "id": "hypothesis",
+  "name": "Encapsulated rapamycin lifespan extension in aged male C57BL/6J mice",
+  "preprompt": "Refine the research question into a testable lifespan study protocol and coordinate the experimental workflow across animal handling, diet formulation, treatment initiation, monitoring, endpoint definition, and survival analysis. Keep the primary endpoint centered on median lifespan and preserve the exact comparison: encapsulated rapamycin chow versus eudragit-only control chow in male C57BL/6J mice starting at 12 months of age.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. Write: own data only.",
+  "summary": "We want to test whether encapsulated rapamycin delivered in chow at 14 ppm (~2.24 mg/kg/day) increases median lifespan relative to eudragit-only control chow in male C57BL/6J mice. The study starts treatment at 12 months of age and follows mice longitudinally until natural death or humane endpoint, with survivorship as the primary outcome.",
+  "toc": [],
+  "tasks": [],
+  "slug": "encapsulated-rapamycin-lifespan-extension-in-aged-male-c57bl-6j-mice"
+}

@@ -1,5 +1,5 @@
 {
-  "active": "enzyme-stability",
+  "active": "encapsulated-rapamycin-lifespan-study-in-aged-male-c57bl-6j-mice",
   "hypotheses": [
     {
       "slug": "enzyme-stability",
@@ -10,6 +10,18 @@
       "slug": "pilbara-hydrothermal",
       "name": "Pilbara greenstone records seafloor hydrothermal alteration",
       "domain": "geology"
+    },
+    {
+      "slug": "rapamycin-lifespan-extension-in-male-c57bl-6j-mice",
+      "name": "Rapamycin Lifespan Extension in Male C57BL/6J Mice"
+    },
+    {
+      "slug": "encapsulated-rapamycin-lifespan-extension-in-aged-male-c57bl-6j-mice",
+      "name": "Encapsulated rapamycin lifespan extension in aged male C57BL/6J mice"
+    },
+    {
+      "slug": "encapsulated-rapamycin-lifespan-study-in-aged-male-c57bl-6j-mice",
+      "name": "Encapsulated rapamycin lifespan study in aged male C57BL/6J mice"
     }
   ]
 }

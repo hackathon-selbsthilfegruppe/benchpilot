@@ -1,0 +1,11 @@
+{
+  "components": [
+    "mouse-acquisition-and-baseline-qualification",
+    "chow-formulation-and-dose-verification",
+    "randomization-blinding-and-treatment-initiation",
+    "longitudinal-health-and-survival-monitoring",
+    "necropsy-and-cause-of-death-review",
+    "secondary-behavioral-phenotyping"
+  ],
+  "supporting": []
+}

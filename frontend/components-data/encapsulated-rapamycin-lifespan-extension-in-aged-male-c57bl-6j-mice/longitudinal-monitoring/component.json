@@ -1,0 +1,9 @@
+{
+  "id": "longitudinal-monitoring",
+  "name": "Longitudinal Health and Survival Monitoring",
+  "preprompt": "Create the monitoring protocol for body weight, food intake if measured, general health scoring, adverse events, and survivorship checks. Define observation frequency, humane intervention criteria, and how to record dates of death, censoring, or removal from study.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
+  "summary": "Tracks animal status over time and captures survival outcomes.",
+  "toc": [],
+  "tasks": []
+}

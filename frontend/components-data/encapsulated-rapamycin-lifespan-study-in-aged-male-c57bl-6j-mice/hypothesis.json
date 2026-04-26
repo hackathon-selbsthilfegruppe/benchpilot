@@ -1,0 +1,10 @@
+{
+  "id": "hypothesis",
+  "name": "Encapsulated rapamycin lifespan study in aged male C57BL/6J mice",
+  "preprompt": "You are refining a lifespan study protocol for aged male C57BL/6J mice. Keep the question focused on the primary survival endpoint, define the comparison clearly (encapsulated rapamycin 14 ppm in chow vs eudragit-only control), and preserve the treatment start age of 12 months. Produce a practical protocol template with executable steps, critical controls, and analysis-ready endpoints.",
+  "tooling": "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. Write: own data only.",
+  "summary": "We are testing whether starting encapsulated rapamycin at 12 months of age increases median lifespan in male C57BL/6J mice relative to eudragit-only control chow. The protocol template should define a clean randomized, blinded survival study with the primary endpoint of median lifespan and minimal confounding from husbandry or diet variability.",
+  "toc": [],
+  "tasks": [],
+  "slug": "encapsulated-rapamycin-lifespan-study-in-aged-male-c57bl-6j-mice"
+}

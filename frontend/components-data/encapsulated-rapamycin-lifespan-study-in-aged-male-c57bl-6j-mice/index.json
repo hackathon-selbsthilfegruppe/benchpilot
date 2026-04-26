@@ -1,0 +1,13 @@
+{
+  "components": [
+    "animal-cohort-setup",
+    "diet-formulation-qc",
+    "randomization-blinding",
+    "treatment-and-monitoring",
+    "lifespan-endpoint-and-necropsy",
+    "statistical-analysis-and-reporting"
+  ],
+  "supporting": [
+    "component"
+  ]
+}

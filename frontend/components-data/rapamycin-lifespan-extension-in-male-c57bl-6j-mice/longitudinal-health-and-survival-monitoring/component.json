@@ -1,0 +1,9 @@
+{
+  "id": "longitudinal-health-and-survival-monitoring",
+  "name": "Longitudinal Health and Survival Monitoring",
+  "preprompt": "Specify the monitoring schedule for body weight, food intake, clinical signs, morbidity, and survival status. Include humane endpoint criteria, monitoring frequency, and how deaths versus euthanasia are recorded for survival analysis.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
+  "summary": "Tracks the primary outcome and welfare throughout the study. Produces the survival dataset needed to test median lifespan differences.",
+  "toc": [],
+  "tasks": []
+}

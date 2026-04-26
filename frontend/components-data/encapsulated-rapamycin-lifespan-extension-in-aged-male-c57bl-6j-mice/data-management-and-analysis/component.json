@@ -1,0 +1,9 @@
+{
+  "id": "data-management-and-analysis",
+  "name": "Data Management and Survival Analysis",
+  "preprompt": "Define the data schema, primary endpoint calculation, censoring rules, and statistical plan for comparing median lifespan between groups. Include recommendations for Kaplan-Meier analysis, median survival estimation, effect sizes, and documentation needed for reproducible reporting.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
+  "summary": "Turns the study records into the primary lifespan comparison.",
+  "toc": [],
+  "tasks": []
+}

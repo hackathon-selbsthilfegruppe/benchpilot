@@ -1,0 +1,9 @@
+{
+  "id": "component",
+  "name": "Component",
+  "preprompt": "",
+  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
+  "summary": "",
+  "toc": [],
+  "tasks": []
+}

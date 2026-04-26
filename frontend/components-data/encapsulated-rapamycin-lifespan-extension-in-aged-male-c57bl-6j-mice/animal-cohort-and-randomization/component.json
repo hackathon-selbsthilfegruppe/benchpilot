@@ -1,0 +1,9 @@
+{
+  "id": "animal-cohort-and-randomization",
+  "name": "Animal Cohort Setup and Randomization",
+  "preprompt": "Define the study cohort, inclusion/exclusion criteria, housing conditions, acclimation period, and randomization scheme for male C57BL/6J mice at 12 months of age. Specify baseline metadata to capture, how to assign mice to treatment versus control, and how to maintain allocation concealment where possible.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
+  "summary": "Establishes the study population and assigns animals to groups before treatment begins.",
+  "toc": [],
+  "tasks": []
+}

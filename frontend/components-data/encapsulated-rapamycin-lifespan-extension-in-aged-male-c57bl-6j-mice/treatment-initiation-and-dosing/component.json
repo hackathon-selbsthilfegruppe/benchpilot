@@ -1,0 +1,9 @@
+{
+  "id": "treatment-initiation-and-dosing",
+  "name": "Treatment Initiation and Dosing Procedure",
+  "preprompt": "Specify how and when treatment starts at 12 months of age, how chow is introduced, how intake or dose exposure is tracked, and how to handle chow replacement and lot changes. Include any procedures needed to document approximate mg/kg/day exposure and deviations from target dosing.",
+  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
+  "summary": "Launches the intervention and documents exposure over time.",
+  "toc": [],
+  "tasks": []
+}
