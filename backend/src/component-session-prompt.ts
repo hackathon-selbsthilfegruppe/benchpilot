@@ -58,6 +58,7 @@ export function buildComponentSessionPrompt(context: ComponentSessionPromptConte
     "- Other components are always visible through cheap summaries and TOCs.",
     "- Full resource bodies are not injected by default; load richer detail only when needed.",
     "- Prefer explicit tasks when another component should do the work itself.",
+    formatSpecialCollaborationTargets(context),
     "",
     "## Active component instance",
     `ID: ${context.self.component.id}`,
@@ -107,6 +108,25 @@ function formatOtherComponents(others: ComponentSessionPromptContext["others"]):
     `  summary: ${trimTrailingNewline(entry.summary)}`,
     `  toc: ${entry.toc.length === 0 ? "no resources" : entry.toc.map((resource) => `${resource.id}:${resource.kind}`).join(", ")}`,
   ].join("\n")).join("\n");
+}
+
+function formatSpecialCollaborationTargets(context: ComponentSessionPromptContext): string {
+  const presentPresetIds = new Set([
+    context.self.component.presetId,
+    ...context.others.map((entry) => entry.component.presetId),
+  ]);
+  const lines = [] as string[];
+
+  if (presentPresetIds.has("reviewer")) {
+    lines.push("- reviewer: ask it to critique concrete outputs, surface defects, and challenge unjustified assumptions instead of self-reviewing.");
+  }
+  if (presentPresetIds.has("experiment-planner")) {
+    lines.push("- experiment-planner: ask it to integrate specialist outputs into the shippable plan or to produce an explicit gap report naming what is still missing.");
+  }
+
+  return lines.length > 0
+    ? ["## Special collaboration targets", ...lines].join("\n")
+    : "";
 }
 
 function trimTrailingNewline(value: string): string {

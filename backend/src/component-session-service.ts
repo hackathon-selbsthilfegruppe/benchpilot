@@ -100,6 +100,7 @@ export class ComponentSessionService {
       `Title: ${task.title}`,
       `Request: ${task.request}`,
       "You are running in a fresh task-run session. Complete the delegated work in a durable, inspectable way.",
+      buildTaskRunRoleSpecificGuidance(preset.id),
       buildTaskRunCompletionGuidance(this.projectRoot, task),
     ].join("\n");
 
@@ -138,6 +139,27 @@ function buildBenchpilotCliGuidance(projectRoot: string, benchId: string, actorC
     `Read one task: ${cliPrefix} tasks get <task-id> --bench ${benchId}`,
     `Read a task result: ${cliPrefix} tasks result <task-id> --bench ${benchId}`,
   ].join("\n");
+}
+
+function buildTaskRunRoleSpecificGuidance(presetId: string): string {
+  if (presetId === "reviewer") {
+    return [
+      "Reviewer task-run framing:",
+      "- This is review-of-X work, not produce-X work.",
+      "- Name concrete defects, missing controls, weak evidence, and unjustified assumptions.",
+      "- Do not approve generically and do not rewrite the target artifact from scratch.",
+    ].join("\n");
+  }
+
+  if (presetId === "experiment-planner") {
+    return [
+      "Experiment-planner task-run framing:",
+      "- Gather and integrate current specialist outputs into the deliverable plan.",
+      "- If critical inputs are missing, produce an explicit gap report naming the missing inputs and responsible components instead of padding the plan.",
+    ].join("\n");
+  }
+
+  return "";
 }
 
 function buildTaskRunCompletionGuidance(projectRoot: string, task: TaskMetadata): string {

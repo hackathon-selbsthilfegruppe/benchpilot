@@ -34,9 +34,16 @@ describe("component session service", () => {
       summary: "Tracks protocol candidates.",
       toolMode: "read-only",
     });
+    const reviewer = createComponentInstance({
+      benchId: bench.id,
+      presetId: "reviewer",
+      name: "Reviewer — CRP biosensor",
+      summary: "Reviews specialist output.",
+    });
 
     await store.writeBench(bench);
     await store.writeComponent(component);
+    await store.writeComponent(reviewer);
 
     const createdRoles: RoleDefinition[] = [];
     const pool = createFakeBootstrapService((role) => {
@@ -72,12 +79,81 @@ describe("component session service", () => {
     expect(session.role.instructions).toContain("Tracks protocol candidates");
     expect(session.role.instructions).toContain("## BenchPilot backend operations");
     expect(session.role.instructions).toContain(`tasks create --bench ${bench.id} --from ${component.id}`);
+    expect(session.role.instructions).toContain("reviewer: ask it to critique concrete outputs");
     expect(session.cwd).toBe(path.join(store.workspaceRoot, "benches", bench.id, "components", component.id));
 
     const reused = await service.ensureComponentSession(bench.id, component.id);
     expect(reused.id).toBe(session.id);
     expect(createdRoles).toHaveLength(1);
     expect(service.lookupComponentSession(bench.id, component.id)?.id).toBe(session.id);
+  });
+
+  it("frames reviewer task-run sessions as review work", async () => {
+    const baseDir = await mkdtemp(path.join(os.tmpdir(), "benchpilot-reviewer-task-session-"));
+    tempDirs.push(baseDir);
+
+    const store = new WorkspaceStore(baseDir);
+    const bench = createBench({
+      title: "CRP biosensor",
+      question: "Can we build a paper-based electrochemical biosensor for CRP?",
+    });
+    const reviewer = createComponentInstance({
+      benchId: bench.id,
+      presetId: "reviewer",
+      name: "Reviewer — CRP biosensor",
+      summary: "Reviews specialist output.",
+    });
+    const protocols = createComponentInstance({
+      benchId: bench.id,
+      presetId: "protocols",
+      name: "Protocols — CRP biosensor",
+      summary: "Tracks protocol candidates.",
+      toolMode: "read-only",
+    });
+
+    await store.writeBench(bench);
+    await store.writeComponent(reviewer);
+    await store.writeComponent(protocols);
+
+    const pool = createFakeBootstrapService((role) => ({
+      id: "task-run-1",
+      role: {
+        id: role.id ?? "generated-role",
+        name: role.name,
+        description: role.description,
+        instructions: role.instructions ?? "",
+        cwd: role.cwd,
+        toolMode: role.toolMode ?? "full",
+      },
+      cwd: role.cwd ?? "/tmp/benchpilot",
+      status: "idle",
+      createdAt: "2026-04-25T19:15:00.000Z",
+    }));
+
+    const service = new ComponentSessionService(
+      pool,
+      new BenchReadService(store),
+      store,
+      path.join(process.cwd(), ".."),
+    );
+
+    const session = await service.createTaskRunSession({
+      id: "task-review-protocol",
+      benchId: bench.id,
+      fromComponentInstanceId: protocols.id,
+      toComponentInstanceId: reviewer.id,
+      title: "Review protocol draft",
+      request: "Review the protocol draft for missing controls.",
+      status: "running",
+      taskSessionId: "task-run-1",
+      createdResourceIds: [],
+      modifiedResourceIds: [],
+      createdAt: "2026-04-25T19:20:00.000Z",
+      updatedAt: "2026-04-25T19:20:00.000Z",
+    });
+
+    expect(session.role.instructions).toContain("Reviewer task-run framing:");
+    expect(session.role.instructions).toContain("This is review-of-X work");
   });
 });
 
