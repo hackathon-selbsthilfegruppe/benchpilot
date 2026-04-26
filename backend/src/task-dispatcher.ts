@@ -101,6 +101,9 @@ export class TaskDispatcher {
       }
       try {
         await this.taskService.failTask(task.id, task.benchId, verdict.kind, verdict.message);
+        // The original prompt promise is unreachable now; release the in-flight
+        // slot so retry/redispatch can pick up future attempts of this task.
+        this.inFlightTaskIds.delete(task.id);
         this.logger.error(
           verdict.kind === "runtime_timeout"
             ? "task.dispatch.timeout.runtime"
