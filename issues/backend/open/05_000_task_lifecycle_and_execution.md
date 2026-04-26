@@ -37,11 +37,11 @@ Tasks are the bridge between one component deciding work should happen and anoth
 
 ## Candidate child issues
 
-- task schema
-- task create/list/get endpoints
-- task-run session bootstrap
-- task completion endpoint/tool path
-- task result resource conventions
+- `05_001` task schema and workspace-backed storage
+- `05_002` task create/list/get api endpoints
+- `05_003` task-run session bootstrap and tracking
+- `05_004` task completion submission and result linkage
+- `05_005` task lifecycle integration tests and polling verification
 
 ## Exit criteria
 
