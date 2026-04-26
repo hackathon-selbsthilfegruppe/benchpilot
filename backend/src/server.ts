@@ -6,6 +6,7 @@ import { BenchMaterializationService } from "./bench-materialization-service.js"
 import { BenchReadService } from "./bench-read-service.js";
 import { BenchWriteService } from "./bench-write-service.js";
 import { ComponentSessionService } from "./component-session-service.js";
+import { MockSessionPool } from "./demo/mock-session-pool.js";
 import { IntakeService } from "./intake-service.js";
 import { logger } from "./logger.js";
 import { SessionPool } from "./session-pool.js";
@@ -17,7 +18,15 @@ import { WorkspaceStore } from "./workspace-store.js";
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const projectRoot = path.resolve(backendRoot, "..");
 const port = Number(process.env.PORT ?? 8787);
-const pool = new SessionPool({ projectRoot: backendRoot });
+const demoMode = process.env.BENCHPILOT_DEMO_MODE?.trim() === "1";
+const pool = demoMode
+  ? new MockSessionPool({ promptDelayMs: Number(process.env.BENCHPILOT_DEMO_PROMPT_DELAY_MS ?? 800) })
+  : new SessionPool({ projectRoot: backendRoot });
+if (demoMode) {
+  logger.warn("backend.demo_mode.enabled", {
+    note: "MockSessionPool is serving orchestrator prompts — no real LLM calls.",
+  });
+}
 const workspaceStore = new WorkspaceStore(backendRoot);
 const benchReadService = new BenchReadService(workspaceStore);
 const benchWriteService = new BenchWriteService(workspaceStore);

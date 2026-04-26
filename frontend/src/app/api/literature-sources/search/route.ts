@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { searchAllSources } from "@/lib/literature-sources";
+import { DEMO_LITERATURE_SOURCES, isDemoMode } from "@/lib/demo/canned-search";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,10 @@ export async function POST(req: Request) {
 
   if (!body.query?.trim()) {
     return NextResponse.json({ error: "query is required" }, { status: 400 });
+  }
+
+  if (isDemoMode()) {
+    return NextResponse.json({ sources: DEMO_LITERATURE_SOURCES });
   }
 
   const sources = await searchAllSources(body.query.trim(), body.pageSize ?? 10);

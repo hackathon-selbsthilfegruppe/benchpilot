@@ -1,11 +1,13 @@
 @import "tailwindcss";
 
-@keyframes bp-typing-dot {
-  0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
-  40% { transform: translateY(-3px); opacity: 1; }
-}
-.bp-typing-dot {
-  animation: bp-typing-dot 1.2s infinite ease-in-out;
+@layer utilities {
+  @keyframes bp-typing-dot {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
+    40% { transform: translateY(-3px); opacity: 1; }
+  }
+  .bp-typing-dot {
+    animation: bp-typing-dot 1.2s infinite ease-in-out;
+  }
 }
 
 @custom-variant dark (&:where(.dark, .dark *));

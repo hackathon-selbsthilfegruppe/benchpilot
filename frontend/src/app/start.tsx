@@ -559,7 +559,7 @@ export default function Start({
       <main className="flex flex-1 justify-center p-6">
         <div
           className={`flex w-full flex-col gap-4 ${
-            accepted ? "max-w-6xl" : "max-w-3xl"
+            accepted || protoActive ? "max-w-6xl" : "max-w-3xl"
           }`}
         >
           <div data-testid="hypothesis-step" className="flex flex-1 flex-col gap-3">
