@@ -109,6 +109,11 @@ export default function Start({
         e.preventDefault();
         e.stopPropagation();
         setStep("hypothesis");
+        // Seed both the research question (so the user can immediately
+        // continue to literature/protocols/finalize) and the chat input
+        // (so they can also send it to the orchestrator if they want a
+        // refinement round-trip first).
+        setQuestion(EXAMPLE_QUESTIONS[0]);
         setChatInput(EXAMPLE_QUESTIONS[0]);
       }
     }
@@ -118,6 +123,19 @@ export default function Start({
       window.removeEventListener("keydown", onKey, true);
       document.removeEventListener("keydown", onKey, true);
     };
+  }, []);
+
+  // URL-driven seeding: `/?seed=question` pre-fills the orchestrator
+  // chat input with the canned example so the user (or the e2e spec)
+  // can click Send and have the orchestrator do its refinement
+  // round-trip — exactly the normal flow, just with one less paste.
+  // Nothing else on the page is seeded.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("seed") === "question") {
+      setChatInput(EXAMPLE_QUESTIONS[0]);
+    }
   }, []);
 
   async function ensureSession(seedQuestion?: string): Promise<{

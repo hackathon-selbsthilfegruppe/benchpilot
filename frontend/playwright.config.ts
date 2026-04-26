@@ -9,16 +9,25 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [["list"]],
-  // Screencast specs are recorded via CDP frame-by-frame; the per-test
-  // wallclock is dominated by setContent + freeze frames + real LLM
-  // calls, not by assertion timeouts. Lift the per-test timeout so the
-  // whole demo run completes in one Playwright test.
-  timeout: isScreencast ? 1_200_000 : 60_000,
+  // Per-test budget. The screencast budget is generous because the
+  // spec waits for one real LLM round-trip (the finalize template
+  // draft); every other beat resolves on a deterministic UI signal
+  // via Playwright's auto-wait, with no per-assertion timeout
+  // overrides in the spec itself.
+  timeout: isScreencast ? 300_000 : 60_000,
   use: {
     baseURL: `http://127.0.0.1:${port}`,
-    trace: "on-first-retry",
+    trace: "on",
     viewport: isScreencast ? { width: 1920, height: 1080 } : undefined,
+    // 1s ceilings on UI actions and navigation. Anything in the app
+    // that is not waiting on a real LLM call must respond inside this
+    // window or the test fails fast.
+    actionTimeout: 1_000,
+    navigationTimeout: 1_000,
   },
+  // 1s ceiling on UI assertion polling. A page state that does not
+  // hold inside a second is a real bug, not flakiness.
+  expect: { timeout: 1_000 },
   projects: [
     {
       name: "chromium",

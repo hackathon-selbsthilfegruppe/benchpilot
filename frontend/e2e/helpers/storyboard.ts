@@ -1,6 +1,15 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Page, Locator } from "@playwright/test";
 import { Storyboard as NarratorStoryboard } from "screencast-narrator";
 import { E2eMode, readMode } from "./e2e-mode";
+
+// Single source of truth: the same logo SVG that the running app serves
+// at /benchpilot-logo.svg. Read once at module load.
+const LOGO_SVG = readFileSync(
+  join(__dirname, "..", "..", "public", "benchpilot-logo.svg"),
+  "utf8",
+);
 
 export type Voice = "natalie" | "harmony" | "clara" | "douglas";
 
@@ -31,28 +40,43 @@ const TITLE_CARD_HTML = (title: string, subtitle: string) => `
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     display: flex; align-items: center; justify-content: center;
-    height: 100vh; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    height: 100vh;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(14, 165, 233, 0.20), transparent 55%),
+      radial-gradient(circle at 80% 80%, rgba(129, 140, 248, 0.22), transparent 60%),
+      linear-gradient(135deg, #0a0f1f 0%, #111827 100%);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     color: white; text-align: center;
   }
-  .card { max-width: 960px; padding: 60px; }
+  .card { max-width: 1100px; padding: 60px; }
+  .mark {
+    display: flex; justify-content: center; margin-bottom: 40px;
+    color: #f8fafc; /* drives currentColor inside the inlined SVG */
+  }
+  .mark svg { width: 360px; height: auto; }
   .badge {
     display: inline-block;
-    font-size: 14px; letter-spacing: 4px; text-transform: uppercase;
-    color: #94a3b8; margin-bottom: 24px;
+    font-size: 13px; letter-spacing: 4px; text-transform: uppercase;
+    color: #64748b; margin-bottom: 32px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    padding: 6px 14px; border-radius: 999px;
   }
   h1 {
-    font-size: 56px; font-weight: 700; letter-spacing: -1px;
-    margin-bottom: 24px;
-    background: linear-gradient(90deg, #0ea5e9, #818cf8);
+    font-size: 64px; font-weight: 700; letter-spacing: -1.5px; line-height: 1.1;
+    margin-bottom: 28px;
+    background: linear-gradient(90deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   }
-  p { font-size: 24px; color: #cbd5e1; line-height: 1.6; }
+  p {
+    font-size: 26px; color: #cbd5e1; line-height: 1.5; max-width: 820px;
+    margin: 0 auto;
+  }
 </style>
 </head>
 <body>
 <div class="card">
-  <div class="badge">BenchPilot — Protocol Generation Engine</div>
+  <div class="mark">${LOGO_SVG}</div>
+  <div class="badge">Protocol Generation Engine</div>
   <h1>${title.replace(/"/g, "&quot;")}</h1>
   <p>${subtitle.replace(/"/g, "&quot;")}</p>
 </div>

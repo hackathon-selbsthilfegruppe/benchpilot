@@ -1,5 +1,35 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { createStoryboard, type Storyboard } from "./helpers/storyboard";
+
+async function fillReactTextarea(locator: Locator, value: string): Promise<void> {
+  // The canonical React-onChange-trigger trick. React tracks the previous
+  // value via an internal `_valueTracker` on the DOM node; when an input
+  // event fires, it compares the current value to the tracker and only
+  // dispatches onChange if they differ. We have to:
+  //   1. Reset the tracker's cached value to something different from
+  //      what we are about to set, so React believes the value changed.
+  //   2. Set the new value via the native setter (bypasses React's
+  //      proxy on the prototype's value setter).
+  //   3. Dispatch a bubbling input event so React's delegated listener
+  //      catches it at the root.
+  await locator.evaluate((el, v) => {
+    const textarea = el as HTMLTextAreaElement & {
+      _valueTracker?: { setValue: (s: string) => void };
+    };
+    if (textarea._valueTracker) {
+      textarea._valueTracker.setValue("__bp_e2e_force__");
+    }
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype,
+      "value",
+    )?.set;
+    setter?.call(textarea, v);
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+  }, value);
+}
+
+const CANNED_QUESTION =
+  "Does encapsulated rapamycin (14 ppm in chow, ≈2.24 mg/kg/day) extend median lifespan in male C57BL/6J mice vs eudragit-only control chow when treatment starts at 12 months of age?";
 
 /**
  * Scientist demo screencast.
@@ -28,145 +58,255 @@ test.describe("demo: scientist generates an experiment plan", () => {
       { language: "en" },
     );
 
+    // E2E-only mocks for the two LLM-bound endpoints. They live entirely
+    // inside the Playwright browser context — the running dev server never
+    // sees them, so production/manual runs hit the real orchestrator.
+    const DEMO_BENCH_SLUG = "enzyme-stability";
+    const REVISED_QUESTION = "What governs enzyme inactivation between pH 4 and 8 — His-network protonation (H1) or cofactor displacement (H2)?";
+
+    // Orchestrator session creation — instant canned response.
+    await page.route("**/api/benchpilot/agent-sessions", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: {
+            id: "demo-orchestrator",
+            role: { id: "orchestrator", name: "Orchestrator" },
+            cwd: "/tmp/demo",
+            status: "idle",
+            createdAt: new Date().toISOString(),
+          },
+        }),
+      });
+    });
+
+    // Orchestrator prompts — start.tsx makes two distinct calls:
+    //   (1) chat refinement on Send → expects a free-form reply with a
+    //       "Revised question:" line so start.tsx populates the
+    //       research-question textarea.
+    //   (2) finalize template draft → expects a fenced JSON block
+    //       matching the ProtocolTemplateDraft shape.
+    // Branch on the request body so each call gets the right reply.
+    await page.route("**/api/benchpilot/agent-sessions/*/prompt", async (route) => {
+      const requestBody = route.request().postData() ?? "";
+      const isTemplateDraft = requestBody.includes("BenchPilot orchestrator drafting a protocol template");
+      if (!isTemplateDraft) {
+        const refinementReply = `Sharper framing — pinned to the alternative mechanisms.\n\nRevised question: ${REVISED_QUESTION}`;
+        const refinementEvents = [
+          { type: "session_started", sessionId: "demo-orchestrator", roleId: "orchestrator" },
+          { type: "message_completed", sessionId: "demo-orchestrator", roleId: "orchestrator", assistantText: refinementReply },
+        ];
+        await route.fulfill({
+          status: 200,
+          contentType: "application/x-ndjson; charset=utf-8",
+          body: refinementEvents.map((e) => JSON.stringify(e)).join("\n") + "\n",
+        });
+        return;
+      }
+      const reply = [
+        "Here is the merged experiment plan:",
+        "",
+        "```json",
+        JSON.stringify({
+          hypothesis: {
+            name: "Encapsulated rapamycin lifespan in C57BL/6J mice",
+            summary: REVISED_QUESTION,
+            preprompt: "You hold the framing for the rapamycin lifespan study.",
+          },
+          components: [
+            { id: "chow-prep", name: "Chow preparation", preprompt: "Prepare encapsulated rapamycin chow.", summary: "14 ppm encapsulated rapamycin chow plus eudragit-only control." },
+            { id: "cohort", name: "Animal cohort", preprompt: "Source and randomize the cohort.", summary: "Male C57BL/6J at 12 months, randomized into treatment and control." },
+            { id: "monitoring", name: "Treatment & monitoring", preprompt: "Run the lifespan arm.", summary: "Daily welfare, biweekly weights, monthly food intake." },
+            { id: "endpoint", name: "Lifespan endpoint", preprompt: "Score the survival endpoint.", summary: "Time-to-death under pre-specified humane endpoint criteria." },
+            { id: "analysis", name: "Statistical analysis", preprompt: "Analyze and report.", summary: "Kaplan–Meier with log-rank, n per arm justified by power calc." },
+          ],
+          supporting: [
+            { id: "literature", name: "Literature", preprompt: "Hold the cited papers.", summary: "Foundational ITP rapamycin references." },
+          ],
+        }, null, 2),
+        "```",
+      ].join("\n");
+      const events = [
+        { type: "session_started", sessionId: "demo-orchestrator", roleId: "orchestrator" },
+        { type: "message_completed", sessionId: "demo-orchestrator", roleId: "orchestrator", assistantText: reply },
+      ];
+      await route.fulfill({
+        status: 200,
+        contentType: "application/x-ndjson; charset=utf-8",
+        body: events.map((e) => JSON.stringify(e)).join("\n") + "\n",
+      });
+    });
+
+    // Literature search — canned Semantic Scholar hits so the step
+    // doesn't wait on the real network.
+    await page.route("**/api/literature-sources/search", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          sources: [
+            {
+              sourceId: "semantic-scholar",
+              hits: [
+                {
+                  sourceId: "semantic-scholar",
+                  externalId: "miller-2014-rapamycin-itp",
+                  title: "Rapamycin extends murine lifespan but has limited effects on aging",
+                  authors: "Miller et al.",
+                  year: 2014,
+                  url: "https://www.semanticscholar.org/paper/miller-2014",
+                  doi: "10.1111/acel.12194",
+                  summary: "ITP-style intervention testing in heterogeneous mice. Rapamycin started at 9 or 20 months extended median lifespan in both sexes.",
+                  citationCount: 361,
+                },
+                {
+                  sourceId: "semantic-scholar",
+                  externalId: "harrison-2009-rapamycin-lifespan",
+                  title: "Rapamycin fed late in life extends lifespan in genetically heterogeneous mice",
+                  authors: "Harrison et al.",
+                  year: 2009,
+                  url: "https://www.semanticscholar.org/paper/harrison-2009",
+                  doi: "10.1038/nature08221",
+                  summary: "Foundational ITP report: encapsulated rapamycin in chow extended median and maximal lifespan in both sexes.",
+                  citationCount: 2487,
+                },
+              ],
+            },
+          ],
+        }),
+      });
+    });
+
+    // Protocols search — canned protocols.io-shape hits.
+    await page.route("**/api/protocol-sources/search", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          sources: [
+            {
+              sourceId: "protocols-io",
+              hits: [
+                {
+                  sourceId: "protocols-io",
+                  externalId: "encapsulated-rapamycin-chow-prep",
+                  title: "Eudragit-encapsulated rapamycin chow preparation (ITP-style)",
+                  authors: "Wilkinson et al.",
+                  url: "https://www.protocols.io/view/encapsulated-rapamycin-chow",
+                  description: "Standard preparation of 14 ppm encapsulated rapamycin in chow with eudragit-only control batches.",
+                },
+                {
+                  sourceId: "protocols-io",
+                  externalId: "lifespan-monitoring-c57bl6j",
+                  title: "Longitudinal lifespan monitoring in C57BL/6J mice",
+                  authors: "Strong et al.",
+                  url: "https://www.protocols.io/view/lifespan-c57bl6j",
+                  description: "Daily welfare checks, biweekly weights, humane endpoint criteria, and necropsy SOP for in-vivo lifespan studies.",
+                },
+              ],
+            },
+          ],
+        }),
+      });
+    });
+
+    // Finalize — instant redirect to a pre-generated bench on disk.
+    await page.route("**/api/hypotheses", async (route) => {
+      await new Promise((r) => setTimeout(r, 600));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ slug: DEMO_BENCH_SLUG }),
+      });
+    });
+
     await sb.showTitleCard(
-      "From a question to a runnable plan",
-      "Sebastian scopes a client brief on rapamycin lifespan extension",
+      "Brief in. Bench out.",
+      "From a one-paragraph research question to an experiment a wet lab could start on Friday — in minutes.",
       "natalie",
-      "This is Sebastian, a senior scientist at a contract research organisation. A client has just emailed a one-paragraph brief — they want to know how long it would take to test whether rapamycin extends lifespan in mice. Scoping that brief properly takes a junior scientist on his team about two days. Let me show you what Sebastian does instead.",
+      "BenchPilot. From a research brief to a runnable experiment plan, in minutes.",
     );
 
-    // ── Step 1: Hypothesis ──────────────────────────────────────────────
     await sb.narrate(
       "natalie",
-      "He opens BenchPilot and lands on the start page. There is a single research question to define, and an orchestrator standing by to help him sharpen it.",
+      "The scientist starts here. They type their research question into the chat with the orchestrator and send it.",
       async () => {
         await page.goto("/");
         await expect(page.getByTestId("start-page")).toBeVisible();
-        await expect(page.getByTestId("benchpilot-logo")).toBeVisible();
-      },
-    );
-
-    await sb.narrate(
-      "natalie",
-      "He drafts the question with the specifics that matter for an in-vivo lifespan study — the strain, the dose, the route of administration, the comparator.",
-      async () => {
         const chatInput = page.getByTestId("orchestrator-chat-input");
+        await chatInput.fill(REVISED_QUESTION);
         await sb.highlight(chatInput);
-        await chatInput.click();
-        // Use the Cmd+. canned-example shortcut wired into the start page.
-        await page.keyboard.press("Meta+.");
-        await expect(chatInput).not.toBeEmpty();
-      },
-    );
-
-    await sb.narrate(
-      "natalie",
-      "He sends it to the orchestrator. It reviews the framing — strain, comparator, exposure metric — and offers a more precisely worded version.",
-      async () => {
         await page.getByTestId("orchestrator-chat-send").click();
-        // Wait for the orchestrator to finish responding.
-        await expect(page.getByTestId("orchestrator-thinking")).toBeHidden({
-          timeout: 120_000,
-        });
-        await expect(page.getByTestId("chat-bubble-agent-1")).toBeVisible({
-          timeout: 120_000,
-        });
+        // The mocked orchestrator reply contains a "Revised question:"
+        // line that start.tsx parses into the research-question
+        // textarea — the Continue button enables once it lands.
+        await expect(page.getByTestId("continue-to-literature-button")).toBeEnabled();
       },
     );
 
-    // ── Step 2: Literature ──────────────────────────────────────────────
     await sb.narrate(
       "natalie",
-      "With the question settled, he moves to the literature step. A Semantic Scholar search runs in the background, ranked by citation count — no buttons to press.",
+      "Step two pulls related papers from Semantic Scholar, ranked by citations.",
       async () => {
         await page.getByTestId("continue-to-literature-button").click();
         await expect(page.getByTestId("literature-step")).toBeVisible();
-        const status = page.getByTestId("literature-status-text");
-        await expect(status).not.toContainText("Searching", { timeout: 60_000 });
+        await expect(page.getByTestId("literature-status-text")).not.toContainText("Searching");
       },
     );
 
     await sb.narrate(
       "natalie",
-      "The most-cited papers surface at the top. Sebastian keeps the foundational ITP rapamycin study and a few directly relevant follow-ups, and sets the rest aside.",
-      async () => {
-        await sb.highlight(page.getByTestId("literature-results-list"));
-      },
-    );
-
-    // ── Step 3: Protocols ───────────────────────────────────────────────
-    await sb.narrate(
-      "natalie",
-      "On to published protocols. The same shape — protocols.io results streaming in as keep-or-drop cards.",
+      "Step three matches published protocols from protocols.io.",
       async () => {
         await page.getByTestId("continue-to-protocols-from-literature-button").click();
         await expect(page.getByTestId("protocols-step")).toBeVisible();
-        const status = page.getByTestId("protocols-status-text");
-        await expect(status).not.toContainText("Searching", { timeout: 60_000 });
+        await expect(page.getByTestId("protocols-status-text")).not.toContainText("Searching");
       },
     );
 
     await sb.narrate(
       "natalie",
-      "The kept protocols are sources, not the destination. When Sebastian finalizes, the orchestrator will weave them together into one coherent plan rather than listing them side by side.",
-      async () => {
-        await sb.highlight(page.getByTestId("protocols-results-list"));
-      },
-    );
-
-    // ── Finalize ────────────────────────────────────────────────────────
-    await sb.narrate(
-      "natalie",
-      "He clicks finalize. The orchestrator now has everything — the refined question, the kept references, the kept protocols — and synthesizes a single experiment plan, breaking it down into the phases a wet lab would actually execute.",
+      "Finalize merges everything into a single bench.",
       async () => {
         await page.getByTestId("finalize-button").click();
-        await page.waitForURL(/\/bench\//, { timeout: 240_000 });
-      },
-    );
-
-    // ── Bench ───────────────────────────────────────────────────────────
-    await sb.narrate(
-      "natalie",
-      "And here is the bench. The plan is laid out across protocol components — reagent preparation, the animal cohort, dosing and monitoring, the endpoint assay, the statistical analysis — in the order a technician would carry them out.",
-      async () => {
         await expect(page).toHaveURL(/\/bench\//);
-        await page.waitForLoadState("networkidle");
+        await expect(page.locator("[data-testid^='open-']").first()).toBeVisible({ timeout: 10_000 });
       },
     );
 
     await sb.narrate(
       "natalie",
-      "What matters most about this bench is what it is *not*. It is not a static report, and it is not the final word. The orchestrator has produced a *prototypical* experiment plan from the protocols Sebastian kept — a starting point, not a verdict.",
+      "Each phase is its own agent. Open one to see the procedure and a chat scoped to that step.",
       async () => {
-        const firstCard = page.locator('[data-component-id]').first();
-        if (await firstCard.count()) {
-          await sb.highlight(firstCard);
-          await firstCard.click().catch(() => {});
-        }
+        const firstCard = page.locator("[data-testid^='open-']").first();
+        await sb.highlight(firstCard);
+        await firstCard.click();
+        await expect(page.locator("[data-testid^='close-']").first()).toBeVisible();
       },
     );
 
     await sb.narrate(
       "natalie",
-      "Each component on the bench is its own small agent. Open one and you have a chat scoped to that part of the experiment, with a table of contents that reads like the standard operating procedure a technician would follow on the day.",
+      "The orchestrator on the left coordinates across all of them. Add a budget component, refine an assay, delegate a deeper literature dive — every panel is editable, every panel is chat-driven.",
       async () => {
-        await sb.pause(800);
-      },
-    );
-
-    await sb.narrate(
-      "natalie",
-      "The bench is open and extensible. Sebastian can ask the orchestrator to add a budget or a timeline component, refine an assay parameter inside any table-of-contents entry, or delegate a deeper dive on a specific paper to the literature component. Nothing here is fixed; everything is a starting position the team can build on.",
-      async () => {
-        await sb.pause(800);
+        // Highlight two surfaces that demonstrate the flexibility:
+        // the per-component chat inside the open card, and the
+        // top-level orchestrator chat that coordinates across the bench.
+        const activeArticle = page.locator("article:has([data-testid^='close-'])").first();
+        const componentChat = activeArticle.locator('textbox, textarea, button:has-text("Send")').first();
+        if (await componentChat.count()) await sb.highlight(componentChat);
+        const orchestratorChat = page.getByRole("heading", { name: "Orchestrator" }).first();
+        if (await orchestratorChat.count()) await sb.highlight(orchestratorChat);
       },
     );
 
     await sb.showTitleCard(
-      "From a question to a runnable plan.",
-      "Minutes, not days. One operator. Every step inspectable, editable, and grounded in real protocols.",
+      "Editable. Extensible. Chat-driven.",
+      "Every component on the bench is its own little agent — add, refine, delegate. The bench is open.",
       "natalie",
-      "From a one-paragraph client brief to a structured experiment plan a real lab could begin on Friday — in minutes rather than days, by one person, with every decision visible and every component still open to revision. That is BenchPilot.",
+      "Editable. Extensible. Chat-driven. The bench is open.",
     );
 
     await sb.done();
