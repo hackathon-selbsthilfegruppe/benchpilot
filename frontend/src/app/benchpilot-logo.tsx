@@ -8,7 +8,7 @@ export function BenchpilotLogo({ className, testId, ariaLabel = "BenchPilot — 
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 460 140"
+      viewBox="0 0 620 220"
       role="img"
       aria-label={ariaLabel}
       data-testid={testId}
@@ -20,7 +20,8 @@ export function BenchpilotLogo({ className, testId, ariaLabel = "BenchPilot — 
           <stop offset="100%" stopColor="#6366f1" />
         </linearGradient>
       </defs>
-      <g transform="translate(10, 0)">
+      {/* Mark — scaled 1.7x and centred vertically against the wordmark. */}
+      <g transform="translate(10, 18) scale(1.7)">
         <path
           d="M 15,75 L 110,25 L 85,120 L 55,80 Z"
           fill="none"
@@ -41,12 +42,13 @@ export function BenchpilotLogo({ className, testId, ariaLabel = "BenchPilot — 
         <circle cx="85" cy="120" r="8" fill="#8b5cf6" />
         <circle cx="110" cy="25" r="9" fill="#6366f1" />
       </g>
+      {/* Wordmark — bumped to fs 88 to match the bigger mark. */}
       <text
-        x="145"
-        y="88"
+        x="240"
+        y="138"
         fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-        fontSize="56"
-        letterSpacing="-1.5"
+        fontSize="88"
+        letterSpacing="-2.5"
       >
         <tspan fontWeight="800" fill="currentColor">
           bench
@@ -56,14 +58,14 @@ export function BenchpilotLogo({ className, testId, ariaLabel = "BenchPilot — 
         </tspan>
       </text>
       <text
-        x="150"
-        y="112"
+        x="245"
+        y="172"
         fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-        fontSize="12"
+        fontSize="18"
         fontWeight="600"
         fill="currentColor"
         fillOpacity="0.55"
-        letterSpacing="2.5"
+        letterSpacing="3.5"
       >
         PROTOCOL GENERATION ENGINE
       </text>
