@@ -82,7 +82,7 @@ export class TaskDispatcher {
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      await this.taskService.failTask(startedTask.id, benchId, errorMessage);
+      await this.taskService.failTask(startedTask.id, benchId, "prompt_error", errorMessage);
       this.logger.error("task.dispatch.failed", {
         taskId: startedTask.id,
         benchId,

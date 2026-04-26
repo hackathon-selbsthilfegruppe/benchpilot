@@ -3,7 +3,14 @@ import { z } from "zod";
 import { benchIdSchema } from "./bench.js";
 import { componentInstanceIdSchema } from "./component.js";
 import { logger as rootLogger } from "./logger.js";
-import { createTask, taskMetadataSchema, taskStatusSchema, type TaskMetadata, type TaskStatus } from "./task.js";
+import {
+  createTask,
+  taskMetadataSchema,
+  taskStatusSchema,
+  type TaskFailureKind,
+  type TaskMetadata,
+  type TaskStatus,
+} from "./task.js";
 import type { ComponentSessionService } from "./component-session-service.js";
 import { parseComponentWriteActor } from "./write-actor.js";
 import { WorkspaceNotFoundError, WorkspaceStore, WorkspaceValidationError } from "./workspace-store.js";
@@ -111,11 +118,13 @@ export class TaskService {
       taskSessionId: taskSession.id,
       toComponentInstanceId: task.toComponentInstanceId,
     });
+    const transitionTimestamp = new Date().toISOString();
     const runningTask = taskMetadataSchema.parse({
       ...task,
       status: "running",
       taskSessionId: taskSession.id,
-      updatedAt: new Date().toISOString(),
+      lastActivityAt: transitionTimestamp,
+      updatedAt: transitionTimestamp,
     });
     await this.store.writeTask(runningTask);
     this.logger.info("task.state_changed", {
@@ -189,10 +198,12 @@ export class TaskService {
       return task;
     }
 
+    const timestamp = new Date().toISOString();
     const started = taskMetadataSchema.parse({
       ...task,
-      executionStartedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      executionStartedAt: timestamp,
+      lastActivityAt: timestamp,
+      updatedAt: timestamp,
     });
     await this.store.writeTask(started);
     this.logger.info("task.execution_started", {
@@ -204,13 +215,37 @@ export class TaskService {
     return started;
   }
 
-  async failTask(taskId: string, benchId: string, errorMessage: string): Promise<TaskMetadata> {
+  async recordTaskActivity(taskId: string, benchId: string): Promise<TaskMetadata> {
     const task = await this.getTask(taskId, benchId);
+    if (task.status !== "running") {
+      return task;
+    }
+    const timestamp = new Date().toISOString();
+    const updated = taskMetadataSchema.parse({
+      ...task,
+      lastActivityAt: timestamp,
+      updatedAt: timestamp,
+    });
+    await this.store.writeTask(updated);
+    return updated;
+  }
+
+  async failTask(
+    taskId: string,
+    benchId: string,
+    failureKind: TaskFailureKind,
+    failureMessage: string,
+  ): Promise<TaskMetadata> {
+    const task = await this.getTask(taskId, benchId);
+    const timestamp = new Date().toISOString();
     const failed = taskMetadataSchema.parse({
       ...task,
       status: "error",
-      resultText: errorMessage,
-      updatedAt: new Date().toISOString(),
+      failureKind,
+      failureMessage,
+      resultText: undefined,
+      lastActivityAt: timestamp,
+      updatedAt: timestamp,
     });
     await this.store.writeTask(failed);
     this.logger.error("task.state_changed", {
@@ -218,7 +253,8 @@ export class TaskService {
       benchId: failed.benchId,
       fromStatus: task.status,
       toStatus: failed.status,
-      error: errorMessage,
+      failureKind,
+      failureMessage,
     });
     return failed;
   }
@@ -251,6 +287,7 @@ export class TaskService {
       resultResourceId: request.resultResourceId,
       createdResourceIds: request.createdResourceIds,
       modifiedResourceIds: request.modifiedResourceIds,
+      lastActivityAt: timestamp,
       updatedAt: timestamp,
       completedAt: timestamp,
     });

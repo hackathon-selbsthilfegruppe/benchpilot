@@ -344,6 +344,8 @@ describe("task dispatcher", () => {
 
     const stored = await store.readTask(bench.id, target.id, task.id);
     expect(stored.status).toBe("error");
-    expect(stored.resultText).toBe("budget session failed");
+    expect(stored.failureKind).toBe("prompt_error");
+    expect(stored.failureMessage).toBe("budget session failed");
+    expect(stored.resultText).toBeUndefined();
   });
 });

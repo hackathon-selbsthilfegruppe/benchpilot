@@ -12,6 +12,14 @@ export type TaskId = z.infer<typeof taskIdSchema>;
 export const taskStatusSchema = z.enum(["pending", "running", "completed", "error"]);
 export type TaskStatus = z.infer<typeof taskStatusSchema>;
 
+export const taskFailureKindSchema = z.enum([
+  "runtime_timeout",
+  "inactivity_timeout",
+  "prompt_error",
+  "unknown",
+]);
+export type TaskFailureKind = z.infer<typeof taskFailureKindSchema>;
+
 const isoDateTimeSchema = z.string().datetime({ offset: true });
 
 export const taskMetadataSchema = z.object({
@@ -24,6 +32,10 @@ export const taskMetadataSchema = z.object({
   status: taskStatusSchema,
   taskSessionId: z.string().trim().min(1).optional(),
   executionStartedAt: isoDateTimeSchema.optional(),
+  lastActivityAt: isoDateTimeSchema.optional(),
+  attemptCount: z.number().int().positive().default(1),
+  failureKind: taskFailureKindSchema.optional(),
+  failureMessage: z.string().trim().min(1).optional(),
   resultText: z.string().trim().min(1).optional(),
   resultResourceId: resourceIdSchema.optional(),
   createdResourceIds: z.array(resourceIdSchema).default([]),
@@ -93,6 +105,52 @@ export const taskMetadataSchema = z.object({
       path: ["completedAt"],
       message: "completedAt must be greater than or equal to createdAt",
     });
+  }
+
+  const lastActivityAt = task.lastActivityAt ? Date.parse(task.lastActivityAt) : undefined;
+  if (
+    lastActivityAt !== undefined
+    && !Number.isNaN(createdAt)
+    && !Number.isNaN(lastActivityAt)
+    && lastActivityAt < createdAt
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["lastActivityAt"],
+      message: "lastActivityAt must be greater than or equal to createdAt",
+    });
+  }
+
+  if (task.status === "error") {
+    if (!task.failureKind) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["failureKind"],
+        message: "error tasks must set failureKind",
+      });
+    }
+    if (!task.failureMessage) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["failureMessage"],
+        message: "error tasks must set failureMessage",
+      });
+    }
+  } else {
+    if (task.failureKind) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["failureKind"],
+        message: "failureKind may only be set for error tasks",
+      });
+    }
+    if (task.failureMessage) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["failureMessage"],
+        message: "failureMessage may only be set for error tasks",
+      });
+    }
   }
 });
 
