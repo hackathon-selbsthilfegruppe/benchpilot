@@ -485,10 +485,38 @@ describe("createApp", () => {
         createdAt: "2026-04-25T19:10:00.000Z",
         updatedAt: "2026-04-25T19:10:00.000Z",
       }),
+      updateResource: async () => ({
+        id: "manual-notes",
+        benchId: "bench-crp-biosensor",
+        componentInstanceId: "literature-crp-biosensor",
+        producedByComponentInstanceId: "literature-crp-biosensor",
+        title: "Manual notes",
+        kind: "lab-note",
+        description: "Markdown notes for later browsing.",
+        summary: "Updated notes about the experimental setup.",
+        tags: [],
+        files: [
+          {
+            filename: "notes.md",
+            mediaType: "text/markdown",
+            description: "Updated markdown notes",
+            role: "primary",
+          },
+        ],
+        primaryFile: "notes.md",
+        contentType: "text/markdown",
+        supportsRequirementIds: [],
+        derivedFromResourceIds: [],
+        status: "ready",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:11:00.000Z",
+      }),
     });
 
+    const app = createApp(createFakePool({}), undefined, benchWriteService);
+
     const response = await request(
-      createApp(createFakePool({}), undefined, benchWriteService),
+      app,
       "/api/benches/bench-crp-biosensor/components/literature-crp-biosensor/resources",
       {
         method: "POST",
@@ -550,6 +578,64 @@ describe("createApp", () => {
         updatedAt: "2026-04-25T19:10:00.000Z",
       },
     });
+
+    const patchResponse = await request(
+      app,
+      "/api/benches/bench-crp-biosensor/components/literature-crp-biosensor/resources/manual-notes",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          actor: {
+            benchId: "bench-crp-biosensor",
+            componentInstanceId: "literature-crp-biosensor",
+            presetId: "literature",
+          },
+          resource: {
+            summary: "Updated notes about the experimental setup.",
+          },
+          files: [
+            {
+              filename: "notes.md",
+              mediaType: "text/markdown",
+              description: "Updated markdown notes",
+              role: "primary",
+              contentBase64: Buffer.from("# Notes\nupdated", "utf8").toString("base64"),
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(patchResponse.status).toBe(200);
+    expect(await patchResponse.json()).toEqual({
+      resource: {
+        id: "manual-notes",
+        benchId: "bench-crp-biosensor",
+        componentInstanceId: "literature-crp-biosensor",
+        producedByComponentInstanceId: "literature-crp-biosensor",
+        title: "Manual notes",
+        kind: "lab-note",
+        description: "Markdown notes for later browsing.",
+        summary: "Updated notes about the experimental setup.",
+        tags: [],
+        files: [
+          {
+            filename: "notes.md",
+            mediaType: "text/markdown",
+            description: "Updated markdown notes",
+            role: "primary",
+          },
+        ],
+        primaryFile: "notes.md",
+        contentType: "text/markdown",
+        supportsRequirementIds: [],
+        derivedFromResourceIds: [],
+        status: "ready",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:11:00.000Z",
+      },
+    });
   });
 });
 
@@ -589,6 +675,9 @@ function createFakeBenchWriteService(overrides: Partial<BenchWriteService>): Ben
   return {
     createResource: async () => {
       throw new Error("missing createResource");
+    },
+    updateResource: async () => {
+      throw new Error("missing updateResource");
     },
     ...overrides,
   } as BenchWriteService;

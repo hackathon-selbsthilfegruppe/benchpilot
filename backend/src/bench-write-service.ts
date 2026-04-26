@@ -1,13 +1,15 @@
 import { z } from "zod";
 
 import {
+  buildResourceMetadataFromIngestion,
   ingestibleFileRoleSchema,
   parseResourceIngestionRequest,
   resourceIngestionMetadataSchema,
   supportedResourceMediaTypeSchema,
 } from "./resource-ingestion.js";
+import { buildExtractedTextFile, extractTextFromPdf } from "./pdf-extraction.js";
 import { ResourceIngestionService } from "./resource-ingestion-service.js";
-import type { ResourceMetadata } from "./resource.js";
+import { resourceMetadataSchema, type ResourceFile, type ResourceMetadata } from "./resource.js";
 import { assertWriteAccess, componentWriteActorSchema, type ComponentWriteActor } from "./write-actor.js";
 import { WorkspaceStore } from "./workspace-store.js";
 
@@ -34,6 +36,33 @@ export const createResourceRequestSchema = z.object({
 }).strict();
 
 export type CreateResourceRequest = z.infer<typeof createResourceRequestSchema>;
+
+const updateResourceFieldsSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  kind: z.string().trim().min(1).optional(),
+  description: z.string().trim().min(1).optional(),
+  summary: z.string().trim().min(1).optional(),
+  tags: z.array(z.string().trim().min(1)).optional(),
+  supportsRequirementIds: z.array(z.string().trim().min(1)).optional(),
+  derivedFromResourceIds: z.array(z.string().trim().min(1)).optional(),
+  status: z.enum(["draft", "ready", "error"]).optional(),
+  confidence: z.enum(["low", "medium", "high"]).nullable().optional(),
+  primaryFilename: z.string().trim().min(1).optional(),
+}).strict();
+
+export const updateResourceRequestSchema = z.object({
+  actor: componentWriteActorSchema,
+  resource: updateResourceFieldsSchema,
+  files: z.array(z.object({
+    filename: z.string().trim().min(1),
+    mediaType: supportedResourceMediaTypeSchema,
+    description: z.string().trim().min(1),
+    role: ingestibleFileRoleSchema.default("attachment"),
+    contentBase64: base64ContentSchema,
+  })).optional(),
+}).strict();
+
+export type UpdateResourceRequest = z.infer<typeof updateResourceRequestSchema>;
 
 export class BenchWriteService {
   private readonly ingestion: ResourceIngestionService;
@@ -76,6 +105,71 @@ export class BenchWriteService {
     return result.resource;
   }
 
+  async updateResource(
+    benchId: string,
+    componentInstanceId: string,
+    resourceId: string,
+    input: unknown,
+  ): Promise<ResourceMetadata> {
+    const request = updateResourceRequestSchema.parse(input);
+    const actor = this.assertScopedActor(request.actor, benchId, componentInstanceId);
+
+    assertWriteAccess(actor, {
+      kind: "write-resource",
+      benchId,
+      componentInstanceId,
+      resourceId,
+    });
+
+    const existing = await this.store.readResource(benchId, componentInstanceId, resourceId);
+    const existingFiles = await this.readStoredSourceFiles(existing);
+    const incomingFiles = (request.files ?? []).map((file) => ({
+      filename: file.filename,
+      mediaType: file.mediaType,
+      description: file.description,
+      role: file.role,
+      content: Buffer.from(file.contentBase64, "base64"),
+    }));
+
+    const mergedSourceFiles = mergeSourceFiles(existingFiles, incomingFiles);
+    const generatedFiles = await this.generateDerivedFiles(mergedSourceFiles);
+    const primaryFilename = request.resource.primaryFilename
+      ?? existing.primaryFile
+      ?? mergedSourceFiles.find((file) => file.role === "primary")?.filename;
+    const primaryMediaType = mergedSourceFiles.find((file) => file.filename === primaryFilename)?.mediaType;
+
+    const updated = resourceMetadataSchema.parse({
+      ...existing,
+      ...request.resource,
+      confidence: request.resource.confidence === null ? undefined : request.resource.confidence ?? existing.confidence,
+      files: [
+        ...mergedSourceFiles.map<ResourceFile>(({ filename, mediaType, description, role }) => ({
+          filename,
+          mediaType,
+          description,
+          role,
+        })),
+        ...generatedFiles.map((entry) => entry.file),
+      ],
+      primaryFile: primaryFilename,
+      contentType: primaryMediaType,
+      updatedAt: new Date().toISOString(),
+    });
+
+    await this.store.writeResource(updated);
+    await this.store.replaceResourceFiles(
+      benchId,
+      componentInstanceId,
+      resourceId,
+      [
+        ...mergedSourceFiles.map((file) => ({ filename: file.filename, content: file.content })),
+        ...generatedFiles.map((file) => ({ filename: file.file.filename, content: file.content })),
+      ],
+    );
+
+    return updated;
+  }
+
   private assertScopedActor(
     actor: ComponentWriteActor,
     benchId: string,
@@ -89,4 +183,38 @@ export class BenchWriteService {
     }
     return actor;
   }
+
+  private async readStoredSourceFiles(resource: ResourceMetadata) {
+    const sourceFiles = resource.files.filter((file) => file.role !== "extracted-text");
+    return Promise.all(sourceFiles.map(async (file) => ({
+      filename: file.filename,
+      mediaType: file.mediaType as z.infer<typeof supportedResourceMediaTypeSchema>,
+      description: file.description,
+      role: file.role as z.infer<typeof ingestibleFileRoleSchema>,
+      content: await this.store.readResourceFile(resource.benchId, resource.componentInstanceId, resource.id, file.filename),
+    })));
+  }
+
+  private async generateDerivedFiles(sourceFiles: Array<{ filename: string; mediaType: z.infer<typeof supportedResourceMediaTypeSchema>; description: string; role: z.infer<typeof ingestibleFileRoleSchema>; content: Uint8Array }>) {
+    const generated = [] as Array<{ file: ResourceFile; content: Buffer }>;
+    for (const file of sourceFiles) {
+      if (file.mediaType !== "application/pdf") {
+        continue;
+      }
+      const text = await extractTextFromPdf(file.content);
+      generated.push(buildExtractedTextFile(file, text));
+    }
+    return generated;
+  }
+}
+
+function mergeSourceFiles(
+  existingFiles: Array<{ filename: string; mediaType: z.infer<typeof supportedResourceMediaTypeSchema>; description: string; role: z.infer<typeof ingestibleFileRoleSchema>; content: Uint8Array }>,
+  incomingFiles: Array<{ filename: string; mediaType: z.infer<typeof supportedResourceMediaTypeSchema>; description: string; role: z.infer<typeof ingestibleFileRoleSchema>; content: Uint8Array }>,
+) {
+  const merged = new Map(existingFiles.map((file) => [file.filename, file]));
+  for (const file of incomingFiles) {
+    merged.set(file.filename, file);
+  }
+  return Array.from(merged.values()).sort((a, b) => a.filename.localeCompare(b.filename));
 }

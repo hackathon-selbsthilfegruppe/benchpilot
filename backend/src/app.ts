@@ -112,6 +112,17 @@ export function createApp(pool: SessionService, benchReadService?: BenchReadServ
     res.status(201).json({ resource });
   }));
 
+  app.patch("/api/benches/:benchId/components/:componentInstanceId/resources/:resourceId", asyncHandler(async (req, res) => {
+    ensureBenchWriteService(benchWriteService);
+    const resource = await benchWriteService.updateResource(
+      requireBenchId(req),
+      requireComponentInstanceId(req),
+      requireResourceId(req),
+      req.body,
+    );
+    res.json({ resource });
+  }));
+
   app.get("/api/agent-sessions", (_req, res) => {
     res.json({ sessions: pool.list() });
   });

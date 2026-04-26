@@ -199,6 +199,21 @@ export class WorkspaceStore {
     }
   }
 
+  async replaceResourceFiles(
+    benchId: string,
+    componentInstanceId: string,
+    resourceId: string,
+    files: Array<{ filename: string; content: Uint8Array }>,
+  ): Promise<void> {
+    await this.ensureResourceExists(benchId, componentInstanceId, resourceId);
+    const filesDir = getResourceFilesDir(this.workspaceRoot, benchId, componentInstanceId, resourceId);
+    await rm(filesDir, { recursive: true, force: true });
+    await mkdir(filesDir, { recursive: true });
+    for (const file of files) {
+      await this.writeResourceFile(benchId, componentInstanceId, resourceId, file.filename, file.content);
+    }
+  }
+
   async deleteResource(benchId: string, componentInstanceId: string, resourceId: string): Promise<void> {
     await rm(getResourceDir(this.workspaceRoot, benchId, componentInstanceId, resourceId), {
       recursive: true,
