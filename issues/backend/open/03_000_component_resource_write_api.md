@@ -37,11 +37,11 @@ Resources need to be created and updated, and component-owned metadata must be w
 
 ## Candidate child issues
 
-- create resource endpoint
-- update resource metadata endpoint
-- file attachment/update flow
-- component metadata update rules
-- write validation and conflict handling
+- `03_001` write-actor contract and ownership enforcement
+- `03_002` resource create endpoint and ingestion-backed writes
+- `03_003` resource metadata and file update endpoints
+- `03_004` component summary update endpoint
+- `03_005` write API integration tests and read-after-write verification
 
 ## Exit criteria
 
