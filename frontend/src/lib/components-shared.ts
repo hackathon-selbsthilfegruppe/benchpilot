@@ -15,8 +15,15 @@ export type DetailDoc = {
 
 export type TaskStatus = "open" | "accepted" | "declined" | "done";
 
+export type TaskFailureKind =
+  | "runtime_timeout"
+  | "inactivity_timeout"
+  | "prompt_error"
+  | "unknown";
+
 export type Task = {
   id: string;
+  benchId?: string;
   from: string;
   to: string;
   title: string;
@@ -28,6 +35,10 @@ export type Task = {
   backendStatus?: "pending" | "running" | "completed" | "error";
   taskSessionId?: string;
   executionStartedAt?: string;
+  lastActivityAt?: string;
+  attemptCount?: number;
+  failureKind?: TaskFailureKind;
+  failureMessage?: string;
   resultResourceId?: string;
   createdResourceIds?: string[];
   modifiedResourceIds?: string[];

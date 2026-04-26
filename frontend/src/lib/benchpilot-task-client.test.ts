@@ -6,6 +6,7 @@ import {
   getBackendTask,
   getBackendTaskResult,
   listBackendTasks,
+  retryBackendTask,
 } from "./benchpilot-task-client";
 
 afterEach(() => {
@@ -41,6 +42,40 @@ describe("benchpilot task client", () => {
     await expect(getBackendTaskResult("task-1", "bench-1")).resolves.toMatchObject({ taskId: "task-1" });
 
     expect(fetchSpy).toHaveBeenCalledTimes(5);
+  });
+
+  it("posts to the retry proxy and returns the updated task", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      expect(String(input)).toBe("/api/benchpilot/tasks/task-1/retry");
+      expect((init as RequestInit).method).toBe("POST");
+      const body = JSON.parse(String((init as RequestInit).body));
+      expect(body.benchId).toBe("bench-1");
+      return jsonResponse({
+        task: {
+          id: "task-1",
+          benchId: "bench-1",
+          fromComponentInstanceId: "from",
+          toComponentInstanceId: "to",
+          title: "T",
+          request: "R",
+          status: "running",
+          attemptCount: 2,
+          taskSessionId: "task-run-2",
+          createdResourceIds: [],
+          modifiedResourceIds: [],
+          createdAt: "2026-04-25T00:00:00.000Z",
+          updatedAt: "2026-04-25T00:01:00.000Z",
+        },
+      });
+    });
+
+    const task = await retryBackendTask("task-1", {
+      benchId: "bench-1",
+      actor: { benchId: "bench-1", componentInstanceId: "from", presetId: "orchestrator" },
+    });
+    expect(task.attemptCount).toBe(2);
+    expect(task.taskSessionId).toBe("task-run-2");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -37,6 +37,7 @@ describe("backend task workbench projection", () => {
           title: "Review prior work overlap",
           request: "Check whether related work exists.",
           status: "completed",
+          attemptCount: 1,
           resultText: "Similar work exists.",
           createdResourceIds: [],
           modifiedResourceIds: [],
@@ -50,6 +51,7 @@ describe("backend task workbench projection", () => {
     expect(result.components[0]?.tasks).toEqual([
       {
         id: "task-1",
+        benchId: "bench-1",
         from: "orchestrator-bench-1",
         to: "literature-bench-1",
         title: "Review prior work overlap",
@@ -61,6 +63,10 @@ describe("backend task workbench projection", () => {
         backendStatus: "completed",
         taskSessionId: undefined,
         executionStartedAt: undefined,
+        lastActivityAt: undefined,
+        attemptCount: 1,
+        failureKind: undefined,
+        failureMessage: undefined,
         resultResourceId: undefined,
         createdResourceIds: [],
         modifiedResourceIds: [],

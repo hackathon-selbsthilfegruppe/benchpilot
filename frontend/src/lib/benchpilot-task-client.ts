@@ -1,3 +1,9 @@
+export type BackendTaskFailureKind =
+  | "runtime_timeout"
+  | "inactivity_timeout"
+  | "prompt_error"
+  | "unknown";
+
 export type BackendTask = {
   id: string;
   benchId: string;
@@ -8,6 +14,10 @@ export type BackendTask = {
   status: "pending" | "running" | "completed" | "error";
   taskSessionId?: string;
   executionStartedAt?: string;
+  lastActivityAt?: string;
+  attemptCount: number;
+  failureKind?: BackendTaskFailureKind;
+  failureMessage?: string;
   resultText?: string;
   resultResourceId?: string;
   createdResourceIds: string[];
@@ -25,6 +35,10 @@ export type BackendTaskResult = {
   createdResourceIds: string[];
   modifiedResourceIds: string[];
   completedAt: string | null;
+  failureKind: BackendTaskFailureKind | null;
+  failureMessage: string | null;
+  lastActivityAt: string | null;
+  attemptCount: number;
 };
 
 const API_PREFIX = "/api/benchpilot";
@@ -61,6 +75,24 @@ export async function completeBackendTask(taskId: string, input: unknown): Promi
 export async function getBackendTaskResult(taskId: string, benchId: string): Promise<BackendTaskResult> {
   const body = await fetchJson<{ result: BackendTaskResult }>(`${API_PREFIX}/tasks/${encodeURIComponent(taskId)}/result?benchId=${encodeURIComponent(benchId)}`);
   return body.result;
+}
+
+export type RetryBackendTaskInput = {
+  benchId: string;
+  actor: {
+    benchId: string;
+    componentInstanceId: string;
+    presetId?: string;
+  };
+};
+
+export async function retryBackendTask(taskId: string, input: RetryBackendTaskInput): Promise<BackendTask> {
+  const body = await fetchJson<{ task: BackendTask }>(`${API_PREFIX}/tasks/${encodeURIComponent(taskId)}/retry`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return body.task;
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {

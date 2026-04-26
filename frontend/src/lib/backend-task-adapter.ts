@@ -4,10 +4,11 @@ import type { Task, TaskStatus } from "./components-shared";
 export function adaptBackendTask(task: BackendTask): Task {
   return {
     id: task.id,
+    benchId: task.benchId,
     from: task.fromComponentInstanceId,
     to: task.toComponentInstanceId,
     title: task.title,
-    body: task.resultText ?? task.request,
+    body: task.failureMessage ?? task.resultText ?? task.request,
     status: mapBackendTaskStatus(task.status),
     created: task.createdAt,
     updatedAt: task.updatedAt,
@@ -15,6 +16,10 @@ export function adaptBackendTask(task: BackendTask): Task {
     backendStatus: task.status,
     taskSessionId: task.taskSessionId,
     executionStartedAt: task.executionStartedAt,
+    lastActivityAt: task.lastActivityAt,
+    attemptCount: task.attemptCount,
+    failureKind: task.failureKind,
+    failureMessage: task.failureMessage,
     resultResourceId: task.resultResourceId,
     createdResourceIds: task.createdResourceIds,
     modifiedResourceIds: task.modifiedResourceIds,
@@ -31,6 +36,10 @@ export function mergeTaskResult(task: Task, result: BackendTaskResult): Task {
     resultResourceId: result.resultResourceId ?? undefined,
     createdResourceIds: result.createdResourceIds,
     modifiedResourceIds: result.modifiedResourceIds,
+    failureKind: result.failureKind ?? undefined,
+    failureMessage: result.failureMessage ?? undefined,
+    lastActivityAt: result.lastActivityAt ?? task.lastActivityAt,
+    attemptCount: result.attemptCount,
   };
 }
 
