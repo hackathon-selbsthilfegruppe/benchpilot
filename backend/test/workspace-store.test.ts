@@ -8,6 +8,7 @@ import { createBench } from "../src/bench.js";
 import { createComponentInstance } from "../src/component.js";
 import { createRequirement } from "../src/requirement.js";
 import { createResource } from "../src/resource.js";
+import { createTask } from "../src/task.js";
 import {
   WorkspaceNotFoundError,
   WorkspaceStore,
@@ -105,6 +106,41 @@ describe("workspace store", () => {
         updatedAt: resource.updatedAt,
       },
     ]);
+  });
+
+  it("roundtrips task metadata through the workspace-backed task store", async () => {
+    const baseDir = await mkdtemp(path.join(os.tmpdir(), "benchpilot-workspace-store-"));
+    tempDirs.push(baseDir);
+
+    const store = new WorkspaceStore(baseDir);
+    const bench = createBench({
+      title: "CRP biosensor",
+      question: "Can we build a paper-based electrochemical biosensor for CRP?",
+    });
+    const component = createComponentInstance({
+      benchId: bench.id,
+      presetId: "literature",
+      name: "Literature — CRP biosensor",
+      summary: "Tracks prior work and novelty.",
+    });
+    const task = createTask(
+      {
+        benchId: bench.id,
+        fromComponentInstanceId: "orchestrator-crp-biosensor",
+        toComponentInstanceId: component.id,
+        title: "Review prior work overlap",
+        request: "Check whether closely related CRP protocols already exist.",
+      },
+      { now: new Date("2026-04-25T19:20:00.000Z") },
+    );
+
+    await store.writeBench(bench);
+    await store.writeComponent(component);
+    await store.writeTask(task);
+
+    await expect(store.readTask(bench.id, component.id, task.id)).resolves.toEqual(task);
+    await expect(store.listTasks(bench.id, component.id)).resolves.toEqual([task]);
+    await expect(store.listTasks(bench.id, component.id, "pending")).resolves.toEqual([task]);
   });
 
   it("rejects nested writes when the parent bench or component does not exist", async () => {

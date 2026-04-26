@@ -20,7 +20,7 @@ export const COMPONENT_SUMMARY_FILENAME = "summary.md";
 export const COMPONENT_TOC_FILENAME = "toc.json";
 export const RESOURCE_METADATA_FILENAME = "resource.json";
 
-export const taskStateSchema = z.enum(["pending", "running", "completed"]);
+export const taskStateSchema = z.enum(["pending", "running", "completed", "error"]);
 export type TaskState = z.infer<typeof taskStateSchema>;
 
 export function resolveWorkspaceRoot(baseDir: string): string {
@@ -133,5 +133,18 @@ export function getComponentTaskStateDir(
   return path.join(
     getComponentTasksDir(workspaceRoot, benchId, componentInstanceId),
     taskStateSchema.parse(state),
+  );
+}
+
+export function getTaskMetadataPath(
+  workspaceRoot: string,
+  benchId: string,
+  componentInstanceId: string,
+  state: TaskState,
+  taskId: string,
+): string {
+  return path.join(
+    getComponentTaskStateDir(workspaceRoot, benchId, componentInstanceId, state),
+    `${taskId}.json`,
   );
 }

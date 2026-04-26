@@ -23,6 +23,7 @@ import {
   getComponentTaskStateDir,
   getComponentTasksDir,
   getComponentTocPath,
+  getTaskMetadataPath,
   getRequirementMetadataPath,
   getResourceDir,
   getResourceFilePath,
@@ -107,6 +108,18 @@ describe("workspace layout", () => {
         "literature-crp-biosensor",
         "tasks",
         "pending",
+      ),
+    );
+    expect(getTaskMetadataPath(workspaceRoot, "bench-crp-biosensor", "literature-crp-biosensor", "pending", "task-001")).toBe(
+      path.join(
+        workspaceRoot,
+        "benches",
+        "bench-crp-biosensor",
+        "components",
+        "literature-crp-biosensor",
+        "tasks",
+        "pending",
+        "task-001.json",
       ),
     );
   });

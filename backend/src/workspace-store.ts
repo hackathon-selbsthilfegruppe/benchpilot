@@ -7,6 +7,7 @@ import { z } from "zod";
 import { benchMetadataSchema, type BenchMetadata } from "./bench.js";
 import { componentInstanceSchema, type ComponentInstance } from "./component.js";
 import { requirementMetadataSchema, type RequirementMetadata } from "./requirement.js";
+import { taskMetadataSchema, taskStatusSchema, type TaskMetadata, type TaskStatus } from "./task.js";
 import {
   resourceMetadataSchema,
   resourceTocEntrySchema,
@@ -24,9 +25,11 @@ import {
   getComponentMetadataPath,
   getComponentResourcesDir,
   getComponentSummaryPath,
+  getComponentTaskStateDir,
   getComponentTocPath,
   getRequirementMetadataPath,
   getResourceDir,
+  getTaskMetadataPath,
   getResourceFilePath,
   getResourceFilesDir,
   getResourceMetadataPath,
@@ -137,6 +140,49 @@ export class WorkspaceStore {
       getBenchComponentsDirSafe(this.workspaceRoot, benchId),
       async (componentInstanceId) => this.readComponent(benchId, componentInstanceId),
     );
+  }
+
+  async writeTask(task: TaskMetadata): Promise<void> {
+    const parsed = taskMetadataSchema.parse(task);
+    await this.ensureComponentExists(parsed.benchId, parsed.toComponentInstanceId);
+    await mkdir(getComponentTaskStateDir(this.workspaceRoot, parsed.benchId, parsed.toComponentInstanceId, parsed.status), { recursive: true });
+
+    for (const status of taskStatusSchema.options) {
+      await rm(
+        getTaskMetadataPath(this.workspaceRoot, parsed.benchId, parsed.toComponentInstanceId, status, parsed.id),
+        { force: true },
+      );
+    }
+
+    await writeJsonFile(
+      getTaskMetadataPath(this.workspaceRoot, parsed.benchId, parsed.toComponentInstanceId, parsed.status, parsed.id),
+      parsed,
+    );
+  }
+
+  async readTask(benchId: string, componentInstanceId: string, taskId: string): Promise<TaskMetadata> {
+    for (const status of taskStatusSchema.options) {
+      const filePath = getTaskMetadataPath(this.workspaceRoot, benchId, componentInstanceId, status, taskId);
+      try {
+        return await readJsonFile(filePath, taskMetadataSchema, "task");
+      } catch (error) {
+        if (error instanceof WorkspaceNotFoundError) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new WorkspaceNotFoundError(`task file not found for ${taskId}`);
+  }
+
+  async listTasks(benchId: string, componentInstanceId: string, status?: TaskStatus): Promise<TaskMetadata[]> {
+    const statuses = status ? [status] : taskStatusSchema.options;
+    const tasks = await Promise.all(statuses.map(async (currentStatus) => listJsonFiles(
+      getComponentTaskStateDir(this.workspaceRoot, benchId, componentInstanceId, currentStatus),
+      async (filename) => this.readTask(benchId, componentInstanceId, filename.replace(/\.json$/, "")),
+    )));
+    return tasks.flat().sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
   async readComponentSummary(benchId: string, componentInstanceId: string): Promise<string> {
