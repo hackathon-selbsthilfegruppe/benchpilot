@@ -6,8 +6,11 @@ import { WorkspaceStore } from "./workspace-store.js";
 
 export interface ComponentContextView {
   bench: BenchSummary;
-  self: ComponentInstance;
-  selfSummary: string;
+  self: {
+    component: ComponentInstance;
+    summary: string;
+    toc: ResourceTocEntry[];
+  };
   others: Array<{
     component: ComponentInstance;
     summary: string;
@@ -59,10 +62,11 @@ export class BenchReadService {
   }
 
   async getComponentContext(benchId: string, componentInstanceId: string): Promise<ComponentContextView> {
-    const [bench, self, selfSummary, components] = await Promise.all([
+    const [bench, self, selfSummary, selfToc, components] = await Promise.all([
       this.getBench(benchId),
       this.getComponent(benchId, componentInstanceId),
       this.store.readComponentSummary(benchId, componentInstanceId),
+      this.store.readComponentToc(benchId, componentInstanceId),
       this.listComponents(benchId),
     ]);
 
@@ -78,8 +82,11 @@ export class BenchReadService {
 
     return {
       bench: benchSummarySchema.parse(bench),
-      self,
-      selfSummary,
+      self: {
+        component: self,
+        summary: selfSummary,
+        toc: selfToc,
+      },
       others,
     };
   }

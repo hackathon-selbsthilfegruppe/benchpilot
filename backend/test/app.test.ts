@@ -197,6 +197,63 @@ describe("createApp", () => {
         updatedAt: "2026-04-25T19:10:00.000Z",
         content: "# Notes\n\nFull markdown body here...",
       }),
+      getComponentContext: async () => ({
+        bench: {
+          id: "bench-crp-biosensor",
+          title: "CRP biosensor",
+          question: "Can we build a paper-based electrochemical biosensor for CRP?",
+          status: "active",
+          updatedAt: "2026-04-25T19:12:00.000Z",
+        },
+        self: {
+          component: {
+            id: "literature-crp-biosensor",
+            benchId: "bench-crp-biosensor",
+            presetId: "literature",
+            name: "Literature — CRP biosensor",
+            summary: "Tracks prior work, novelty signal, and references relevant to the CRP biosensor hypothesis.",
+            requirementIds: ["req-assess-novelty"],
+            toolMode: "read-only",
+            resourceCount: 1,
+            status: "active",
+            createdAt: "2026-04-25T19:10:00.000Z",
+            updatedAt: "2026-04-25T19:12:00.000Z",
+          },
+          summary: "Tracks prior work, novelty signal, and references relevant to the CRP biosensor hypothesis.\n",
+          toc: [
+            {
+              id: "lit-0007",
+              benchId: "bench-crp-biosensor",
+              componentInstanceId: "literature-crp-biosensor",
+              title: "CRP paper sensor prior art",
+              kind: "paper-note",
+              description: "Prior-art note",
+              summary: "Summary of prior work on CRP paper sensors and likely overlap with the current hypothesis.",
+              tags: ["diagnostics", "crp"],
+              updatedAt: "2026-04-25T19:10:00.000Z",
+            },
+          ],
+        },
+        others: [
+          {
+            component: {
+              id: "budget-crp-biosensor",
+              benchId: "bench-crp-biosensor",
+              presetId: "budget",
+              name: "Budget — CRP biosensor",
+              summary: "Tracks costs and assumptions.",
+              requirementIds: [],
+              toolMode: "read-only",
+              resourceCount: 0,
+              status: "active",
+              createdAt: "2026-04-25T19:10:00.000Z",
+              updatedAt: "2026-04-25T19:12:00.000Z",
+            },
+            summary: "Tracks costs and assumptions.\n",
+            toc: [],
+          },
+        ],
+      }),
     });
 
     const app = createApp(createFakePool({}), benchReadService);
@@ -332,6 +389,68 @@ describe("createApp", () => {
         createdAt: "2026-04-25T19:10:00.000Z",
         updatedAt: "2026-04-25T19:10:00.000Z",
         content: "# Notes\n\nFull markdown body here...",
+      },
+    });
+
+    const contextResponse = await request(app, "/api/benches/bench-crp-biosensor/context/components/literature-crp-biosensor", { method: "GET" });
+    expect(contextResponse.status).toBe(200);
+    expect(await contextResponse.json()).toEqual({
+      context: {
+        bench: {
+          id: "bench-crp-biosensor",
+          title: "CRP biosensor",
+          question: "Can we build a paper-based electrochemical biosensor for CRP?",
+          status: "active",
+          updatedAt: "2026-04-25T19:12:00.000Z",
+        },
+        self: {
+          component: {
+            id: "literature-crp-biosensor",
+            benchId: "bench-crp-biosensor",
+            presetId: "literature",
+            name: "Literature — CRP biosensor",
+            summary: "Tracks prior work, novelty signal, and references relevant to the CRP biosensor hypothesis.",
+            requirementIds: ["req-assess-novelty"],
+            toolMode: "read-only",
+            resourceCount: 1,
+            status: "active",
+            createdAt: "2026-04-25T19:10:00.000Z",
+            updatedAt: "2026-04-25T19:12:00.000Z",
+          },
+          summary: "Tracks prior work, novelty signal, and references relevant to the CRP biosensor hypothesis.\n",
+          toc: [
+            {
+              id: "lit-0007",
+              benchId: "bench-crp-biosensor",
+              componentInstanceId: "literature-crp-biosensor",
+              title: "CRP paper sensor prior art",
+              kind: "paper-note",
+              description: "Prior-art note",
+              summary: "Summary of prior work on CRP paper sensors and likely overlap with the current hypothesis.",
+              tags: ["diagnostics", "crp"],
+              updatedAt: "2026-04-25T19:10:00.000Z",
+            },
+          ],
+        },
+        others: [
+          {
+            component: {
+              id: "budget-crp-biosensor",
+              benchId: "bench-crp-biosensor",
+              presetId: "budget",
+              name: "Budget — CRP biosensor",
+              summary: "Tracks costs and assumptions.",
+              requirementIds: [],
+              toolMode: "read-only",
+              resourceCount: 0,
+              status: "active",
+              createdAt: "2026-04-25T19:10:00.000Z",
+              updatedAt: "2026-04-25T19:12:00.000Z",
+            },
+            summary: "Tracks costs and assumptions.\n",
+            toc: [],
+          },
+        ],
       },
     });
   });

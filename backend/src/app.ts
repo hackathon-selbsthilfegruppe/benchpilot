@@ -94,6 +94,12 @@ export function createApp(pool: SessionService, benchReadService?: BenchReadServ
     res.json({ resource });
   }));
 
+  app.get("/api/benches/:benchId/context/components/:componentInstanceId", asyncHandler(async (req, res) => {
+    ensureBenchReadService(benchReadService);
+    const context = await benchReadService.getComponentContext(requireBenchId(req), requireComponentInstanceId(req));
+    res.json({ context });
+  }));
+
   app.get("/api/agent-sessions", (_req, res) => {
     res.json({ sessions: pool.list() });
   });
