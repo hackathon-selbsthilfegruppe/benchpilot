@@ -3,7 +3,7 @@
 - ID: `09_000`
 - Type: `Epic`
 - Area: `Backend`
-- Status: `In Progress`
+- Status: `Closed`
 
 ## Goal
 

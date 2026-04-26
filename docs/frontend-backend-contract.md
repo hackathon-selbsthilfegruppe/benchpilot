@@ -298,7 +298,7 @@ Tasks now belong between **component instances**.
 - `GET /api/tasks/:taskId`
 - `GET /api/tasks/:taskId/result`
 
-Polling remains acceptable for the hackathon.
+Polling remains acceptable for the hackathon. When the backend task-dispatch loop is enabled, newly created runnable tasks are also picked up automatically by the backend runtime rather than waiting for a manual operator step.
 
 ## 9. CLI contract over the backend API
 

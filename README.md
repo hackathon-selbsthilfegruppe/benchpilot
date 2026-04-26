@@ -88,6 +88,11 @@ Backend logging:
 - default is `info`
 - HTTP requests now emit `x-request-id` headers and matching structured request logs for correlation
 
+Backend task dispatch loop:
+- `BENCHPILOT_TASK_DISPATCH_ENABLED=false` disables automatic task pickup
+- `BENCHPILOT_TASK_DISPATCH_INTERVAL_MS=<ms>` controls the backend polling cadence (default: `2000`)
+- when enabled, the backend scans for runnable task-run sessions and dispatches them automatically
+
 ## Frontend intake + compatibility API
 
 These routes live in the Next.js app as either thin backend proxies for the guided intake flow or compatibility support for existing local benches under `frontend/components-data/`.
