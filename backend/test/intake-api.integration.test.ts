@@ -39,9 +39,11 @@ describe("intake api integration", () => {
     expect(createBody.bench.status).toBe("draft");
     expect(createBody.components.map((component: { presetId: string }) => component.presetId).sort()).toEqual([
       "budget",
+      "experiment-planner",
       "literature",
       "orchestrator",
       "protocols",
+      "reviewer",
       "timeline",
     ]);
     expect(createBody.orchestratorComponent.presetId).toBe("orchestrator");

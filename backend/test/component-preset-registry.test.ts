@@ -25,15 +25,23 @@ describe("component preset registry", () => {
 
     expect(Object.keys(registry).sort()).toEqual([
       "budget",
+      "experiment-planner",
       "literature",
       "orchestrator",
       "protocols",
+      "reviewer",
       "timeline",
     ]);
     expect(registry.protocols.source).toEqual({
       kind: "doc-package",
       path: "docs/preset-components/protocols/README.md",
     });
+    expect(registry["experiment-planner"].source).toEqual({
+      kind: "doc-package",
+      path: "docs/preset-components/experiment-planner/README.md",
+    });
+    expect(registry["experiment-planner"].defaultToolMode).toBe("full");
+    expect(registry.reviewer.source.kind).toBe("inline-provisional");
     expect(registry.orchestrator.source.kind).toBe("inline-provisional");
     expect(registry.literature.source.kind).toBe("inline-provisional");
   });
@@ -47,6 +55,8 @@ describe("component preset registry", () => {
       "budget",
       "timeline",
       "literature",
+      "reviewer",
+      "experiment-planner",
     ]);
     expect(review.preparedPromptPackages).toEqual([
       "experiment-planner",
@@ -55,7 +65,7 @@ describe("component preset registry", () => {
       "reagents",
       "thorough-literature-research",
     ]);
-    expect(review.exactMatches).toEqual(["protocols"]);
+    expect(review.exactMatches).toEqual(["experiment-planner", "protocols"]);
     expect(review.notes.join(" ")).toContain("provisional inline presets");
   });
 });
