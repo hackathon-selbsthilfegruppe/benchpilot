@@ -24,6 +24,105 @@ test.describe("backend-backed bench page", () => {
     await page.getByRole("button", { name: /Hypothesis Backend E2E Bench/i }).click();
     await expect(page.getByTestId("open-literature-backend-e2e-bench")).toBeVisible();
   });
+
+  test("uses backend-backed component sessions for component chat requests", async ({ page }) => {
+    await seedBackendBenchFixture();
+
+    let componentSessionCreateSeen = false;
+
+    await page.route("**/api/benchpilot/agent-sessions/prewarm", async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          sessions: [
+            {
+              id: "orchestrator-session-1",
+              role: { id: "orchestrator", name: "Orchestrator" },
+              cwd: "/tmp/orchestrator",
+              status: "idle",
+              createdAt: "2026-04-25T19:00:00.000Z",
+            },
+            {
+              id: "hypothesis-session-1",
+              role: { id: "hypothesis", name: "Hypothesis Generator" },
+              cwd: "/tmp/hypothesis",
+              status: "idle",
+              createdAt: "2026-04-25T19:00:00.000Z",
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.route("**/api/benchpilot/component-sessions/prewarm", async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({ sessions: [] }),
+      });
+    });
+
+    await page.route("**/api/benchpilot/benches/*/components/*/session", async (route) => {
+      componentSessionCreateSeen = true;
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: {
+            id: "component-session-1",
+            role: { id: "literature-backend-e2e-bench", name: "Literature — Backend E2E Bench" },
+            cwd: "/tmp/literature",
+            status: "idle",
+            createdAt: "2026-04-25T19:00:00.000Z",
+          },
+        }),
+      });
+    });
+
+    await page.route("**/api/benchpilot/agent-sessions/component-session-1/prompt", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/x-ndjson; charset=utf-8",
+        body: [
+          JSON.stringify({ type: "session_started", sessionId: "component-session-1", roleId: "literature-backend-e2e-bench" }),
+          JSON.stringify({ type: "message_delta", sessionId: "component-session-1", roleId: "literature-backend-e2e-bench", text: "I found similar prior work." }),
+          JSON.stringify({ type: "message_completed", sessionId: "component-session-1", roleId: "literature-backend-e2e-bench", assistantText: "I found similar prior work." }),
+        ].join("\n"),
+      });
+    });
+
+    await page.goto(`/bench/${BENCH_ID}`);
+    await expect(page.getByTestId("open-literature-backend-e2e-bench")).toBeVisible();
+
+    const result = await page.evaluate(async ({ benchId }) => {
+      const sessionResponse = await fetch(`/api/benchpilot/benches/${benchId}/components/literature-backend-e2e-bench/session`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      const session = await sessionResponse.json();
+
+      const promptResponse = await fetch(`/api/benchpilot/agent-sessions/${session.session.id}/prompt`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: "What did you find?" }),
+      });
+      const ndjson = await promptResponse.text();
+
+      return {
+        sessionStatus: sessionResponse.status,
+        promptStatus: promptResponse.status,
+        ndjson,
+      };
+    }, { benchId: BENCH_ID });
+
+    await expect.poll(() => componentSessionCreateSeen).toBe(true);
+    expect(result.sessionStatus).toBe(201);
+    expect(result.promptStatus).toBe(200);
+    expect(result.ndjson).toContain('"type":"message_completed"');
+    expect(result.ndjson).toContain("I found similar prior work.");
+  });
 });
 
 async function seedBackendBenchFixture() {
