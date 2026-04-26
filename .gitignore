@@ -3,6 +3,8 @@ backend/dist/
 backend/coverage/
 frontend/dist/
 frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
 *.log
 .DS_Store
 .benchpilot/
