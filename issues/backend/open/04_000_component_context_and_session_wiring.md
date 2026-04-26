@@ -37,10 +37,11 @@ This is where the preset component definitions and prompt-engineering work conne
 
 ## Candidate child issues
 
-- component session prompt builder
-- component context service
-- preset-to-instance wiring
-- session bootstrap tests
+- `04_001` preset metadata registry and prompt source loading
+- `04_002` component session prompt builder and context assembly
+- `04_003` component-aware session bootstrap and lookup
+- `04_004` component session API wiring and preload support
+- `04_005` session wiring integration tests and preset coverage review
 
 ## Exit criteria
 
