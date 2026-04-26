@@ -129,17 +129,21 @@ test.describe("backend-backed bench page", () => {
       tasks: [
         {
           id: "task-review-prior-work-overlap",
-          status: "pending",
+          status: "running",
+          taskSessionId: "task-session-review-prior-work-overlap",
+          executionStartedAt: "2026-04-25T19:21:00.000Z",
           resultText: undefined,
           resultResourceId: undefined,
           createdResourceIds: [],
           modifiedResourceIds: [],
-          updatedAt: "2026-04-25T19:20:00.000Z",
+          updatedAt: "2026-04-25T19:21:00.000Z",
           completedAt: undefined,
         },
         {
           id: "task-literature-result",
           status: "completed",
+          taskSessionId: "task-session-literature-result",
+          executionStartedAt: "2026-04-25T19:23:00.000Z",
           resultText: "Similar work exists.",
           resultResourceId: "lit-0007",
           createdResourceIds: ["lit-0007"],
@@ -157,6 +161,10 @@ test.describe("backend-backed bench page", () => {
     expect(tasksResponse.ok()).toBe(true);
     const tasksJson = await tasksResponse.json();
     expect(tasksJson.tasks.find((task: { id: string }) => task.id === "task-literature-result")?.status).toBe("completed");
+
+    expect(tasksJson.tasks.find((task: { id: string }) => task.id === "task-review-prior-work-overlap")?.executionStartedAt).toBe("2026-04-25T19:21:00.000Z");
+    expect(tasksJson.tasks.find((task: { id: string }) => task.id === "task-review-prior-work-overlap")?.taskSessionId).toBe("task-session-review-prior-work-overlap");
+    expect(tasksJson.tasks.find((task: { id: string }) => task.id === "task-literature-result")?.resultResourceId).toBe("lit-0007");
 
     const resultResponse = await request.get(`/api/benchpilot/tasks/task-literature-result/result?benchId=${encodeURIComponent(BENCH_ID)}`);
     expect(resultResponse.ok()).toBe(true);
@@ -178,6 +186,8 @@ async function seedBackendBenchFixture(options: {
   tasks?: Array<{
     id: string;
     status: "pending" | "running" | "completed" | "error";
+    taskSessionId?: string;
+    executionStartedAt?: string;
     resultText?: string;
     resultResourceId?: string;
     createdResourceIds: string[];
@@ -297,6 +307,8 @@ async function seedBackendBenchFixture(options: {
       title: task.id === "task-review-prior-work-overlap" ? "Review prior work overlap" : "Literature result",
       request: "Check whether closely related work already exists.",
       status: task.status,
+      taskSessionId: task.taskSessionId,
+      executionStartedAt: task.executionStartedAt,
       resultText: task.resultText,
       resultResourceId: task.resultResourceId,
       createdResourceIds: task.createdResourceIds,
