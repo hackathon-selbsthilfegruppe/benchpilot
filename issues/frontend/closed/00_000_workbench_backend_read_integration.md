@@ -3,7 +3,7 @@
 - ID: `00_000`
 - Type: `Epic`
 - Area: `Frontend`
-- Status: `Open`
+- Status: `Closed`
 
 ## Goal
 
@@ -51,3 +51,12 @@ That means the frontend can start consuming the real backend state without touch
 - the workbench can browse bench/component/resource state from the backend
 - frontend no longer depends primarily on the older local hypothesis/component file model for post-intake reads
 - intake remains unchanged
+
+## Resolution
+
+Closed after implementing and testing:
+
+- `00_001` frontend backend-read client and proxy helpers
+- `00_002` backend bench-to-workbench view model adapter
+- `00_003` bench page backend-loading path with safe fallback
+- `00_004` playwright and integration test adaptation for backend bench reads
