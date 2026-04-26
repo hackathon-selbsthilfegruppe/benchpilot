@@ -107,4 +107,74 @@ describe("task dispatcher", () => {
     expect(content.toString("utf8")).toContain("## Result");
     expect(content.toString("utf8")).toContain("Similar CRP protocols exist");
   });
+
+  it("marks task execution as error when the task-run prompt fails", async () => {
+    const baseDir = await mkdtemp(path.join(os.tmpdir(), "benchpilot-task-dispatcher-error-"));
+    tempDirs.push(baseDir);
+
+    const store = new WorkspaceStore(baseDir);
+    const bench = createBench({
+      title: "CRP biosensor",
+      question: "Can we build a paper-based electrochemical biosensor for CRP?",
+    });
+    const sender = createComponentInstance({
+      benchId: bench.id,
+      presetId: "orchestrator",
+      name: "Orchestrator — CRP biosensor",
+      summary: "Coordinates the bench.",
+    });
+    const target = createComponentInstance({
+      benchId: bench.id,
+      presetId: "budget",
+      name: "Budget — CRP biosensor",
+      summary: "Tracks costs and assumptions.",
+      toolMode: "read-only",
+    });
+
+    await store.writeBench(bench);
+    await store.writeComponent(sender);
+    await store.writeComponent(target);
+
+    const taskService = new TaskService(store, {
+      createTaskRunSession: async (task: TaskMetadata) => ({
+        id: `task-session-${task.id}`,
+        role: {
+          id: `${task.toComponentInstanceId}-${task.id}`,
+          name: `${task.toComponentInstanceId} Task Run`,
+          description: "Task-run session",
+          instructions: "task prompt",
+          cwd: "/tmp/task-run",
+          toolMode: "read-only",
+        },
+        cwd: "/tmp/task-run",
+        status: "idle",
+        createdAt: "2026-04-25T19:20:00.000Z",
+      }),
+    } as any);
+
+    const task = await taskService.createTask({
+      actor: {
+        benchId: bench.id,
+        componentInstanceId: sender.id,
+        presetId: "orchestrator",
+      },
+      fromComponentInstanceId: sender.id,
+      toComponentInstanceId: target.id,
+      title: "Estimate budget",
+      request: "Estimate the budget envelope for the CRP biosensor.",
+    });
+
+    const dispatcher = new TaskDispatcher(store, taskService, {
+      prompt: async () => {
+        throw new Error("budget session failed");
+      },
+    });
+
+    await dispatcher.dispatchRunnableTasksOnce();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    const stored = await store.readTask(bench.id, target.id, task.id);
+    expect(stored.status).toBe("error");
+    expect(stored.resultText).toBe("budget session failed");
+  });
 });
