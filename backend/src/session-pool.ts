@@ -11,6 +11,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 
 import { extractLatestAssistantOutcome } from "./assistant-message.js";
+import { logger as rootLogger } from "./logger.js";
 import { resolvePreferredModel } from "./model-selection.js";
 import { buildRoleSystemPrompt, ensureRoleWorkspace, normalizeRoleDefinition } from "./roles.js";
 import { normalizeSessionEvent } from "./stream-events.js";
@@ -34,6 +35,7 @@ export interface SessionPoolOptions {
 }
 
 export class SessionPool {
+  private readonly logger = rootLogger.child({ scope: "session_pool" });
   private readonly projectRoot: string;
   private readonly workspaceRoot: string;
   private readonly sessionStoreRoot: string;
@@ -126,6 +128,15 @@ export class SessionPool {
       unsubscribe,
     });
 
+    this.logger.info("session.created", {
+      sessionId: id,
+      roleId: role.id,
+      roleName: role.name,
+      cwd: roleDir,
+      toolMode: role.toolMode,
+      modelId: session.model?.id,
+    });
+
     return { ...summary };
   }
 
@@ -134,6 +145,12 @@ export class SessionPool {
     if (!managed) {
       throw new Error(`Unknown session: ${sessionId}`);
     }
+
+    this.logger.info("session.history.read", {
+      sessionId,
+      roleId: managed.history.roleId,
+      itemCount: managed.history.items.length,
+    });
 
     return {
       sessionId: managed.history.sessionId,
@@ -160,11 +177,19 @@ export class SessionPool {
       text: message,
       createdAt: new Date().toISOString(),
     });
+    this.logger.info("session.prompt.submitted", {
+      sessionId,
+      roleId: managed.summary.role.id,
+      roleName: managed.summary.role.name,
+      message,
+    });
+
 
     const unsubscribe = managed.session.subscribe((event: any) => {
       const chunks = normalizeSessionEvent(event, sessionId, managed.summary.role.id);
       for (const chunk of chunks) {
         recordHistoryChunk(managed.history.items, chunk);
+        logStreamChunk(this.logger, chunk);
         onEvent(chunk);
       }
     });
@@ -184,6 +209,11 @@ export class SessionPool {
           roleId: managed.summary.role.id,
           error: outcome.error,
         } satisfies StreamEnvelope;
+        this.logger.error("session.assistant.error", {
+          sessionId,
+          roleId: managed.summary.role.id,
+          error: outcome.error,
+        });
         recordHistoryChunk(managed.history.items, errorChunk);
         onEvent(errorChunk);
       } else {
@@ -191,6 +221,11 @@ export class SessionPool {
           type: "assistant_message",
           text: outcome.text,
           createdAt: new Date().toISOString(),
+        });
+        this.logger.info("session.assistant.completed", {
+          sessionId,
+          roleId: managed.summary.role.id,
+          assistantText: outcome.text,
         });
         onEvent({
           type: "message_completed",
@@ -210,6 +245,11 @@ export class SessionPool {
         roleId: managed.summary.role.id,
         error: errorMessage,
       } satisfies StreamEnvelope;
+      this.logger.error("session.prompt.failed", {
+        sessionId,
+        roleId: managed.summary.role.id,
+        error,
+      });
       recordHistoryChunk(managed.history.items, errorChunk);
       onEvent(errorChunk);
       throw error;
@@ -230,6 +270,10 @@ export class SessionPool {
     managed.unsubscribe();
     managed.session.dispose();
     this.sessions.delete(sessionId);
+    this.logger.info("session.disposed", {
+      sessionId,
+      roleId: managed.summary.role.id,
+    });
     return true;
   }
 
@@ -279,6 +323,49 @@ function recordHistoryChunk(history: SessionHistoryItem[], chunk: StreamEnvelope
       error: chunk.error,
       createdAt,
     });
+  }
+}
+
+function logStreamChunk(logger: ReturnType<typeof rootLogger.child>, chunk: StreamEnvelope): void {
+  switch (chunk.type) {
+    case "session_started":
+      logger.info("session.prompt.started", {
+        sessionId: chunk.sessionId,
+        roleId: chunk.roleId,
+      });
+      return;
+    case "message_delta":
+      logger.debug("session.assistant.delta", {
+        sessionId: chunk.sessionId,
+        roleId: chunk.roleId,
+        text: chunk.text,
+      });
+      return;
+    case "tool_started":
+      logger.info("session.tool.started", {
+        sessionId: chunk.sessionId,
+        roleId: chunk.roleId,
+        toolName: chunk.toolName,
+        summary: chunk.summary,
+      });
+      return;
+    case "tool_finished":
+      logger.info("session.tool.finished", {
+        sessionId: chunk.sessionId,
+        roleId: chunk.roleId,
+        toolName: chunk.toolName,
+        ok: chunk.ok,
+      });
+      return;
+    case "session_error":
+      logger.error("session.error", {
+        sessionId: chunk.sessionId,
+        roleId: chunk.roleId,
+        error: chunk.error,
+      });
+      return;
+    case "message_completed":
+      return;
   }
 }
 
