@@ -34,7 +34,10 @@ That gives the frontend a cleaner way to open and reuse sessions for real bench 
 
 ## Candidate child issues
 
-- later
+- `01_001` frontend component-session client and proxy helpers
+- `01_002` workbench session bootstrap and reuse by component identity
+- `01_003` orchestrator and component chat alignment with backend component sessions
+- `01_004` frontend tests and playwright coverage for session-backed bench chat
 
 ## Exit criteria
 
