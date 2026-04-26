@@ -3,6 +3,7 @@ import type { Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createApp, type SessionService } from "../src/app.js";
+import type { BenchReadService } from "../src/bench-read-service.js";
 import type { RoleDefinition, SessionSummary, StreamEnvelope } from "../src/types.js";
 
 const createdServers: Server[] = [];
@@ -94,6 +95,90 @@ describe("createApp", () => {
       session: createSessionSummary({ id: "literature", name: "Literature Research" }),
     });
   });
+
+  it("serves bench and requirement reads through the bench read service", async () => {
+    const benchReadService = createFakeBenchReadService({
+      listBenches: async () => [
+        {
+          id: "bench-crp-biosensor",
+          title: "CRP biosensor",
+          question: "Can we build a paper-based electrochemical biosensor for CRP?",
+          status: "active",
+          updatedAt: "2026-04-25T19:12:00.000Z",
+        },
+      ],
+      getBench: async () => ({
+        id: "bench-crp-biosensor",
+        title: "CRP biosensor",
+        question: "Can we build a paper-based electrochemical biosensor for CRP?",
+        normalizedQuestion: "A paper-based electrochemical biosensor will detect CRP in whole blood.",
+        status: "active",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:12:00.000Z",
+      }),
+      listRequirements: async () => [
+        {
+          id: "req-assess-novelty",
+          benchId: "bench-crp-biosensor",
+          title: "Assess novelty and prior art",
+          summary: "Determine whether closely similar work already exists.",
+          status: "open",
+          componentInstanceIds: ["literature-crp-biosensor"],
+          resourceIds: [],
+          createdAt: "2026-04-25T19:11:00.000Z",
+          updatedAt: "2026-04-25T19:12:00.000Z",
+        },
+      ],
+    });
+
+    const app = createApp(createFakePool({}), benchReadService);
+
+    const benchesResponse = await request(app, "/api/benches", { method: "GET" });
+    expect(benchesResponse.status).toBe(200);
+    expect(await benchesResponse.json()).toEqual({
+      benches: [
+        {
+          id: "bench-crp-biosensor",
+          title: "CRP biosensor",
+          question: "Can we build a paper-based electrochemical biosensor for CRP?",
+          status: "active",
+          updatedAt: "2026-04-25T19:12:00.000Z",
+        },
+      ],
+    });
+
+    const benchResponse = await request(app, "/api/benches/bench-crp-biosensor", { method: "GET" });
+    expect(benchResponse.status).toBe(200);
+    expect(await benchResponse.json()).toEqual({
+      bench: {
+        id: "bench-crp-biosensor",
+        title: "CRP biosensor",
+        question: "Can we build a paper-based electrochemical biosensor for CRP?",
+        normalizedQuestion: "A paper-based electrochemical biosensor will detect CRP in whole blood.",
+        status: "active",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:12:00.000Z",
+      },
+    });
+
+    const requirementsResponse = await request(app, "/api/benches/bench-crp-biosensor/requirements", { method: "GET" });
+    expect(requirementsResponse.status).toBe(200);
+    expect(await requirementsResponse.json()).toEqual({
+      requirements: [
+        {
+          id: "req-assess-novelty",
+          benchId: "bench-crp-biosensor",
+          title: "Assess novelty and prior art",
+          summary: "Determine whether closely similar work already exists.",
+          status: "open",
+          componentInstanceIds: ["literature-crp-biosensor"],
+          resourceIds: [],
+          createdAt: "2026-04-25T19:11:00.000Z",
+          updatedAt: "2026-04-25T19:12:00.000Z",
+        },
+      ],
+    });
+  });
 });
 
 function createFakePool(overrides: Partial<SessionService>): SessionService {
@@ -104,6 +189,28 @@ function createFakePool(overrides: Partial<SessionService>): SessionService {
     dispose: async () => true,
     ...overrides,
   };
+}
+
+function createFakeBenchReadService(overrides: Partial<BenchReadService>): BenchReadService {
+  return {
+    listBenches: async () => [],
+    getBench: async () => {
+      throw new Error("missing bench");
+    },
+    listRequirements: async () => [],
+    listComponents: async () => [],
+    getComponent: async () => {
+      throw new Error("missing component");
+    },
+    listComponentResources: async () => [],
+    getComponentResource: async () => {
+      throw new Error("missing resource");
+    },
+    getComponentContext: async () => {
+      throw new Error("missing context");
+    },
+    ...overrides,
+  } satisfies BenchReadService;
 }
 
 function createSessionSummary(role: RoleDefinition): SessionSummary {

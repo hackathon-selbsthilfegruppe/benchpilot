@@ -3,6 +3,8 @@ import cors from "cors";
 import { z } from "zod";
 
 import type { RoleDefinition, SessionSummary, StreamEnvelope } from "./types.js";
+import { WorkspaceNotFoundError } from "./workspace-store.js";
+import type { BenchReadService } from "./bench-read-service.js";
 import {
   fetchProtocolIo,
   searchProtocolsIo,
@@ -36,7 +38,7 @@ const promptSchema = z.object({
   message: z.string().min(1),
 });
 
-export function createApp(pool: SessionService) {
+export function createApp(pool: SessionService, benchReadService?: BenchReadService) {
   const app = express();
 
   app.use(cors());
@@ -45,6 +47,24 @@ export function createApp(pool: SessionService) {
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
   });
+
+  app.get("/api/benches", asyncHandler(async (_req, res) => {
+    ensureBenchReadService(benchReadService);
+    const benches = await benchReadService.listBenches();
+    res.json({ benches });
+  }));
+
+  app.get("/api/benches/:benchId", asyncHandler(async (req, res) => {
+    ensureBenchReadService(benchReadService);
+    const bench = await benchReadService.getBench(requireBenchId(req));
+    res.json({ bench });
+  }));
+
+  app.get("/api/benches/:benchId/requirements", asyncHandler(async (req, res) => {
+    ensureBenchReadService(benchReadService);
+    const requirements = await benchReadService.listRequirements(requireBenchId(req));
+    res.json({ requirements });
+  }));
 
   app.get("/api/agent-sessions", (_req, res) => {
     res.json({ sessions: pool.list() });
@@ -122,7 +142,11 @@ export function createApp(pool: SessionService) {
   }));
 
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    const status = error instanceof z.ZodError ? 400 : 500;
+    const status = error instanceof z.ZodError
+      ? 400
+      : error instanceof WorkspaceNotFoundError
+        ? 404
+        : 500;
     res.status(status).json({
       error: error instanceof Error ? error.message : "Unknown server error",
       details: error instanceof z.ZodError ? error.flatten() : undefined,
@@ -136,6 +160,20 @@ function asyncHandler(handler: (req: Request, res: Response, next: NextFunction)
   return (req: Request, res: Response, next: NextFunction) => {
     void handler(req, res, next).catch(next);
   };
+}
+
+function ensureBenchReadService(service: BenchReadService | undefined): asserts service is BenchReadService {
+  if (!service) {
+    throw new Error("Bench read service is not configured");
+  }
+}
+
+function requireBenchId(req: Request): string {
+  const value = req.params.benchId;
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error("Missing benchId route parameter");
+  }
+  return value;
 }
 
 function requireSessionId(req: Request): string {
