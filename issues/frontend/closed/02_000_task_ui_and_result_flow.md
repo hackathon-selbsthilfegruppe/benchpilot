@@ -3,7 +3,7 @@
 - ID: `02_000`
 - Type: `Epic`
 - Area: `Frontend`
-- Status: `Open`
+- Status: `Closed`
 
 ## Goal
 
@@ -47,3 +47,12 @@ The frontend can now show and drive delegation without inventing a parallel task
 
 - frontend can create and inspect backend tasks
 - task results are visible through the UI without relying on legacy local task state
+
+## Resolution
+
+Closed after implementing and testing:
+
+- `02_001` frontend backend-task client and proxy helpers
+- `02_002` backend task to workbench task-model adapter
+- `02_003` workbench backend-task create and polling path with safe fallback
+- `02_004` frontend tests and playwright coverage for backend task ui flow
