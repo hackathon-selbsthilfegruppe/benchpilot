@@ -6,6 +6,7 @@ import type { RoleDefinition, SessionSummary, StreamEnvelope } from "./types.js"
 import { WorkspaceNotFoundError, WorkspaceValidationError } from "./workspace-store.js";
 import type { BenchReadService } from "./bench-read-service.js";
 import type { BenchWriteService } from "./bench-write-service.js";
+import type { ComponentSessionService } from "./component-session-service.js";
 import { OwnershipRuleError } from "./ownership.js";
 import {
   fetchProtocolIo,
@@ -41,7 +42,19 @@ const promptSchema = z.object({
   message: z.string().min(1),
 });
 
-export function createApp(pool: SessionService, benchReadService?: BenchReadService, benchWriteService?: BenchWriteService) {
+const componentSessionPrewarmSchema = z.object({
+  components: z.array(z.object({
+    benchId: z.string().min(1),
+    componentInstanceId: z.string().min(1),
+  })).min(1),
+});
+
+export function createApp(
+  pool: SessionService,
+  benchReadService?: BenchReadService,
+  benchWriteService?: BenchWriteService,
+  componentSessionService?: ComponentSessionService,
+) {
   const app = express();
 
   app.use(cors());
@@ -132,6 +145,24 @@ export function createApp(pool: SessionService, benchReadService?: BenchReadServ
       req.body,
     );
     res.json({ component });
+  }));
+
+  app.post("/api/benches/:benchId/components/:componentInstanceId/session", asyncHandler(async (req, res) => {
+    ensureComponentSessionService(componentSessionService);
+    const session = await componentSessionService.ensureComponentSession(
+      requireBenchId(req),
+      requireComponentInstanceId(req),
+    );
+    res.status(201).json({ session });
+  }));
+
+  app.post("/api/component-sessions/prewarm", asyncHandler(async (req, res) => {
+    ensureComponentSessionService(componentSessionService);
+    const body = componentSessionPrewarmSchema.parse(req.body);
+    const sessions = await Promise.all(
+      body.components.map((entry) => componentSessionService.ensureComponentSession(entry.benchId, entry.componentInstanceId)),
+    );
+    res.status(201).json({ sessions });
   }));
 
   app.get("/api/agent-sessions", (_req, res) => {
@@ -252,6 +283,12 @@ function ensureBenchReadService(service: BenchReadService | undefined): asserts 
 function ensureBenchWriteService(service: BenchWriteService | undefined): asserts service is BenchWriteService {
   if (!service) {
     throw new Error("Bench write service is not configured");
+  }
+}
+
+function ensureComponentSessionService(service: ComponentSessionService | undefined): asserts service is ComponentSessionService {
+  if (!service) {
+    throw new Error("Component session service is not configured");
   }
 }
 

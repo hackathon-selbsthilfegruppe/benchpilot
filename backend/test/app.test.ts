@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createApp, type SessionService } from "../src/app.js";
 import type { BenchReadService } from "../src/bench-read-service.js";
 import type { BenchWriteService } from "../src/bench-write-service.js";
+import type { ComponentSessionService } from "../src/component-session-service.js";
 import type { RoleDefinition, SessionSummary, StreamEnvelope } from "../src/types.js";
 
 const createdServers: Server[] = [];
@@ -526,7 +527,11 @@ describe("createApp", () => {
       }),
     });
 
-    const app = createApp(createFakePool({}), undefined, benchWriteService);
+    const componentSessionService = createFakeComponentSessionService({
+      ensureComponentSession: async () => createSessionSummary({ id: "literature-crp-biosensor", name: "Literature" }),
+    });
+
+    const app = createApp(createFakePool({}), undefined, benchWriteService, componentSessionService);
 
     const response = await request(
       app,
@@ -683,6 +688,37 @@ describe("createApp", () => {
         updatedAt: "2026-04-25T19:12:00.000Z",
       },
     });
+
+    const componentSessionResponse = await request(
+      app,
+      "/api/benches/bench-crp-biosensor/components/literature-crp-biosensor/session",
+      { method: "POST", headers: { "content-type": "application/json" }, body: "{}" },
+    );
+    expect(componentSessionResponse.status).toBe(201);
+    expect(await componentSessionResponse.json()).toEqual({
+      session: createSessionSummary({ id: "literature-crp-biosensor", name: "Literature" }),
+    });
+
+    const prewarmResponse = await request(
+      app,
+      "/api/component-sessions/prewarm",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          components: [
+            {
+              benchId: "bench-crp-biosensor",
+              componentInstanceId: "literature-crp-biosensor",
+            },
+          ],
+        }),
+      },
+    );
+    expect(prewarmResponse.status).toBe(201);
+    expect(await prewarmResponse.json()).toEqual({
+      sessions: [createSessionSummary({ id: "literature-crp-biosensor", name: "Literature" })],
+    });
   });
 });
 
@@ -731,6 +767,16 @@ function createFakeBenchWriteService(overrides: Partial<BenchWriteService>): Ben
     },
     ...overrides,
   } as BenchWriteService;
+}
+
+function createFakeComponentSessionService(overrides: Partial<ComponentSessionService>): ComponentSessionService {
+  return {
+    ensureComponentSession: async () => {
+      throw new Error("missing ensureComponentSession");
+    },
+    lookupComponentSession: () => null,
+    ...overrides,
+  } as ComponentSessionService;
 }
 
 function createSessionSummary(role: RoleDefinition): SessionSummary {

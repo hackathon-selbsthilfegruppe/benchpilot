@@ -1,6 +1,7 @@
 import { createApp } from "./app.js";
 import { BenchReadService } from "./bench-read-service.js";
 import { BenchWriteService } from "./bench-write-service.js";
+import { ComponentSessionService } from "./component-session-service.js";
 import { SessionPool } from "./session-pool.js";
 import { WorkspaceStore } from "./workspace-store.js";
 
@@ -9,7 +10,8 @@ const pool = new SessionPool();
 const workspaceStore = new WorkspaceStore(process.cwd());
 const benchReadService = new BenchReadService(workspaceStore);
 const benchWriteService = new BenchWriteService(workspaceStore);
-const app = createApp(pool, benchReadService, benchWriteService);
+const componentSessionService = new ComponentSessionService(pool, benchReadService, workspaceStore);
+const app = createApp(pool, benchReadService, benchWriteService, componentSessionService);
 
 const server = app.listen(port, () => {
   console.log(`BenchPilot backend listening on http://localhost:${port}`);
