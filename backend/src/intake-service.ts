@@ -4,6 +4,7 @@ import { BenchMaterializationService } from "./bench-materialization-service.js"
 import { type ComponentInstance } from "./component.js";
 import { ComponentSessionService } from "./component-session-service.js";
 import { createIntakeBrief, intakeBriefSchema, type IntakeBrief } from "./intake.js";
+import { logger as rootLogger } from "./logger.js";
 import { type SessionSummary } from "./types.js";
 import { createRequirement, type RequirementMetadata } from "./requirement.js";
 import { createResource, type ResourceMetadata } from "./resource.js";
@@ -56,6 +57,8 @@ export interface FinalizedIntakeResult {
 }
 
 export class IntakeService {
+  private readonly logger = rootLogger.child({ scope: "intake_service" });
+
   constructor(
     private readonly store: WorkspaceStore,
     private readonly benchMaterializationService: BenchMaterializationService,
@@ -64,6 +67,11 @@ export class IntakeService {
   ) {}
 
   async createBrief(input: CreateIntakeBriefRequest): Promise<IntakeBootstrapResult> {
+    this.logger.info("intake.brief.create.requested", {
+      title: input.title ?? null,
+      question: input.question,
+      normalizedQuestion: input.normalizedQuestion ?? null,
+    });
     const materialized = await this.benchMaterializationService.createBenchFromIntake({
       title: input.title,
       question: input.question,
@@ -90,6 +98,13 @@ export class IntakeService {
     });
 
     await this.store.writeIntakeBrief(brief);
+    this.logger.info("intake.brief.created", {
+      briefId: brief.id,
+      benchId: brief.benchId,
+      orchestratorComponentInstanceId: brief.orchestratorComponentInstanceId,
+      orchestratorSessionId: brief.orchestratorSessionId ?? null,
+      status: brief.status,
+    });
 
     return {
       brief,
@@ -102,6 +117,13 @@ export class IntakeService {
 
   async updateBrief(briefId: string, input: UpdateIntakeBriefRequest): Promise<{ brief: IntakeBrief; bench: BenchMetadata }> {
     const brief = await this.store.readIntakeBrief(briefId);
+    this.logger.info("intake.brief.update.requested", {
+      briefId,
+      benchId: brief.benchId,
+      title: input.title ?? null,
+      question: input.question ?? null,
+      normalizedQuestion: input.normalizedQuestion ?? null,
+    });
     const nextTitle = input.title?.trim() || brief.title;
     const nextQuestion = input.question?.trim() || brief.question;
     const updatedBench = await this.store.updateBench(brief.benchId, {
@@ -118,12 +140,22 @@ export class IntakeService {
       updatedAt: new Date().toISOString(),
     });
     await this.store.writeIntakeBrief(updatedBrief);
+    this.logger.info("intake.brief.updated", {
+      briefId: updatedBrief.id,
+      benchId: updatedBrief.benchId,
+      status: updatedBrief.status,
+    });
 
     return { brief: updatedBrief, bench: updatedBench };
   }
 
   async ensureOrchestratorSession(briefId: string): Promise<IntakeBootstrapResult> {
     const brief = await this.store.readIntakeBrief(briefId);
+    this.logger.info("intake.orchestrator_session.ensure_requested", {
+      briefId,
+      benchId: brief.benchId,
+      orchestratorComponentInstanceId: brief.orchestratorComponentInstanceId,
+    });
     const [bench, components] = await Promise.all([
       this.store.readBench(brief.benchId),
       this.benchReadService.listComponents(brief.benchId),
@@ -136,6 +168,11 @@ export class IntakeService {
       updatedAt: new Date().toISOString(),
     });
     await this.store.writeIntakeBrief(updatedBrief);
+    this.logger.info("intake.orchestrator_session.ensured", {
+      briefId: updatedBrief.id,
+      benchId: updatedBrief.benchId,
+      orchestratorSessionId: updatedBrief.orchestratorSessionId ?? null,
+    });
 
     return {
       brief: updatedBrief,
@@ -148,9 +185,19 @@ export class IntakeService {
 
   async finalizeBrief(briefId: string, input: FinalizeIntakeBriefRequest): Promise<FinalizedIntakeResult> {
     const brief = await this.store.readIntakeBrief(briefId);
+    this.logger.info("intake.finalize.requested", {
+      briefId,
+      benchId: brief.benchId,
+      literatureSelectionCount: input.literatureSelections?.length ?? 0,
+      protocolSelectionCount: input.protocolSelections?.length ?? 0,
+    });
     const update = await this.updateBrief(briefId, input);
 
     if (brief.status === "finalized") {
+      this.logger.info("intake.finalize.already_finalized", {
+        briefId,
+        benchId: brief.benchId,
+      });
       return {
         brief,
         bench: update.bench,
@@ -199,6 +246,13 @@ export class IntakeService {
       });
     }
 
+    this.logger.info("intake.resources.persisted", {
+      briefId,
+      benchId: update.bench.id,
+      literatureResourceIds: literatureResources.map((resource) => resource.id),
+      protocolResourceIds: protocolResources.map((resource) => resource.id),
+    });
+
     const finalizedBench = await this.store.updateBench(update.bench.id, { status: "active" });
     const finalizedBrief = intakeBriefSchema.parse({
       ...update.brief,
@@ -207,6 +261,13 @@ export class IntakeService {
       finalizedAt: new Date().toISOString(),
     });
     await this.store.writeIntakeBrief(finalizedBrief);
+    this.logger.info("intake.finalized", {
+      briefId: finalizedBrief.id,
+      benchId: finalizedBench.id,
+      requirementCount: requirements.length,
+      componentCount: components.length,
+      status: finalizedBrief.status,
+    });
 
     return {
       brief: finalizedBrief,
@@ -253,6 +314,15 @@ export class IntakeService {
 
     await this.store.writeResource(resource);
     await this.store.writeResourceFile(benchId, componentInstanceId, resource.id, "selection.md", Buffer.from(body, "utf8"));
+    this.logger.info("intake.selection_resource.created", {
+      benchId,
+      componentInstanceId,
+      resourceId: resource.id,
+      title: resource.title,
+      kind: resource.kind,
+      supportsRequirementId: supportsRequirementId ?? null,
+      sourceId: selection.sourceId,
+    });
     return resource;
   }
 }
