@@ -38,7 +38,10 @@ The frontend can now show and drive delegation without inventing a parallel task
 
 ## Candidate child issues
 
-- later
+- `02_001` frontend backend-task client and proxy helpers
+- `02_002` backend task to workbench task-model adapter
+- `02_003` workbench backend-task create and polling path with safe fallback
+- `02_004` frontend tests and playwright coverage for backend task ui flow
 
 ## Exit criteria
 
