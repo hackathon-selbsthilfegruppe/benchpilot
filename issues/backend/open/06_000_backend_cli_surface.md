@@ -17,9 +17,11 @@ It also reduces pressure to invent custom tool integrations too early.
 
 ## Scope
 
+- list/get benches
+- list/get requirements
 - list/get components
 - list/get resources
-- list/get tasks
+- list/get tasks when task APIs exist
 - optionally create/complete tasks once the backend APIs exist
 - machine-readable JSON output for agent consumption
 
@@ -30,8 +32,8 @@ It also reduces pressure to invent custom tool integrations too early.
 
 ## Dependencies
 
-- `02_000` backend component/resource read API
-- `05_000` backend task lifecycle and execution
+- `02_000` backend bench/component/resource read API
+- `05_000` backend task lifecycle and execution for task subcommands
 
 ## Candidate child issues
 
@@ -42,6 +44,7 @@ It also reduces pressure to invent custom tool integrations too early.
 
 ## Exit criteria
 
-- agents can inspect backend state through CLI commands and `bash`
+- agents can inspect backend bench/component/resource state through CLI commands and `bash`
 - CLI output is stable enough for session prompts and automation
-- no custom pi tool is required for the basic backend workflow
+- read commands do not require a custom pi tool
+- task commands can be added incrementally once task APIs exist

@@ -153,10 +153,54 @@ Prefer moving the same file instead of creating copies.
 
 1. create or refine high-level epics
 2. choose the next epic to execute
-3. move that epic to `inprogress/`
-4. create child issues under the same epic number
-5. close child issues as they land
-6. close the epic when its exit criteria are met
+3. **read the relevant docs before starting implementation**
+4. move that epic to `inprogress/`
+5. create child issues under the same epic number
+6. close child issues as they land
+7. close the epic when its exit criteria are met
+
+## Doc-first rule
+
+Before starting work on an epic, re-read the relevant docs so implementation stays aligned with the current plan.
+
+Core docs:
+
+- `docs/concept.md`
+- `docs/pi-integration-concept.md`
+- `docs/pi-integration-plan.md`
+- `docs/backend-components-api-proposal.md`
+- `docs/implementation-plan.md`
+- `docs/frontend-backend-contract.md`
+- `docs/prompt-engineering-handover.md` when prompt/session wiring is relevant
+
+Suggested mapping by backend epic:
+
+- `00_000` model and storage foundations:
+  - `docs/concept.md`
+  - `docs/backend-components-api-proposal.md`
+  - `docs/frontend-backend-contract.md`
+- `01_000` resource ingestion:
+  - `docs/concept.md`
+  - `docs/backend-components-api-proposal.md`
+- `02_000` read APIs:
+  - `docs/backend-components-api-proposal.md`
+  - `docs/frontend-backend-contract.md`
+  - `docs/implementation-plan.md`
+- `03_000` write APIs:
+  - `docs/concept.md`
+  - `docs/backend-components-api-proposal.md`
+  - `docs/frontend-backend-contract.md`
+- `04_000` context/session wiring:
+  - `docs/pi-integration-concept.md`
+  - `docs/pi-integration-plan.md`
+  - `docs/prompt-engineering-handover.md`
+- `05_000` task lifecycle:
+  - `docs/concept.md`
+  - `docs/pi-integration-concept.md`
+  - `docs/frontend-backend-contract.md`
+- `06_000` CLI surface:
+  - `docs/pi-integration-plan.md`
+  - `docs/frontend-backend-contract.md`
 
 ## Current planning bias
 

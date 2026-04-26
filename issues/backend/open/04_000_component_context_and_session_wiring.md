@@ -31,9 +31,8 @@ This is where the preset component definitions and prompt-engineering work conne
 
 ## Dependencies
 
-- `00_000` backend component/resource model
-- `02_000` backend component/resource read API
-- `03_000` backend component/resource write API
+- `00_000` backend bench/component/resource model
+- `02_000` backend bench/component/resource read API
 - prompt-engineering outputs for preset components
 
 ## Candidate child issues

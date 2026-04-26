@@ -1,4 +1,4 @@
-# Backend component/resource read API
+# Backend bench/component/resource read API
 
 - ID: `02_000`
 - Type: `Epic`
@@ -7,7 +7,7 @@
 
 ## Goal
 
-Expose read-only backend APIs for components and resources.
+Expose read-only backend APIs for benches, requirements, components, and resources.
 
 ## Why now
 
@@ -17,10 +17,14 @@ This also enables the TOC-first, details-on-demand access pattern described in t
 
 ## Scope
 
-- list components
+- list benches
+- get bench details
+- list requirements for a bench
+- list components for a bench
 - get component details
 - list resources for a component
 - get resource details
+- expose a cheap cross-component context endpoint
 - keep global browsing cheap via short descriptions and summaries
 - keep full resource content behind explicit detail reads
 
@@ -37,14 +41,19 @@ This also enables the TOC-first, details-on-demand access pattern described in t
 
 ## Candidate child issues
 
-- `GET /api/components`
-- `GET /api/components/:componentId`
-- `GET /api/components/:componentId/resources`
-- `GET /api/components/:componentId/resources/:resourceId`
+- `GET /api/benches`
+- `GET /api/benches/:benchId`
+- `GET /api/benches/:benchId/requirements`
+- `GET /api/benches/:benchId/components`
+- `GET /api/benches/:benchId/components/:componentInstanceId`
+- `GET /api/benches/:benchId/components/:componentInstanceId/resources`
+- `GET /api/benches/:benchId/components/:componentInstanceId/resources/:resourceId`
+- `GET /api/benches/:benchId/context/components/:componentInstanceId`
 - loader-backed read services
 
 ## Exit criteria
 
-- backend exposes stable component/resource read endpoints
+- backend exposes stable bench/requirement/component/resource read endpoints
 - cheap component/resource browsing works without loading all full bodies
+- the context endpoint supports TOC-first cross-component access
 - agents and frontend can inspect the same backend state consistently
