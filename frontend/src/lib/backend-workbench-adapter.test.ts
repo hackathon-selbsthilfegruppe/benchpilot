@@ -74,10 +74,10 @@ describe("backend workbench adapter", () => {
     expect(result.components[0]).toMatchObject({
       id: "literature-crp-biosensor",
       name: "Literature — CRP biosensor",
-      preprompt: "Backend preset: literature",
-      tooling: "Tool mode: read-only",
       summary: "Tracks prior work and novelty.",
     });
+    expect(result.components[0]?.preprompt).toContain("You are the BenchPilot literature component.");
+    expect(result.components[0]?.tooling).toContain("literature resource writes");
     expect(result.components[0]?.toc).toEqual([
       {
         slug: "lit-0007",

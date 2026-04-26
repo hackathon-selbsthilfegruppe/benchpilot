@@ -5,6 +5,7 @@ import type {
   ResourceDetail,
 } from "./benchpilot-workbench-client";
 import type { BenchComponent, DetailDoc, Task, TocEntry, Status } from "./components-shared";
+import { resolveWorkbenchPresetSeed } from "./workbench-presets";
 
 export interface BackendWorkbenchData {
   hypothesis: BenchComponent;
@@ -66,11 +67,13 @@ function adaptRequirementToDetailDoc(requirement: RequirementSummary): DetailDoc
 }
 
 function adaptComponent(component: ComponentInstanceSummary, resources: ResourceDetail[]): BenchComponent {
+  const preset = resolveWorkbenchPresetSeed(component.presetId);
+
   return {
     id: component.id,
     name: component.name,
-    preprompt: `Backend preset: ${component.presetId ?? "dynamic"}`,
-    tooling: `Tool mode: ${component.toolMode ?? "full"}`,
+    preprompt: preset.preprompt,
+    tooling: preset.tooling,
     summary: component.summary,
     toc: resources.map(adaptResourceToTocEntry),
     details: resources.map(adaptResourceToDetailDoc),

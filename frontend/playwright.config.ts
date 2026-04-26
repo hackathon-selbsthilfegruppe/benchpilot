@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const port = Number(process.env.E2E_PORT ?? 3000);
 const isScreencast = process.env.E2E_MODE === "screencast";
+const systemChromiumPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?.trim() || undefined;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -21,7 +22,12 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: systemChromiumPath
+          ? { executablePath: systemChromiumPath }
+          : undefined,
+      },
     },
   ],
   // No webServer block — the spec assumes the dev stack is running
