@@ -2,7 +2,14 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { createResourceInputSchema } from "./resource.js";
+import {
+  createResource,
+  createResourceInputSchema,
+  resourceFileSchema,
+  type CreateResourceOptions,
+  type ResourceFile,
+  type ResourceMetadata,
+} from "./resource.js";
 
 export const SUPPORTED_RESOURCE_FILE_TYPES = {
   "text/markdown": [".md"],
@@ -111,8 +118,47 @@ export const resourceIngestionRequestSchema = z.object({
 
 export type ResourceIngestionRequest = z.infer<typeof resourceIngestionRequestSchema>;
 
+export interface GeneratedResourceFile {
+  file: ResourceFile;
+  content: Uint8Array;
+}
+
 export function parseResourceIngestionRequest(input: unknown): ResourceIngestionRequest {
   return resourceIngestionRequestSchema.parse(input);
+}
+
+export function buildResourceMetadataFromIngestion(
+  request: ResourceIngestionRequest,
+  generatedFiles: GeneratedResourceFile[] = [],
+  options: CreateResourceOptions = {},
+): ResourceMetadata {
+  const parsedRequest = parseResourceIngestionRequest(request);
+  const parsedGeneratedFiles = generatedFiles.map((entry) => ({
+    file: resourceFileSchema.parse(entry.file),
+    content: entry.content,
+  }));
+  const files = [
+    ...parsedRequest.files.map<ResourceFile>(({ filename, mediaType, description, role }) => ({
+      filename,
+      mediaType,
+      description,
+      role,
+    })),
+    ...parsedGeneratedFiles.map((entry) => entry.file),
+  ];
+  const primaryFile = parsedRequest.primaryFilename
+    ?? parsedRequest.files.find((file) => file.role === "primary")?.filename;
+  const primaryMediaType = parsedRequest.files.find((file) => file.filename === primaryFile)?.mediaType;
+
+  return createResource(
+    {
+      ...parsedRequest.resource,
+      files,
+      primaryFile,
+      contentType: primaryMediaType,
+    },
+    options,
+  );
 }
 
 export function mediaTypeFromFilename(filename: string): SupportedResourceMediaType | null {

@@ -3,6 +3,7 @@ import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 
 import {
+  buildResourceMetadataFromIngestion,
   mediaTypeFromFilename,
   parseResourceIngestionRequest,
   resourceIngestionFileSchema,
@@ -128,5 +129,77 @@ describe("resource ingestion validation", () => {
     expect(request.resource.title).toBe("CRP paper sensor prior art");
     expect(request.files).toHaveLength(2);
     expect(request.primaryFilename).toBe("prior-art.pdf");
+  });
+
+  it("builds resource metadata with stable file inventory entries and generated companions", () => {
+    const request = parseResourceIngestionRequest({
+      resource: {
+        benchId: "bench-crp-biosensor",
+        componentInstanceId: "literature-crp-biosensor",
+        title: "CRP paper sensor prior art",
+        kind: "paper-note",
+        description: "Prior-art note",
+        summary: "Summary of prior work on CRP paper sensors.",
+        supportsRequirementIds: ["req-assess-novelty"],
+      },
+      primaryFilename: "prior-art.pdf",
+      files: [
+        {
+          filename: "prior-art.pdf",
+          mediaType: "application/pdf",
+          description: "Original paper PDF",
+          role: "primary",
+          content: Buffer.from("%PDF-1.4 sample"),
+        },
+        {
+          filename: "review-notes.md",
+          mediaType: "text/markdown",
+          description: "Manual review notes",
+          role: "attachment",
+          content: Buffer.from("# Notes\n"),
+        },
+      ],
+    });
+
+    const resource = buildResourceMetadataFromIngestion(
+      request,
+      [
+        {
+          file: {
+            filename: "prior-art.txt",
+            mediaType: "text/plain",
+            description: "Extracted text from prior-art.pdf: Original paper PDF",
+            role: "extracted-text",
+            sourceFilename: "prior-art.pdf",
+          },
+          content: Buffer.from("hello world"),
+        },
+      ],
+      { now: new Date("2026-04-25T19:10:00.000Z") },
+    );
+
+    expect(resource.primaryFile).toBe("prior-art.pdf");
+    expect(resource.contentType).toBe("application/pdf");
+    expect(resource.files).toEqual([
+      {
+        filename: "prior-art.pdf",
+        mediaType: "application/pdf",
+        description: "Original paper PDF",
+        role: "primary",
+      },
+      {
+        filename: "review-notes.md",
+        mediaType: "text/markdown",
+        description: "Manual review notes",
+        role: "attachment",
+      },
+      {
+        filename: "prior-art.txt",
+        mediaType: "text/plain",
+        description: "Extracted text from prior-art.pdf: Original paper PDF",
+        role: "extracted-text",
+        sourceFilename: "prior-art.pdf",
+      },
+    ]);
   });
 });
