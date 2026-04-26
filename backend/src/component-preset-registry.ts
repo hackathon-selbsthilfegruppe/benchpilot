@@ -19,7 +19,14 @@ export interface PresetCoverageReview {
 }
 
 const PRESET_PACKAGE_PATHS = {
-  protocols: "docs/preset-components/protocols/README.md",
+  protocols: {
+    path: "docs/preset-components/protocols/README.md",
+    defaultToolMode: "read-only",
+  },
+  "experiment-planner": {
+    path: "docs/preset-components/experiment-planner/README.md",
+    defaultToolMode: "full",
+  },
 } as const;
 
 const INLINE_PROVISIONAL_PRESETS: Record<Exclude<ComponentPresetId, keyof typeof PRESET_PACKAGE_PATHS>, Omit<ComponentPresetRecord, "source">> = {
@@ -71,15 +78,28 @@ const INLINE_PROVISIONAL_PRESETS: Record<Exclude<ComponentPresetId, keyof typeof
     ].join("\n\n"),
     defaultToolMode: "read-only",
   },
+  reviewer: {
+    id: "reviewer",
+    name: "Reviewer",
+    shortDescription: "Reviews specialist output for defects, missing controls, weak evidence, and unjustified assumptions.",
+    detailedDescription: "Acts as a quality gate for bench artifacts. It reviews protocols, literature, budgets, timelines, and integrated plans, writes critique resources, and names concrete defects instead of offering generic approval.",
+    preprompt: [
+      "You are the BenchPilot reviewer component.",
+      "Review the work produced by other bench components and surface concrete defects, missing controls, weak evidence, and unjustified assumptions.",
+      "Do not rewrite or re-own the artifact you are reviewing; produce a precise review resource that tells the responsible component what is wrong and what remains unsupported.",
+      "Be skeptical, specific, and terse. Generic praise is a failure mode.",
+    ].join("\n\n"),
+    defaultToolMode: "full",
+  },
 };
 
 export async function loadCurrentPresetRegistry(projectRoot: string = process.cwd()): Promise<Record<ComponentPresetId, ComponentPresetRecord>> {
   const registryEntries = await Promise.all(INITIAL_COMPONENT_PRESET_IDS.map(async (presetId) => {
-    const packageRelativePath = PRESET_PACKAGE_PATHS[presetId as keyof typeof PRESET_PACKAGE_PATHS];
-    if (packageRelativePath) {
-      const absolutePath = path.join(projectRoot, packageRelativePath);
-      const preset = await loadPresetFromMarkdownFile(absolutePath);
-      return [presetId, { ...preset, source: { kind: "doc-package", path: packageRelativePath } }] as const;
+    const packageConfig = PRESET_PACKAGE_PATHS[presetId as keyof typeof PRESET_PACKAGE_PATHS];
+    if (packageConfig) {
+      const absolutePath = path.join(projectRoot, packageConfig.path);
+      const preset = await loadPresetFromMarkdownFile(absolutePath, packageConfig.defaultToolMode);
+      return [presetId, { ...preset, source: { kind: "doc-package", path: packageConfig.path } }] as const;
     }
 
     const preset = INLINE_PROVISIONAL_PRESETS[presetId as keyof typeof INLINE_PROVISIONAL_PRESETS];
@@ -107,16 +127,16 @@ export function reviewPresetCoverage(): PresetCoverageReview {
   return {
     officialPresetIds: INITIAL_COMPONENT_PRESET_IDS,
     preparedPromptPackages,
-    exactMatches: ["protocols"],
+    exactMatches: ["experiment-planner", "protocols"],
     notes: [
-      "The current backend preset vocabulary is orchestrator / protocols / budget / timeline / literature.",
+      "The current backend preset vocabulary is orchestrator / protocols / budget / timeline / literature / reviewer / experiment-planner.",
       "Prompt-engineering packages are richer and include quick-literature-research, thorough-literature-research, reagents, and experiment-planner.",
-      "The backend currently loads protocols from an exact prompt package and uses provisional inline presets for orchestrator, budget, timeline, and literature until the taxonomies are reconciled.",
+      "The backend currently loads protocols and experiment-planner from exact prompt packages and uses provisional inline presets for orchestrator, budget, timeline, literature, and reviewer until the taxonomies are reconciled.",
     ],
   };
 }
 
-export async function loadPresetFromMarkdownFile(filePath: string): Promise<ComponentPreset> {
+export async function loadPresetFromMarkdownFile(filePath: string, defaultToolMode: ComponentPreset["defaultToolMode"] = "read-only"): Promise<ComponentPreset> {
   const markdown = await readFile(filePath, "utf8");
   const id = readHeadingValue(markdown, /^# Component: `([^`]+)`$/m, "component id");
   const shortDescription = readSection(markdown, "## Short description");
@@ -129,7 +149,7 @@ export async function loadPresetFromMarkdownFile(filePath: string): Promise<Comp
     shortDescription,
     detailedDescription,
     preprompt,
-    defaultToolMode: "read-only",
+    defaultToolMode,
   });
 }
 

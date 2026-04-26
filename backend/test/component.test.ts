@@ -19,6 +19,8 @@ describe("component preset and instance schema", () => {
       "budget",
       "timeline",
       "literature",
+      "reviewer",
+      "experiment-planner",
     ]);
   });
 

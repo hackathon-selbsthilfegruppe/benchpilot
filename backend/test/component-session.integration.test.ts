@@ -64,7 +64,7 @@ describe("component session integration", () => {
   it("keeps preset coverage review explicit", () => {
     const review = reviewPresetCoverage();
 
-    expect(review.exactMatches).toEqual(["protocols"]);
+    expect(review.exactMatches).toEqual(["experiment-planner", "protocols"]);
     expect(review.notes.join(" ")).toContain("quick-literature-research");
   });
 });

@@ -10,6 +10,8 @@ export const INITIAL_COMPONENT_PRESET_IDS = [
   "budget",
   "timeline",
   "literature",
+  "reviewer",
+  "experiment-planner",
 ] as const;
 
 export const componentPresetIdSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
