@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@keyframes bp-typing-dot {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
+  40% { transform: translateY(-3px); opacity: 1; }
+}
+.bp-typing-dot {
+  animation: bp-typing-dot 1.2s infinite ease-in-out;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
@@ -34,6 +42,7 @@
   --status-info-soft: #d3dde7;
 }
 
+/* Dark palette: explicit user opt-in via the .dark class. */
 .dark {
   --background: #0a0a0a;
   --foreground: #f5f5f5;
@@ -64,6 +73,43 @@
   --status-blocked-soft: rgba(248, 113, 113, 0.18);
   --status-done-soft: rgba(115, 115, 115, 0.18);
   --status-info-soft: rgba(147, 197, 253, 0.18);
+}
+
+/* First-paint dark mode for users on a dark system who have not
+ * explicitly chosen .light. After hydration, workbench setTheme
+ * stamps an explicit class and this fallback is overridden. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --background: #0a0a0a;
+    --foreground: #f5f5f5;
+    --surface: #171717;
+    --surface-elev: #262626;
+    --surface-strong: #404040;
+    --border: #262626;
+    --border-strong: #404040;
+    --muted: #a3a3a3;
+    --subtle: #737373;
+    --hint: #525252;
+    --accent: #818cf8;
+    --accent-strong: #6366f1;
+    --accent-soft: rgba(49, 46, 129, 0.6);
+    --accent-soft-fg: #e0e7ff;
+    --accent-ring: rgba(129, 140, 248, 0.35);
+    --user-bubble: rgba(49, 46, 129, 0.6);
+    --user-bubble-fg: #e0e7ff;
+    --agent-bubble: #262626;
+    --agent-bubble-fg: #f5f5f5;
+    --status-ok: #34d399;
+    --status-pending: #f4b740;
+    --status-blocked: #f87171;
+    --status-done: #737373;
+    --status-info: #93c5fd;
+    --status-ok-soft: rgba(16, 185, 129, 0.18);
+    --status-pending-soft: rgba(244, 183, 64, 0.18);
+    --status-blocked-soft: rgba(248, 113, 113, 0.18);
+    --status-done-soft: rgba(115, 115, 115, 0.18);
+    --status-info-soft: rgba(147, 197, 253, 0.18);
+  }
 }
 
 @theme inline {

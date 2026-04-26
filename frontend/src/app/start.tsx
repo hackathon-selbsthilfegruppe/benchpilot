@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   streamSessionPrompt,
   type BenchpilotSessionSummary,
@@ -55,7 +55,7 @@ type LiteratureSourceResult = {
 };
 
 type ChatTurn = { role: "user" | "agent"; text: string };
-type Step = "hypothesis" | "literature" | "protocols";
+type Verdict = "novel" | "crowded" | "adjacent";
 type FinalizeStage = null | "drafting" | "creating";
 
 type HypothesisOption = { slug: string; name: string; domain?: string };
@@ -66,15 +66,16 @@ export default function Start({
   existingHypotheses: HypothesisOption[];
 }) {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("hypothesis");
+  const searchParams = useSearchParams();
+  const seededInput = searchParams.get("seed") === "question" ? EXAMPLE_QUESTIONS[0] : "";
   const [question, setQuestion] = useState("");
   const [chat, setChat] = useState<ChatTurn[]>([
     {
       role: "agent",
-      text: "Tell me what you want to find out. I'll help refine the question. When you're happy with it, head to step 2 to pull related protocols and create the bench.",
+      text: "Tell me what you want to find out. I'll help sharpen the question. Once it's solid, I'll pull related literature for you and tell you whether the space is novel, crowded, or adjacent.",
     },
   ]);
-  const [chatInput, setChatInput] = useState("");
+  const [chatInput, setChatInput] = useState(seededInput);
   const [streaming, setStreaming] = useState("");
   const [pending, setPending] = useState(false);
   const [session, setSession] = useState<BenchpilotSessionSummary | null>(null);
@@ -85,15 +86,19 @@ export default function Start({
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [searching, setSearching] = useState(false);
-  const [searchedQuery, setSearchedQuery] = useState<string | null>(null);
-  const [sources, setSources] = useState<SourceResult[]>([]);
-  const [kept, setKept] = useState<Record<string, boolean>>({});
+  const [accepted, setAccepted] = useState(false);
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [verdictPending, setVerdictPending] = useState(false);
+  const [actions, setActions] = useState<OrchestratorAction[]>([]);
 
   const [litSearching, setLitSearching] = useState(false);
-  const [litSearchedQuery, setLitSearchedQuery] = useState<string | null>(null);
   const [litSources, setLitSources] = useState<LiteratureSourceResult[]>([]);
   const [litKept, setLitKept] = useState<Record<string, boolean>>({});
+
+  const [protoActive, setProtoActive] = useState(false);
+  const [protoSearching, setProtoSearching] = useState(false);
+  const [protoSources, setProtoSources] = useState<SourceResult[]>([]);
+  const [protoKept, setProtoKept] = useState<Record<string, boolean>>({});
 
   const [finalizeStage, setFinalizeStage] = useState<FinalizeStage>(null);
 
@@ -112,11 +117,8 @@ export default function Start({
       if (e.key === "." || e.code === "Period") {
         e.preventDefault();
         e.stopPropagation();
-        setStep("hypothesis");
-        // Seed both the research question (so the user can immediately
-        // continue to literature/protocols/finalize) and the chat input
-        // (so they can also send it to the orchestrator if they want a
-        // refinement round-trip first).
+        // Seed both the research question and the chat input so the
+        // user can immediately send it to the orchestrator.
         setQuestion(EXAMPLE_QUESTIONS[0]);
         setChatInput(EXAMPLE_QUESTIONS[0]);
       }
@@ -127,19 +129,6 @@ export default function Start({
       window.removeEventListener("keydown", onKey, true);
       document.removeEventListener("keydown", onKey, true);
     };
-  }, []);
-
-  // URL-driven seeding: `/?seed=question` pre-fills the orchestrator
-  // chat input with the canned example so the user (or the e2e spec)
-  // can click Send and have the orchestrator do its refinement
-  // round-trip — exactly the normal flow, just with one less paste.
-  // Nothing else on the page is seeded.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("seed") === "question") {
-      setChatInput(EXAMPLE_QUESTIONS[0]);
-    }
   }, []);
 
   async function ensureSession(seedQuestion?: string): Promise<{
@@ -200,68 +189,188 @@ export default function Start({
     setError(null);
     setChat((prev) => [...prev, { role: "user", text }]);
     setChatInput("");
+    setActions([]);
     try {
       const initialQuestion = question.trim() || text;
       if (!question.trim()) {
         setQuestion(initialQuestion);
       }
       const reply = await runOrchestrator(
-        `The user is iterating on their research question. Current draft: "${(question.trim() || initialQuestion) || "(empty)"}".\n\nUser says: ${text}\n\nReply briefly. If you suggest concrete edits to the question, also restate the full revised question on its own line prefixed with "Revised question:".`,
+        buildRefinementPrompt({
+          currentDraft: (question.trim() || initialQuestion) || "(empty)",
+          userMessage: text,
+          accepted,
+          verdict,
+        }),
         initialQuestion,
       );
-      setChat((prev) => [...prev, { role: "agent", text: reply }]);
-      const revised = extractRevisedQuestion(reply);
-      if (revised) {
-        setQuestion(revised);
+      const envelope = parseOrchestratorEnvelope(reply);
+      setChat((prev) => [...prev, { role: "agent", text: envelope.display }]);
+      setActions(envelope.actions);
+      const finalQuestion = envelope.acceptedQuestion ?? envelope.revisedQuestion;
+      if (finalQuestion) {
+        setQuestion(finalQuestion);
         if (intakeState) {
           await updateIntakeBrief(intakeState.briefId, {
-            title: revised,
-            question: revised,
-            normalizedQuestion: revised,
+            title: finalQuestion,
+            question: finalQuestion,
+            normalizedQuestion: finalQuestion,
           });
         }
       }
+      if (envelope.acceptedQuestion) {
+        setAccepted(true);
+        // Kick off the literature search the moment the orchestrator
+        // signals the question is ready.
+        void runLiteratureAndVerdict(envelope.acceptedQuestion);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  function dispatchAction(id: ActionId): void {
+    setActions([]);
+    if (id === "goto-protocols") {
+      const q = question.trim();
+      if (q) void runProtocolsAndPromptNext(q);
+      return;
+    }
+    if (id === "research-literature") {
+      const q = question.trim();
+      if (!q) return;
+      // Swap the right column back to literature, fetch fresh hits,
+      // and re-prompt the orchestrator for a verdict + next-step
+      // actions so the chat doesn't go silent.
+      setProtoActive(false);
+      setAccepted(true);
+      void runLiteratureAndVerdict(q);
+      return;
+    }
+    if (id === "finalize") {
+      void finalize();
+      return;
+    }
+    if (id === "refine-question") {
+      // Soft reset: collapse the right column entirely so the chat is
+      // the sole focus again. The user types their refinement next.
+      setAccepted(false);
+      setVerdict(null);
+      setLitSources([]);
+      setLitKept({});
+      setProtoActive(false);
+      setProtoSources([]);
+      setProtoKept({});
+    }
+  }
+
+  async function fetchProtocols(q: string): Promise<SourceResult[]> {
+    const res = await fetch("/api/protocol-sources/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: q, pageSize: 8 }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `HTTP ${res.status}`);
+    }
+    const body = (await res.json()) as { sources: SourceResult[] };
+    return body.sources;
+  }
+
+  function applyProtocolResults(sources: SourceResult[]) {
+    setProtoSources(sources);
+    const next: Record<string, boolean> = {};
+    for (const src of sources) {
+      for (const h of src.hits) next[hitKey(h)] = true;
+    }
+    setProtoKept(next);
   }
 
   async function searchProtocols(q: string) {
-    if (!q || searching) return;
+    if (!q || protoSearching) return;
     setError(null);
-    setSearching(true);
+    setProtoSearching(true);
     try {
-      const res = await fetch("/api/protocol-sources/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q, pageSize: 8 }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
-      const body = (await res.json()) as { sources: SourceResult[] };
-      setSources(body.sources);
-      const next: Record<string, boolean> = {};
-      for (const src of body.sources) {
-        for (const h of src.hits) next[hitKey(h)] = true;
-      }
-      setKept(next);
-      setSearchedQuery(q);
+      const sources = await fetchProtocols(q);
+      applyProtocolResults(sources);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setSearching(false);
+      setProtoSearching(false);
     }
   }
 
-  function goToProtocols() {
+  // Triggered by the LLM `goto-protocols` action. Pull protocols
+  // inline (right column), then ask the orchestrator for the next
+  // step — typically `finalize`. The literature pane closes (kept
+  // selections are preserved in state for finalize).
+  async function runProtocolsAndPromptNext(q: string): Promise<void> {
+    if (!q || protoSearching) return;
+    setProtoActive(true);
     setError(null);
-    setStep("protocols");
-    const q = question.trim();
-    if (q && q !== searchedQuery && !searching) {
-      void searchProtocols(q);
+    setProtoSearching(true);
+    let sources: SourceResult[] = [];
+    try {
+      sources = await fetchProtocols(q);
+      applyProtocolResults(sources);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return;
+    } finally {
+      setProtoSearching(false);
     }
+    await requestProtocolFollowup(q, sources);
+  }
+
+  async function requestProtocolFollowup(
+    q: string,
+    sources: SourceResult[],
+  ): Promise<void> {
+    try {
+      const hits = sources.flatMap((s) => s.hits).slice(0, 5);
+      const summary = hits.length === 0
+        ? "(no protocol hits returned)"
+        : hits
+            .map((h, i) => {
+              const head = `${i + 1}. ${h.title}${h.authors ? ` — ${h.authors}` : ""}`;
+              const blurb = h.description?.trim() ? `\n   ${h.description.trim()}` : "";
+              return `${head}${blurb}`;
+            })
+            .join("\n\n");
+      const reply = await runOrchestrator(
+        buildProtocolsFollowupPrompt({ question: q, summary }),
+        q,
+      );
+      const envelope = parseOrchestratorEnvelope(reply);
+      setChat((prev) => [...prev, { role: "agent", text: envelope.display }]);
+      setActions(envelope.actions);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function fetchLiterature(q: string): Promise<LiteratureSourceResult[]> {
+    const res = await fetch("/api/literature-sources/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: q, pageSize: 10 }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `HTTP ${res.status}`);
+    }
+    const body = (await res.json()) as { sources: LiteratureSourceResult[] };
+    return body.sources;
+  }
+
+  function applyLiteratureResults(sources: LiteratureSourceResult[]) {
+    setLitSources(sources);
+    const next: Record<string, boolean> = {};
+    for (const src of sources) {
+      for (const h of src.hits) next[litHitKey(h)] = true;
+    }
+    setLitKept(next);
   }
 
   async function searchLiterature(q: string) {
@@ -269,23 +378,8 @@ export default function Start({
     setError(null);
     setLitSearching(true);
     try {
-      const res = await fetch("/api/literature-sources/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q, pageSize: 10 }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
-      const body = (await res.json()) as { sources: LiteratureSourceResult[] };
-      setLitSources(body.sources);
-      const next: Record<string, boolean> = {};
-      for (const src of body.sources) {
-        for (const h of src.hits) next[litHitKey(h)] = true;
-      }
-      setLitKept(next);
-      setLitSearchedQuery(q);
+      const sources = await fetchLiterature(q);
+      applyLiteratureResults(sources);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -293,12 +387,65 @@ export default function Start({
     }
   }
 
-  function goToLiterature() {
+  // Once the orchestrator marks the question accepted, this fires the
+  // literature search and then asks the orchestrator for a one-word
+  // novelty verdict to summarise what came back. Pass the freshly
+  // fetched results into the verdict prompt directly — we cannot read
+  // them off `litSources` because setState hasn't flushed yet.
+  async function runLiteratureAndVerdict(acceptedQuestion: string): Promise<void> {
+    setVerdict(null);
+    if (litSearching) return;
     setError(null);
-    setStep("literature");
-    const q = question.trim();
-    if (q && q !== litSearchedQuery && !litSearching) {
-      void searchLiterature(q);
+    setLitSearching(true);
+    let sources: LiteratureSourceResult[] = [];
+    try {
+      sources = await fetchLiterature(acceptedQuestion);
+      applyLiteratureResults(sources);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return;
+    } finally {
+      setLitSearching(false);
+    }
+    await requestVerdict(acceptedQuestion, sources);
+  }
+
+  async function requestVerdict(
+    q: string,
+    sources: LiteratureSourceResult[],
+  ): Promise<void> {
+    if (verdictPending) return;
+    setVerdictPending(true);
+    try {
+      const hits = sources.flatMap((s) => s.hits).slice(0, 5);
+      const summary = hits.length === 0
+        ? "(no literature hits returned)"
+        : hits
+            .map((h, i) => {
+              const meta = [
+                h.authors,
+                h.year ? String(h.year) : null,
+                h.citationCount != null ? `${h.citationCount} citations` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              const head = `${i + 1}. ${h.title}${meta ? ` (${meta})` : ""}`;
+              const blurb = h.summary?.trim() ? `\n   ${h.summary.trim()}` : "";
+              return `${head}${blurb}`;
+            })
+            .join("\n\n");
+      const reply = await runOrchestrator(
+        buildVerdictPrompt({ question: q, summary }),
+        q,
+      );
+      const envelope = parseOrchestratorEnvelope(reply);
+      setChat((prev) => [...prev, { role: "agent", text: envelope.display }]);
+      setActions(envelope.actions);
+      if (envelope.verdict) setVerdict(envelope.verdict);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setVerdictPending(false);
     }
   }
 
@@ -309,9 +456,9 @@ export default function Start({
     try {
       setFinalizeStage("drafting");
       const { intake } = await ensureSession(q);
-      const protocols = sources
+      const protocols = protoSources
         .flatMap((s) => s.hits)
-        .filter((h) => kept[hitKey(h)])
+        .filter((h) => protoKept[hitKey(h)])
         .map((h) => ({
           sourceId: h.sourceId,
           title: h.title,
@@ -349,7 +496,6 @@ export default function Start({
       } catch (err) {
         // Surface the warning but keep finalizing — the bench still works
         // with empty seed components, just less rich on day one.
-        // eslint-disable-next-line no-console
         console.warn("[finalize] enrichment skipped:", err);
       }
 
@@ -369,28 +515,19 @@ export default function Start({
     }
   }
 
-  const keptCount = sources
-    .flatMap((s) => s.hits)
-    .filter((h) => kept[hitKey(h)]).length;
-  const litKeptCount = litSources
-    .flatMap((s) => s.hits)
-    .filter((h) => litKept[litHitKey(h)]).length;
+
+  const finalizing = finalizeStage !== null;
 
   return (
     <div data-testid="start-page" className="flex min-h-screen flex-col bg-background text-foreground">
       <header data-testid="start-header" className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-6 py-3">
-        <div data-testid="step-tabs" className="ml-3 flex items-center gap-1 rounded-md border border-border-strong bg-surface p-0.5 text-xs">
-          <StepButton testId="step-tab-hypothesis" active={step === "hypothesis"} onClick={() => setStep("hypothesis")}>
-            1. Hypothesis
-          </StepButton>
-          <StepButton testId="step-tab-literature" active={step === "literature"} onClick={goToLiterature} disabled={!question.trim()}>
-            2. Literature{litKeptCount > 0 ? ` (${litKeptCount})` : ""}
-          </StepButton>
-          <StepButton testId="step-tab-protocols" active={step === "protocols"} onClick={goToProtocols} disabled={!question.trim()}>
-            3. Protocols{keptCount > 0 ? ` (${keptCount})` : ""}
-          </StepButton>
-        </div>
         <div className="ml-auto flex items-center gap-2 text-xs">
+          {finalizeStage && (
+            <span data-testid="finalize-status" className="text-subtle">
+              <InlineSpinner />
+              {finalizeStage === "drafting" ? "Preparing intake handoff…" : "Creating bench…"}
+            </span>
+          )}
           {existingHypotheses.length > 0 && (
             <>
               <span className="text-subtle">Open existing:</span>
@@ -420,80 +557,42 @@ export default function Start({
       )}
 
       <main className="flex flex-1 justify-center p-6">
-        <div className="flex w-full max-w-3xl flex-col gap-4">
-          <div data-testid="hypothesis-step" hidden={step !== "hypothesis"} className="flex flex-1 flex-col gap-3">
+        <div
+          className={`flex w-full flex-col gap-4 ${
+            accepted ? "max-w-6xl" : "max-w-3xl"
+          }`}
+        >
+          <div data-testid="hypothesis-step" className="flex flex-1 flex-col gap-3">
             <HypothesisView
               question={question}
-              onQuestionChange={setQuestion}
               chat={chat}
               chatInput={chatInput}
               onChatInputChange={setChatInput}
               onSend={() => void sendChat()}
               streaming={streaming}
-              pending={pending}
+              pending={pending || finalizing}
               chatScrollRef={chatScrollRef}
-              onContinue={goToLiterature}
-            />
-          </div>
-          <div data-testid="literature-step" hidden={step !== "literature"} className="flex flex-1 flex-col gap-3">
-            <LiteratureView
-              question={question}
-              searching={litSearching}
-              sources={litSources}
-              kept={litKept}
-              setKept={setLitKept}
-              onResearch={() => void searchLiterature(question.trim())}
-              onBack={() => setStep("hypothesis")}
-              onContinue={goToProtocols}
-            />
-          </div>
-          <div data-testid="protocols-step" hidden={step !== "protocols"} className="flex flex-1 flex-col gap-3">
-            <ProtocolsView
-              question={question}
-              searching={searching}
-              sources={sources}
-              kept={kept}
-              setKept={setKept}
-              onResearch={() => void searchProtocols(question.trim())}
-              onBack={() => setStep("literature")}
-              onFinalize={() => void finalize()}
-              finalizeStage={finalizeStage}
+              accepted={accepted}
+              verdict={verdict}
+              verdictPending={verdictPending}
+              actions={actions}
+              onAction={dispatchAction}
+              litSearching={litSearching}
+              litSources={litSources}
+              litKept={litKept}
+              setLitKept={setLitKept}
+              onLitResearch={() => void searchLiterature(question.trim())}
+              protoActive={protoActive}
+              protoSearching={protoSearching}
+              protoSources={protoSources}
+              protoKept={protoKept}
+              setProtoKept={setProtoKept}
+              onProtoResearch={() => void searchProtocols(question.trim())}
             />
           </div>
         </div>
       </main>
     </div>
-  );
-}
-
-function StepButton({
-  active,
-  disabled,
-  onClick,
-  children,
-  testId,
-}: {
-  active: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  testId?: string;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      data-active={active ? "true" : "false"}
-      onClick={onClick}
-      disabled={disabled}
-      className={`rounded px-2 py-1 font-semibold transition ${
-        active
-          ? "bg-accent text-white"
-          : "text-subtle hover:bg-surface-elev disabled:opacity-40 disabled:hover:bg-transparent"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -586,18 +685,30 @@ function useTypewriterPlaceholder(examples: string[], paused: boolean): string {
 
 function HypothesisView({
   question,
-  onQuestionChange,
   chat,
   chatInput,
   onChatInputChange,
   onSend,
-  streaming,
   pending,
   chatScrollRef,
-  onContinue,
+  accepted,
+  verdict,
+  verdictPending,
+  actions,
+  onAction,
+  litSearching,
+  litSources,
+  litKept,
+  setLitKept,
+  onLitResearch,
+  protoActive,
+  protoSearching,
+  protoSources,
+  protoKept,
+  setProtoKept,
+  onProtoResearch,
 }: {
   question: string;
-  onQuestionChange: (v: string) => void;
   chat: ChatTurn[];
   chatInput: string;
   onChatInputChange: (v: string) => void;
@@ -605,103 +716,301 @@ function HypothesisView({
   streaming: string;
   pending: boolean;
   chatScrollRef: React.RefObject<HTMLDivElement | null>;
-  onContinue: () => void;
+  accepted: boolean;
+  verdict: Verdict | null;
+  verdictPending: boolean;
+  actions: OrchestratorAction[];
+  onAction: (id: ActionId) => void;
+  litSearching: boolean;
+  litSources: LiteratureSourceResult[];
+  litKept: Record<string, boolean>;
+  setLitKept: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  onLitResearch: () => void;
+  protoActive: boolean;
+  protoSearching: boolean;
+  protoSources: SourceResult[];
+  protoKept: Record<string, boolean>;
+  setProtoKept: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  onProtoResearch: () => void;
 }) {
-  const placeholder = useTypewriterPlaceholder(PLACEHOLDER_EXAMPLE_QUESTIONS, question.length > 0);
-  const questionRef = useAutoResize(question, 1, 8);
+  const chatPlaceholder = useTypewriterPlaceholder(
+    PLACEHOLDER_EXAMPLE_QUESTIONS,
+    chatInput.length > 0,
+  );
   const chatInputRef = useAutoResize(chatInput, 1, 6);
+
+  const chatPanel = (
+    <div
+      data-testid="orchestrator-chat"
+      className="flex flex-1 flex-col gap-2 rounded-lg border border-accent bg-surface-elev p-4 ring-1 ring-accent-ring"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-semibold">Chat to refine your research question</div>
+        {verdict && (
+          <span
+            data-testid="verdict-badge"
+            data-verdict={verdict}
+            className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-soft-fg"
+          >
+            {VERDICT_LABEL[verdict]}
+          </span>
+        )}
+      </div>
+      <div
+        data-testid="orchestrator-chat-history"
+        ref={chatScrollRef}
+        className="min-h-[8rem] flex-1 overflow-y-auto rounded-md border border-border bg-surface px-3 py-2 text-sm"
+      >
+        {chat.map((turn, i) => (
+          <ChatBubble key={i} turn={turn} index={i} />
+        ))}
+        {pending && <ThinkingBubble />}
+      </div>
+      <div className="flex items-end gap-2">
+        <textarea
+          data-testid="orchestrator-chat-input"
+          ref={chatInputRef}
+          value={chatInput}
+          onChange={(e) => onChatInputChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              onSend();
+            }
+          }}
+          placeholder={chatPlaceholder || "Ask the orchestrator to refine, narrow, or sharpen…  (Enter to send, Shift+Enter for newline)"}
+          rows={2}
+          className="flex-1 resize-none rounded-md border border-border-strong bg-surface px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-accent placeholder:opacity-70"
+          disabled={pending}
+        />
+        <button
+          type="button"
+          data-testid="orchestrator-chat-send"
+          onClick={onSend}
+          disabled={pending || !chatInput.trim()}
+          className="rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+        >
+          Send
+        </button>
+      </div>
+      {actions.length > 0 && (
+        <div data-testid="orchestrator-action-row" className="flex flex-wrap justify-end gap-2">
+          {actions.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              data-testid={`action-${a.id}`}
+              onClick={() => onAction(a.id)}
+              className={
+                a.primary
+                  ? "rounded-md bg-accent-strong px-4 py-2 text-sm font-semibold text-white"
+                  : "rounded-md border border-border-strong bg-surface px-4 py-2 text-sm font-semibold text-foreground hover:bg-surface-elev"
+              }
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <>
       <div className="flex justify-center pt-2 pb-4 text-foreground">
         <BenchpilotLogo
           testId="benchpilot-logo"
-          className="h-24 w-auto sm:h-28 md:h-32"
+          className={accepted ? "h-16 w-auto sm:h-20" : "h-24 w-auto sm:h-28 md:h-32"}
         />
       </div>
-      <div className="rounded-lg border border-accent bg-accent-soft p-4">
-        <label
-          htmlFor="research-question"
-          className="text-xs font-semibold uppercase tracking-wide text-accent-soft-fg"
-        >
-          Research question
-        </label>
-        <textarea
-          id="research-question"
-          data-testid="research-question-textarea"
-          ref={questionRef}
-          value={question}
-          onChange={(e) => onQuestionChange(e.target.value)}
-          placeholder={placeholder}
-          rows={1}
-          className="mt-2 w-full resize-none bg-transparent text-lg font-semibold leading-snug text-accent-soft-fg outline-none placeholder:text-accent-soft-fg/50"
-        />
-      </div>
-
-      <div data-testid="orchestrator-chat" className="flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface-elev p-4">
-        <div className="text-sm font-semibold">Chat with the orchestrator</div>
-        <div data-testid="orchestrator-chat-history" ref={chatScrollRef} className="min-h-[8rem] flex-1 overflow-y-auto rounded-md border border-border bg-surface px-3 py-2 text-sm">
-          {chat.map((turn, i) => (
-            <ChatBubble key={i} turn={turn} index={i} />
-          ))}
-          {streaming && <ChatBubble turn={{ role: "agent", text: streaming }} index={-1} streaming />}
-          {pending && !streaming && (
-            <span data-testid="orchestrator-thinking" className="text-xs text-subtle">orchestrator thinking…</span>
-          )}
+      {!accepted && !protoActive ? (
+        chatPanel
+      ) : (
+        <div data-testid="hypothesis-twocol" className="grid gap-4 lg:grid-cols-2">
+          {chatPanel}
+          <div className="flex flex-col gap-4">
+            {protoActive ? (
+              <ProtocolsPane
+                question={question}
+                searching={protoSearching}
+                sources={protoSources}
+                kept={protoKept}
+                setKept={setProtoKept}
+                onResearch={onProtoResearch}
+              />
+            ) : (
+              <LiteraturePane
+                question={question}
+                searching={litSearching}
+                sources={litSources}
+                kept={litKept}
+                setKept={setLitKept}
+                onResearch={onLitResearch}
+                verdictPending={verdictPending}
+              />
+            )}
+          </div>
         </div>
-        <div className="flex items-end gap-2">
-          <textarea
-            data-testid="orchestrator-chat-input"
-            ref={chatInputRef}
-            value={chatInput}
-            onChange={(e) => onChatInputChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onSend();
-              }
-            }}
-            placeholder="Ask the orchestrator to refine, narrow, or sharpen…  (Enter to send, Shift+Enter for newline)"
-            rows={2}
-            className="flex-1 resize-none rounded-md border border-border-strong bg-surface px-3 py-2 text-sm leading-relaxed text-foreground"
-            disabled={pending}
-          />
-          <button
-            type="button"
-            data-testid="orchestrator-chat-send"
-            onClick={onSend}
-            disabled={pending || !chatInput.trim()}
-            className="rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-          >
-            Send
-          </button>
-        </div>
-      </div>
-
-      <div className="flex justify-end">
-        <button
-          type="button"
-          data-testid="continue-to-literature-button"
-          onClick={onContinue}
-          disabled={!question.trim()}
-          className="rounded-md bg-accent-strong px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          Continue → Literature
-        </button>
-      </div>
+      )}
     </>
   );
 }
 
-function ProtocolsView({
+function LiteraturePane({
   question,
   searching,
   sources,
   kept,
   setKept,
   onResearch,
-  onBack,
-  onFinalize,
-  finalizeStage,
+  verdictPending,
+}: {
+  question: string;
+  searching: boolean;
+  sources: LiteratureSourceResult[];
+  kept: Record<string, boolean>;
+  setKept: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  onResearch: () => void;
+  verdictPending: boolean;
+}) {
+  const totalHits = sources.reduce((n, s) => n + s.hits.length, 0);
+  const keptCount = Object.values(kept).filter(Boolean).length;
+  const busy = searching || verdictPending;
+  const status = searching
+    ? "Searching configured sources…"
+    : verdictPending
+      ? "Asking the orchestrator for a verdict…"
+      : sources.length === 0
+        ? "No literature pulled yet."
+        : `${keptCount} kept of ${totalHits} found`;
+  const allErrored = sources.length > 0 && sources.every((s) => s.error);
+
+  return (
+    <div
+      data-testid="literature-pane"
+      className="flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface-elev p-4"
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold">Related literature</div>
+          <div data-testid="literature-status-text" className="text-xs text-subtle">
+            {busy && <InlineSpinner />}{status}
+          </div>
+        </div>
+        <button
+          type="button"
+          data-testid="literature-search-button"
+          onClick={onResearch}
+          disabled={!question.trim() || searching}
+          className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-elev disabled:opacity-50"
+        >
+          {searching ? "Searching…" : sources.length === 0 ? "Search now" : "Re-search"}
+        </button>
+      </div>
+      {allErrored && (
+        <div data-testid="literature-all-errored-banner" className="rounded-md border border-border bg-surface p-3 text-xs text-subtle">
+          <div className="font-semibold text-foreground">No literature sources answered this round.</div>
+          <ul className="mt-1 list-disc space-y-1 pl-4">
+            {sources.map((s) => (
+              <li key={s.sourceId} data-testid={`literature-error-line-${s.sourceId}`}>
+                <span className="font-mono text-foreground">{s.sourceId}</span> — {s.error}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div data-testid="literature-results-list" className="mt-1 flex max-h-[28rem] flex-col gap-3 overflow-y-auto pr-1">
+        {sources.map((src) => (
+          <div
+            key={src.sourceId}
+            data-testid={`literature-source-${src.sourceId}`}
+            className="rounded-md border border-border bg-surface p-2"
+          >
+            <div className="mb-2 flex items-center justify-between text-xs font-semibold text-subtle">
+              <span>{src.sourceId}</span>
+              <span>{src.error ? "error" : `${src.hits.length} hits`}</span>
+            </div>
+            {src.error && (
+              <div data-testid={`literature-source-${src.sourceId}-error`} className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-subtle">
+                <span className="mr-1 font-semibold text-foreground">Heads up:</span>
+                {src.error}
+              </div>
+            )}
+            <ul className="flex flex-col gap-2">
+              {src.hits.map((h) => {
+                const k = litHitKey(h);
+                const keep = kept[k] ?? true;
+                return (
+                  <li
+                    key={k}
+                    data-testid={`literature-hit-${k}`}
+                    className={`rounded-md border p-2 text-xs ${
+                      keep
+                        ? "border-accent bg-accent-soft text-accent-soft-fg"
+                        : "border-border bg-surface-elev"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        data-testid={`literature-hit-${k}-keep`}
+                        checked={keep}
+                        onChange={(e) =>
+                          setKept((prev) => ({ ...prev, [k]: e.target.checked }))
+                        }
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <a
+                          href={h.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          data-testid={`literature-hit-${k}-link`}
+                          className="font-semibold underline"
+                        >
+                          {h.title}
+                        </a>
+                        <div className="text-[11px] opacity-80">
+                          {[h.authors, h.year ? String(h.year) : null, h.citationCount != null ? `${h.citationCount} citations` : null]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </div>
+                        {h.summary && <div className="mt-1 leading-snug">{h.summary}</div>}
+                        {h.openAccessPdfUrl && (
+                          <a
+                            href={h.openAccessPdfUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 inline-block text-[11px] underline opacity-80"
+                          >
+                            open-access PDF
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+        {!searching && sources.length === 0 && (
+          <p data-testid="literature-empty-hint" className="text-xs text-subtle">
+            Literature search will run automatically once the orchestrator accepts your question.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProtocolsPane({
+  question,
+  searching,
+  sources,
+  kept,
+  setKept,
+  onResearch,
 }: {
   question: string;
   searching: boolean;
@@ -709,161 +1018,142 @@ function ProtocolsView({
   kept: Record<string, boolean>;
   setKept: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   onResearch: () => void;
-  onBack: () => void;
-  onFinalize: () => void;
-  finalizeStage: FinalizeStage;
 }) {
-  const finalizing = finalizeStage !== null;
+  const totalHits = sources.reduce((n, s) => n + s.hits.length, 0);
+  const keptCount = Object.values(kept).filter(Boolean).length;
+  const status = searching
+    ? "Searching configured sources…"
+    : sources.length === 0
+      ? "No protocols pulled yet."
+      : `${keptCount} kept of ${totalHits} found`;
+  const allErrored = sources.length > 0 && sources.every((s) => s.error);
+
   return (
-    <>
-      <div data-testid="protocols-question-display" className="rounded-lg border border-border bg-surface-elev p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1">
-            <div className="text-xs font-semibold uppercase tracking-wide text-subtle">
-              Research question
-            </div>
-            <div data-testid="protocols-question-text" className="mt-1 text-base font-semibold leading-snug">
-              {question || <span className="text-subtle">(none yet)</span>}
-            </div>
-          </div>
-          <button
-            type="button"
-            data-testid="protocols-back-button"
-            onClick={onBack}
-            disabled={finalizing}
-            className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface disabled:opacity-50"
-          >
-            ← Edit
-          </button>
-        </div>
-      </div>
-
-      <div data-testid="protocols-panel" className="rounded-lg border border-border bg-surface-elev p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold">Candidate protocols</div>
-            <div data-testid="protocols-status-text" className="text-xs text-subtle">
-              {searching
-                ? "Searching configured sources…"
-                : sources.length === 0
-                  ? "No search has been run yet for this question."
-                  : `${Object.values(kept).filter(Boolean).length} kept of ${sources.reduce((n, s) => n + s.hits.length, 0)} found`}
-            </div>
-          </div>
-          <button
-            type="button"
-            data-testid="protocols-search-button"
-            onClick={onResearch}
-            disabled={!question.trim() || searching || finalizing}
-            className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-elev disabled:opacity-50"
-          >
-            {searching ? "Searching…" : sources.length === 0 ? "Search now" : "Re-search"}
-          </button>
-        </div>
-        {sources.length > 0 && sources.every((s) => s.error) && (
-          <div data-testid="protocols-all-errored-banner" className="mt-3 rounded-md border border-status-pending bg-status-pending-soft p-3 text-xs text-foreground">
-            <div className="font-semibold">Every protocol source returned an error.</div>
-            <ul className="mt-1 list-disc space-y-1 pl-4">
-              {sources.map((s) => (
-                <li key={s.sourceId} data-testid={`protocols-error-line-${s.sourceId}`}>
-                  <span className="font-mono">{s.sourceId}</span>: {s.error}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-2">
-              You can still <span className="font-semibold">Finalize</span> below — the orchestrator
-              will draft the bench from your question alone.
-            </div>
-          </div>
-        )}
-        <div data-testid="protocols-results-list" className="mt-3 flex max-h-[36rem] flex-col gap-3 overflow-y-auto pr-1">
-          {sources.map((src) => (
-            <div
-              key={src.sourceId}
-              data-testid={`protocol-source-${src.sourceId}`}
-              className="rounded-md border border-border bg-surface p-2"
-            >
-              <div className="mb-2 flex items-center justify-between text-xs font-semibold text-subtle">
-                <span>{src.sourceId}</span>
-                <span>{src.error ? "error" : `${src.hits.length} hits`}</span>
-              </div>
-              {src.error && (
-                <p data-testid={`protocol-source-${src.sourceId}-error`} className="text-xs text-status-blocked">
-                  {src.error}
-                </p>
-              )}
-              <ul className="flex flex-col gap-2">
-                {src.hits.map((h) => {
-                  const k = hitKey(h);
-                  const keep = kept[k] ?? true;
-                  return (
-                    <li
-                      key={k}
-                      data-testid={`protocol-hit-${k}`}
-                      className={`rounded-md border p-2 text-xs ${
-                        keep
-                          ? "border-accent bg-accent-soft text-accent-soft-fg"
-                          : "border-border bg-surface-elev"
-                      }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          data-testid={`protocol-hit-${k}-keep`}
-                          checked={keep}
-                          onChange={(e) =>
-                            setKept((prev) => ({ ...prev, [k]: e.target.checked }))
-                          }
-                          className="mt-1"
-                          disabled={finalizing}
-                        />
-                        <div className="flex-1">
-                          <a
-                            href={h.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            data-testid={`protocol-hit-${k}-link`}
-                            className="font-semibold underline"
-                          >
-                            {h.title}
-                          </a>
-                          {h.authors && <div className="text-[11px] opacity-80">{h.authors}</div>}
-                          {h.description && (
-                            <div className="mt-1 leading-snug">{h.description}</div>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-          {!searching && sources.length === 0 && (
-            <p data-testid="protocols-empty-hint" className="text-xs text-subtle">
-              Click “Search now” to pull candidate protocols from the configured sources.
-              Skipping is fine — the orchestrator will draft the bench from the question alone.
-            </p>
-          )}
-        </div>
-      </div>
-
+    <div
+      data-testid="protocols-pane"
+      className="flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface-elev p-4"
+    >
       <div className="flex items-center justify-between">
-        <span data-testid="finalize-status" className="text-xs text-subtle">
-          {finalizeStage === "drafting" && "Preparing backend intake handoff…"}
-          {finalizeStage === "creating" && "Creating bench…"}
-        </span>
+        <div>
+          <div className="text-sm font-semibold">Candidate protocols</div>
+          <div data-testid="protocols-status-text" className="text-xs text-subtle">
+            {searching && <InlineSpinner />}{status}
+          </div>
+        </div>
         <button
           type="button"
-          data-testid="finalize-button"
-          onClick={onFinalize}
-          disabled={!question.trim() || finalizing}
-          className="rounded-md bg-accent-strong px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          data-testid="protocols-search-button"
+          onClick={onResearch}
+          disabled={!question.trim() || searching}
+          className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-elev disabled:opacity-50"
         >
-          {finalizing ? "Working…" : "Finalize → open bench"}
+          {searching ? "Searching…" : sources.length === 0 ? "Search now" : "Re-search"}
         </button>
       </div>
-    </>
+      {allErrored && (
+        <div data-testid="protocols-all-errored-banner" className="rounded-md border border-border bg-surface p-3 text-xs text-subtle">
+          <div className="font-semibold text-foreground">No protocol sources answered this round.</div>
+          <ul className="mt-1 list-disc space-y-1 pl-4">
+            {sources.map((s) => (
+              <li key={s.sourceId} data-testid={`protocols-error-line-${s.sourceId}`}>
+                <span className="font-mono text-foreground">{s.sourceId}</span> — {s.error}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div data-testid="protocols-results-list" className="mt-1 flex max-h-[28rem] flex-col gap-3 overflow-y-auto pr-1">
+        {sources.map((src) => (
+          <div
+            key={src.sourceId}
+            data-testid={`protocol-source-${src.sourceId}`}
+            className="rounded-md border border-border bg-surface p-2"
+          >
+            <div className="mb-2 flex items-center justify-between text-xs font-semibold text-subtle">
+              <span>{src.sourceId}</span>
+              <span>{src.error ? "error" : `${src.hits.length} hits`}</span>
+            </div>
+            {src.error && (
+              <div data-testid={`protocol-source-${src.sourceId}-error`} className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-subtle">
+                <span className="mr-1 font-semibold text-foreground">Heads up:</span>
+                {src.error}
+              </div>
+            )}
+            <ul className="flex flex-col gap-2">
+              {src.hits.map((h) => {
+                const k = hitKey(h);
+                const keep = kept[k] ?? true;
+                return (
+                  <li
+                    key={k}
+                    data-testid={`protocol-hit-${k}`}
+                    className={`rounded-md border p-2 text-xs ${
+                      keep
+                        ? "border-accent bg-accent-soft text-accent-soft-fg"
+                        : "border-border bg-surface-elev"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        data-testid={`protocol-hit-${k}-keep`}
+                        checked={keep}
+                        onChange={(e) =>
+                          setKept((prev) => ({ ...prev, [k]: e.target.checked }))
+                        }
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <a
+                          href={h.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          data-testid={`protocol-hit-${k}-link`}
+                          className="font-semibold underline"
+                        >
+                          {h.title}
+                        </a>
+                        {h.authors && <div className="text-[11px] opacity-80">{h.authors}</div>}
+                        {h.description && (
+                          <div className="mt-1 leading-snug">{h.description}</div>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+        {!searching && sources.length === 0 && (
+          <p data-testid="protocols-empty-hint" className="text-xs text-subtle">
+            Protocol search will run when the orchestrator suggests it.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ThinkingBubble() {
+  return (
+    <div data-testid="orchestrator-thinking" className="my-1 flex justify-start">
+      <div className="flex max-w-[85%] items-center gap-1.5 rounded-md bg-agent-bubble px-3 py-2 text-agent-bubble-fg">
+        <span className="bp-typing-dot h-1.5 w-1.5 rounded-full bg-current" style={{ animationDelay: "0ms" }} />
+        <span className="bp-typing-dot h-1.5 w-1.5 rounded-full bg-current" style={{ animationDelay: "150ms" }} />
+        <span className="bp-typing-dot h-1.5 w-1.5 rounded-full bg-current" style={{ animationDelay: "300ms" }} />
+        <span className="ml-1 text-xs opacity-70">orchestrator thinking…</span>
+      </div>
+    </div>
+  );
+}
+
+function InlineSpinner() {
+  return (
+    <span
+      aria-hidden
+      className="mr-1.5 inline-block h-3 w-3 animate-spin rounded-full border-[1.5px] border-current border-t-transparent align-[-2px]"
+    />
   );
 }
 
@@ -903,188 +1193,166 @@ function litHitKey(h: LiteratureHit): string {
   return `${h.sourceId}:${h.externalId}`;
 }
 
-function LiteratureView({
-  question,
-  searching,
-  sources,
-  kept,
-  setKept,
-  onResearch,
-  onBack,
-  onContinue,
-}: {
-  question: string;
-  searching: boolean;
-  sources: LiteratureSourceResult[];
-  kept: Record<string, boolean>;
-  setKept: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
-  onResearch: () => void;
-  onBack: () => void;
-  onContinue: () => void;
-}) {
-  const totalHits = sources.reduce((n, s) => n + s.hits.length, 0);
-  const keptCount = Object.values(kept).filter(Boolean).length;
-  return (
-    <>
-      <div data-testid="literature-question-display" className="rounded-lg border border-border bg-surface-elev p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1">
-            <div className="text-xs font-semibold uppercase tracking-wide text-subtle">
-              Research question
-            </div>
-            <div className="mt-1 text-base font-semibold leading-snug">
-              {question || <span className="text-subtle">(none yet)</span>}
-            </div>
-          </div>
-          <button
-            type="button"
-            data-testid="literature-back-button"
-            onClick={onBack}
-            className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface"
-          >
-            ← Edit
-          </button>
-        </div>
-      </div>
+// Action ids the orchestrator may surface as user-pressable buttons.
+// The orchestrator picks the relevant ones; the client knows how to
+// dispatch each one. Unknown ids are silently dropped.
+const ACTION_IDS = ["goto-protocols", "research-literature", "refine-question", "finalize"] as const;
+type ActionId = (typeof ACTION_IDS)[number];
 
-      <div data-testid="literature-panel" className="rounded-lg border border-border bg-surface-elev p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold">Related literature</div>
-            <div data-testid="literature-status-text" className="text-xs text-subtle">
-              {searching
-                ? "Searching configured sources…"
-                : sources.length === 0
-                  ? "No search has been run yet for this question."
-                  : `${keptCount} kept of ${totalHits} found`}
-            </div>
-          </div>
-          <button
-            type="button"
-            data-testid="literature-search-button"
-            onClick={onResearch}
-            disabled={!question.trim() || searching}
-            className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-elev disabled:opacity-50"
-          >
-            {searching ? "Searching…" : sources.length === 0 ? "Search now" : "Re-search"}
-          </button>
-        </div>
-        {sources.length > 0 && sources.every((s) => s.error) && (
-          <div data-testid="literature-all-errored-banner" className="mt-3 rounded-md border border-status-pending bg-status-pending-soft p-3 text-xs text-foreground">
-            <div className="font-semibold">Every literature source returned an error.</div>
-            <ul className="mt-1 list-disc space-y-1 pl-4">
-              {sources.map((s) => (
-                <li key={s.sourceId} data-testid={`literature-error-line-${s.sourceId}`}>
-                  <span className="font-mono">{s.sourceId}</span>: {s.error}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-2">
-              You can still continue to <span className="font-semibold">Protocols</span> below — the
-              orchestrator will draft the bench from your question alone if no references stick.
-            </div>
-          </div>
-        )}
-        <div data-testid="literature-results-list" className="mt-3 flex max-h-[36rem] flex-col gap-3 overflow-y-auto pr-1">
-          {sources.map((src) => (
-            <div
-              key={src.sourceId}
-              data-testid={`literature-source-${src.sourceId}`}
-              className="rounded-md border border-border bg-surface p-2"
-            >
-              <div className="mb-2 flex items-center justify-between text-xs font-semibold text-subtle">
-                <span>{src.sourceId}</span>
-                <span>{src.error ? "error" : `${src.hits.length} hits`}</span>
-              </div>
-              {src.error && (
-                <p data-testid={`literature-source-${src.sourceId}-error`} className="text-xs text-status-blocked">
-                  {src.error}
-                </p>
-              )}
-              <ul className="flex flex-col gap-2">
-                {src.hits.map((h) => {
-                  const k = litHitKey(h);
-                  const keep = kept[k] ?? true;
-                  return (
-                    <li
-                      key={k}
-                      data-testid={`literature-hit-${k}`}
-                      className={`rounded-md border p-2 text-xs ${
-                        keep
-                          ? "border-accent bg-accent-soft text-accent-soft-fg"
-                          : "border-border bg-surface-elev"
-                      }`}
-                    >
-                      <div className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          data-testid={`literature-hit-${k}-keep`}
-                          checked={keep}
-                          onChange={(e) =>
-                            setKept((prev) => ({ ...prev, [k]: e.target.checked }))
-                          }
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <a
-                            href={h.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            data-testid={`literature-hit-${k}-link`}
-                            className="font-semibold underline"
-                          >
-                            {h.title}
-                          </a>
-                          <div className="text-[11px] opacity-80">
-                            {[h.authors, h.year ? String(h.year) : null, h.citationCount != null ? `${h.citationCount} citations` : null]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </div>
-                          {h.summary && <div className="mt-1 leading-snug">{h.summary}</div>}
-                          {h.openAccessPdfUrl && (
-                            <a
-                              href={h.openAccessPdfUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-1 inline-block text-[11px] underline opacity-80"
-                            >
-                              open-access PDF
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-          {!searching && sources.length === 0 && (
-            <p data-testid="literature-empty-hint" className="text-xs text-subtle">
-              Click &ldquo;Search now&rdquo; to pull related papers from Semantic Scholar.
-              Skipping is fine — you can still finalize without references.
-            </p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex justify-end">
-        <button
-          type="button"
-          data-testid="continue-to-protocols-from-literature-button"
-          onClick={onContinue}
-          disabled={!question.trim()}
-          className="rounded-md bg-accent-strong px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          Continue → Protocols
-        </button>
-      </div>
-    </>
-  );
+interface OrchestratorAction {
+  id: ActionId;
+  label: string;
+  primary?: boolean;
 }
 
-function extractRevisedQuestion(text: string): string | null {
-  const match = /Revised question:\s*([^\n]+)/i.exec(text);
-  if (!match) return null;
-  return match[1].trim().replace(/^["“”']|["“”']$/g, "").trim();
+// Structured envelope every orchestrator chat turn returns. The
+// orchestrator is instructed to reply with a single fenced JSON block
+// of this shape; we render `display` in the chat bubble, the buttons
+// from `actions`, and use the other fields to drive flow.
+interface OrchestratorEnvelope {
+  display: string;
+  revisedQuestion?: string;
+  acceptedQuestion?: string;
+  verdict?: Verdict;
+  actions: OrchestratorAction[];
 }
+
+const FENCED_JSON_BLOCK = /```(?:json)?\s*\n([\s\S]*?)```/;
+
+// Shared envelope schema string interpolated into every prompt so the
+// LLM sees the exact shape we expect, including the action enum it can
+// pick from. Keep this in sync with `OrchestratorEnvelope` and
+// `ACTION_IDS` above.
+const ENVELOPE_SCHEMA = [
+  "Reply with ONLY a single fenced JSON code block matching this shape:",
+  "",
+  "```json",
+  "{",
+  '  "display": "Short conversational reply the user sees in the chat (markdown allowed). Always end with one short sentence asking the user what to do next, phrasing the choices in plain English that mirrors the button LABELS — never write the action `id` strings (like `goto-protocols`) in this field.",',
+  '  "revisedQuestion": "(optional) the full revised question if you suggest a concrete edit",',
+  '  "acceptedQuestion": "(optional) the final question text — set this ONLY when the framing is sharp enough to ground a literature and protocol search and no further refinement is needed. Setting it auto-fires literature search.",',
+  '  "verdict": "(optional) one of `novel`, `crowded`, `adjacent` — only set after weighing literature hits",',
+  '  "actions": [',
+  '    { "id": "<action id>", "label": "<button label the user sees>", "primary": true|false }',
+  "  ]",
+  "}",
+  "```",
+  "",
+  "Allowed `actions[].id` values:",
+  '- "goto-protocols" — pulls candidate protocols inline (right column)',
+  '- "research-literature" — re-fires the literature search for the current question',
+  '- "refine-question" — collapses the right column so the user can type a refinement next',
+  '- "finalize" — finalizes the bench and opens the workbench page',
+  "",
+  "The `actions` you list ARE the buttons the user can press. The question in `display`",
+  "must offer exactly the same choices as the buttons (and Send is always available for",
+  "free-form replies — do not list it as an action).",
+].join("\n");
+
+function buildRefinementPrompt(input: {
+  currentDraft: string;
+  userMessage: string;
+  accepted: boolean;
+  verdict: Verdict | null;
+}): string {
+  const stageNote = input.accepted
+    ? `The question is currently marked accepted${input.verdict ? ` with verdict \`${input.verdict}\`` : ""}. The user is replying after seeing the literature.`
+    : "The user is still iterating on the question — no literature search has fired yet.";
+  return [
+    `The user is iterating on their research question. Current draft: "${input.currentDraft}".`,
+    stageNote,
+    "",
+    `User says: ${input.userMessage}`,
+    "",
+    ENVELOPE_SCHEMA,
+  ].join("\n");
+}
+
+function buildVerdictPrompt(input: { question: string; summary: string }): string {
+  return [
+    `The user accepted this research question: "${input.question}"`,
+    "",
+    "Top literature hits we found:",
+    input.summary,
+    "",
+    "Decide novelty: exactly one of `novel`, `crowded`, or `adjacent` —",
+    "where `novel` means no prior work directly addresses this question, `crowded` means it",
+    "has been done many times already, and `adjacent` means similar work exists but there is",
+    "a clear angle.",
+    "",
+    "After your verdict, ask the user whether they want to refine the question further or",
+    "move on to protocol search, and surface BOTH choices as buttons in `actions`:",
+    '- a `refine-question` button (label like "Refine the question")',
+    '- a `goto-protocols` button (label like "Search for protocols", set `primary: true`)',
+    "",
+    ENVELOPE_SCHEMA,
+  ].join("\n");
+}
+
+function buildProtocolsFollowupPrompt(input: { question: string; summary: string }): string {
+  return [
+    `The user just pulled candidate protocols for the research question: "${input.question}"`,
+    "",
+    "Top protocol hits we found:",
+    input.summary,
+    "",
+    "Briefly comment on the protocol coverage in one short sentence (e.g., do the hits look",
+    "directly applicable, partial, or off-target?), then ask the user whether they want to",
+    "finalize the bench now or refine the question first. Surface BOTH choices as buttons",
+    "in `actions`:",
+    '- a `refine-question` button (label like "Refine the question")',
+    '- a `finalize` button (label like "Finalize the bench", set `primary: true`)',
+    "",
+    ENVELOPE_SCHEMA,
+  ].join("\n");
+}
+
+function parseOrchestratorEnvelope(text: string): OrchestratorEnvelope {
+  // Try a fenced JSON block first; fall back to a bare JSON object;
+  // last resort, treat the whole reply as the display text so the
+  // chat doesn't go silent if the model forgets the format.
+  const fenced = FENCED_JSON_BLOCK.exec(text);
+  const candidate = fenced ? fenced[1].trim() : null;
+  const bare = !candidate && text.trim().startsWith("{") && text.trim().endsWith("}")
+    ? text.trim()
+    : null;
+  const raw = candidate ?? bare;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as Partial<OrchestratorEnvelope> & {
+        actions?: Array<{ id?: string; label?: string; primary?: boolean }>;
+      };
+      return {
+        display: String(parsed.display ?? "").trim() || text.trim(),
+        revisedQuestion: parsed.revisedQuestion?.toString().trim() || undefined,
+        acceptedQuestion: parsed.acceptedQuestion?.toString().trim() || undefined,
+        verdict: parsed.verdict && ["novel", "crowded", "adjacent"].includes(parsed.verdict)
+          ? (parsed.verdict as Verdict)
+          : undefined,
+        actions: normalizeActions(parsed.actions),
+      };
+    } catch {
+      // fall through
+    }
+  }
+  return { display: text.trim(), actions: [] };
+}
+
+function normalizeActions(raw: unknown): OrchestratorAction[] {
+  if (!Array.isArray(raw)) return [];
+  const out: OrchestratorAction[] = [];
+  for (const entry of raw) {
+    const obj = (entry ?? {}) as { id?: unknown; label?: unknown; primary?: unknown };
+    const id = typeof obj.id === "string" ? obj.id : "";
+    const label = typeof obj.label === "string" ? obj.label.trim() : "";
+    if (!label || !ACTION_IDS.includes(id as ActionId)) continue;
+    out.push({ id: id as ActionId, label, primary: obj.primary === true });
+  }
+  return out;
+}
+
+const VERDICT_LABEL: Record<Verdict, string> = {
+  novel: "Great hypothesis — nobody has done this yet.",
+  crowded: "This research question is already widely covered.",
+  adjacent: "Adjacent work exists, but there's a clear angle.",
+};

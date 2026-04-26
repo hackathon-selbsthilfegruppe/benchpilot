@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { Markdown } from "../../../markdown";
 import { getBenchpilotBackendEndpoint } from "@/lib/benchpilot-backend";
+import { AutoPrint } from "./auto-print";
 
 interface ExportResource {
   id: string;
@@ -54,7 +55,7 @@ export default async function BenchPrintPage({
   if (!bundle) notFound();
 
   return (
-    <html>
+    <html lang="en">
       <head>
         <title>{bundle.bench.title} — BenchPilot plan</title>
         <style>{`
@@ -126,7 +127,7 @@ export default async function BenchPrintPage({
           </section>
         ))}
 
-        <script dangerouslySetInnerHTML={{ __html: "setTimeout(() => window.print(), 400);" }} />
+        <AutoPrint />
       </body>
     </html>
   );

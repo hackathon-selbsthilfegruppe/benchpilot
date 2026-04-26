@@ -159,6 +159,7 @@ function createFakeBootstrapService(): SessionBootstrapService {
       sessions.set(session.id, session);
       return session;
     },
+    dispose: async (sessionId) => sessions.delete(sessionId),
   };
 }
 

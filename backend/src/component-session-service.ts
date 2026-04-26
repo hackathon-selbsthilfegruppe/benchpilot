@@ -10,6 +10,7 @@ import { WorkspaceStore } from "./workspace-store.js";
 export interface SessionBootstrapService {
   list(): SessionSummary[];
   createStandbySession(role: RoleDefinition): Promise<SessionSummary>;
+  dispose(sessionId: string): Promise<boolean>;
 }
 
 export class ComponentSessionService {
@@ -68,6 +69,18 @@ export class ComponentSessionService {
       return null;
     }
     return this.pool.list().find((session) => session.id === existingId) ?? null;
+  }
+
+  // Drop the cached session for this component and dispose it from
+  // the pool. Used at intake finalize so the bench-side orchestrator
+  // gets a fresh session — the intake JSON-envelope chatter never
+  // bleeds into the bench page's chat history.
+  async releaseComponentSession(benchId: string, componentInstanceId: string): Promise<void> {
+    const key = `${benchId}:${componentInstanceId}`;
+    const existingId = this.componentSessionIds.get(key);
+    if (!existingId) return;
+    this.componentSessionIds.delete(key);
+    await this.pool.dispose(existingId);
   }
 
   async createTaskRunSession(task: TaskMetadata): Promise<SessionSummary> {

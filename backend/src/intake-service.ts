@@ -307,8 +307,20 @@ export class IntakeService {
     });
 
     const finalizedBench = await this.store.updateBench(update.bench.id, { status: "active" });
+
+    // Compress the intake conversation: drop the orchestrator session
+    // we used during intake so the bench page bootstraps a fresh one
+    // (no JSON envelopes in the visible chat history). The bench's
+    // resources, summaries, and TOCs carry the context forward — the
+    // orchestrator picks it up by reading them.
+    await this.componentSessionService.releaseComponentSession(
+      finalizedBench.id,
+      orchestratorComponent.id,
+    );
+
     const finalizedBrief = intakeBriefSchema.parse({
       ...update.brief,
+      orchestratorSessionId: undefined,
       status: "finalized",
       updatedAt: new Date().toISOString(),
       finalizedAt: new Date().toISOString(),

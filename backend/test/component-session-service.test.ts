@@ -242,5 +242,6 @@ function createFakeBootstrapService(create: (role: RoleDefinition) => SessionSum
       sessions.set(session.id, session);
       return session;
     },
+    dispose: async (sessionId) => sessions.delete(sessionId),
   };
 }
