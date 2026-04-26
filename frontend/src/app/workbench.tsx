@@ -1025,12 +1025,14 @@ function ComponentStrip({
         <span className="shrink-0 rounded-sm bg-accent-soft-fg/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent-soft-fg group-hover:bg-white/20 group-hover:text-white">
           Hypothesis
         </span>
-        <span className="shrink-0 text-sm font-semibold text-accent-soft-fg group-hover:text-white">
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-accent-soft-fg group-hover:text-white">
           {hypothesis.name}
         </span>
-        <span className="min-w-0 flex-1 truncate text-xs text-accent-soft-fg/80 group-hover:text-white/85">
-          {hypothesis.summary}
-        </span>
+        {hypothesis.summary && hypothesis.summary !== hypothesis.name && (
+          <span className="min-w-0 flex-1 truncate text-xs text-accent-soft-fg/80 group-hover:text-white/85">
+            {hypothesis.summary}
+          </span>
+        )}
         {inboundOpen > 0 && (
           <span
             title={`${inboundOpen} open inbound task${inboundOpen === 1 ? "" : "s"}`}
