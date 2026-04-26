@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { benchIdSchema } from "./bench.js";
 import { componentInstanceIdSchema } from "./component.js";
+import { logger as rootLogger } from "./logger.js";
 import { createTask, taskMetadataSchema, taskStatusSchema, type TaskMetadata, type TaskStatus } from "./task.js";
 import type { ComponentSessionService } from "./component-session-service.js";
 import { parseComponentWriteActor } from "./write-actor.js";
@@ -39,6 +40,8 @@ export const completeTaskRequestSchema = z.object({
 }).strict();
 
 export class TaskService {
+  private readonly logger = rootLogger.child({ scope: "task_service" });
+
   constructor(
     private readonly store: WorkspaceStore,
     private readonly componentSessionService?: ComponentSessionService,
@@ -47,6 +50,13 @@ export class TaskService {
   async createTask(input: unknown): Promise<TaskMetadata> {
     const request = createTaskRequestSchema.parse(input);
     const actor = parseComponentWriteActor(request.actor);
+    this.logger.info("task.create.requested", {
+      benchId: request.actor.benchId,
+      fromComponentInstanceId: request.fromComponentInstanceId,
+      toComponentInstanceId: request.toComponentInstanceId,
+      title: request.title,
+      request: request.request,
+    });
 
     if (actor.benchId !== request.actor.benchId) {
       throw new WorkspaceValidationError("Task actor benchId mismatch");
@@ -76,12 +86,31 @@ export class TaskService {
     );
 
     await this.store.writeTask(task);
+    this.logger.info("task.created", {
+      taskId: task.id,
+      benchId: task.benchId,
+      fromComponentInstanceId: task.fromComponentInstanceId,
+      toComponentInstanceId: task.toComponentInstanceId,
+      status: task.status,
+      title: task.title,
+    });
 
     if (!this.componentSessionService) {
+      this.logger.info("task.awaiting_manual_dispatch", {
+        taskId: task.id,
+        benchId: task.benchId,
+        toComponentInstanceId: task.toComponentInstanceId,
+      });
       return task;
     }
 
     const taskSession = await this.componentSessionService.createTaskRunSession(task);
+    this.logger.info("task.session_created", {
+      taskId: task.id,
+      benchId: task.benchId,
+      taskSessionId: taskSession.id,
+      toComponentInstanceId: task.toComponentInstanceId,
+    });
     const runningTask = taskMetadataSchema.parse({
       ...task,
       status: "running",
@@ -89,6 +118,13 @@ export class TaskService {
       updatedAt: new Date().toISOString(),
     });
     await this.store.writeTask(runningTask);
+    this.logger.info("task.state_changed", {
+      taskId: runningTask.id,
+      benchId: runningTask.benchId,
+      fromStatus: task.status,
+      toStatus: runningTask.status,
+      taskSessionId: runningTask.taskSessionId,
+    });
     return runningTask;
   }
 
@@ -97,28 +133,61 @@ export class TaskService {
     const status = options.status ? taskStatusSchema.parse(options.status) : undefined;
 
     if (options.componentInstanceId) {
-      return this.store.listTasks(benchId, componentInstanceIdSchema.parse(options.componentInstanceId), status);
+      const componentInstanceId = componentInstanceIdSchema.parse(options.componentInstanceId);
+      const tasks = await this.store.listTasks(benchId, componentInstanceId, status);
+      this.logger.info("task.list.completed", {
+        benchId,
+        componentInstanceId,
+        status: status ?? null,
+        count: tasks.length,
+      });
+      return tasks;
     }
 
     const components = await this.store.listComponents(benchId);
     const tasks = await Promise.all(
       components.map((component) => this.store.listTasks(benchId, component.id, status)),
     );
-    return tasks.flat().sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const flattened = tasks.flat().sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    this.logger.info("task.list.completed", {
+      benchId,
+      componentInstanceId: null,
+      status: status ?? null,
+      count: flattened.length,
+    });
+    return flattened;
   }
 
   async getTask(taskId: string, benchId: string): Promise<TaskMetadata> {
     const tasks = await this.listTasks({ benchId });
     const task = tasks.find((entry) => entry.id === taskId);
     if (!task) {
+      this.logger.warn("task.get.not_found", {
+        taskId,
+        benchId,
+      });
       throw new WorkspaceNotFoundError(`Task not found: ${taskId}`);
     }
+    this.logger.info("task.get.found", {
+      taskId,
+      benchId,
+      toComponentInstanceId: task.toComponentInstanceId,
+      status: task.status,
+    });
     return taskMetadataSchema.parse(task);
   }
 
   async completeTask(taskId: string, input: unknown): Promise<TaskMetadata> {
     const request = completeTaskRequestSchema.parse(input);
     const actor = parseComponentWriteActor(request.actor);
+    this.logger.info("task.complete.requested", {
+      taskId,
+      benchId: request.benchId,
+      actorComponentInstanceId: actor.componentInstanceId,
+      resultResourceId: request.resultResourceId ?? null,
+      createdResourceIds: request.createdResourceIds,
+      modifiedResourceIds: request.modifiedResourceIds,
+    });
     if (actor.benchId !== request.benchId) {
       throw new WorkspaceValidationError("Task completion actor benchId mismatch");
     }
@@ -140,11 +209,26 @@ export class TaskService {
       completedAt: timestamp,
     });
     await this.store.writeTask(completed);
+    this.logger.info("task.state_changed", {
+      taskId: completed.id,
+      benchId: completed.benchId,
+      fromStatus: task.status,
+      toStatus: completed.status,
+      resultResourceId: completed.resultResourceId ?? null,
+      createdResourceIds: completed.createdResourceIds,
+      modifiedResourceIds: completed.modifiedResourceIds,
+    });
     return completed;
   }
 
   async getTaskResult(taskId: string, benchId: string) {
     const task = await this.getTask(taskId, benchId);
+    this.logger.info("task.result.read", {
+      taskId: task.id,
+      benchId,
+      status: task.status,
+      resultResourceId: task.resultResourceId ?? null,
+    });
     return {
       taskId: task.id,
       status: task.status,
