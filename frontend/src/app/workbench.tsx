@@ -92,6 +92,9 @@ export default function Workbench({
   const [activeTool, setActiveTool] = useState<Record<ChatId, ToolActivity | undefined>>({});
   const [sessionsByRoleId, setSessionsByRoleId] = useState<Record<string, BenchpilotSessionSummary>>({});
   const backendTaskSnapshotsRef = useRef<Record<string, BackendTaskActivitySnapshot>>({});
+  const componentsRef = useRef(initialComponents);
+  const supportingRef = useRef(initialSupporting);
+  const hypothesisRef = useRef(hypothesis);
   const [theme, setTheme] = useState<Theme>("dark");
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
@@ -126,6 +129,22 @@ export default function Workbench({
       localStorage.setItem("theme", theme);
     } catch {}
   }, [theme]);
+
+  useEffect(() => {
+    componentsRef.current = components;
+  }, [components]);
+
+  useEffect(() => {
+    supportingRef.current = supporting;
+  }, [supporting]);
+
+  useEffect(() => {
+    hypothesisRef.current = hypothesisState;
+  }, [hypothesisState]);
+
+  useEffect(() => {
+    backendTaskSnapshotsRef.current = {};
+  }, [backendBenchId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,7 +247,12 @@ export default function Workbench({
       try {
         const backendTasks = await listBackendTasks({ benchId });
         if (cancelled) return;
-        const projected = applyBackendTasksToWorkbench(components, supporting, hypothesisState, backendTasks);
+        const projected = applyBackendTasksToWorkbench(
+          componentsRef.current,
+          supportingRef.current,
+          hypothesisRef.current,
+          backendTasks,
+        );
         const componentNames = buildComponentNameLookup(projected.components, projected.supporting, projected.hypothesis, backendOrchestratorComponentId);
         const activity = buildBackendTaskActivityMessages(
           backendTaskSnapshotsRef.current,
@@ -262,7 +286,7 @@ export default function Workbench({
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [backendBenchId]);
+  }, [backendBenchId, backendOrchestratorComponentId]);
 
   async function send(chatId: ChatId, text: string) {
     if (!text.trim()) return;
