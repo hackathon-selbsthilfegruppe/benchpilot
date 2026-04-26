@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BenchPilot — Tech Stack & Quality Gate</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+  }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    padding: 2rem;
+    line-height: 1.5;
+  }
+  header { margin-bottom: 1.5rem; }
+  h1 { margin: 0 0 0.25rem; font-size: 1.7rem; }
+  h2 { font-size: 1.15rem; margin: 2rem 0 0.75rem; color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: 0.9rem; }
+  .diagram-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    overflow: auto;
+  }
+  .mermaid { min-width: 1100px; }
+  footer { color: var(--muted); font-size: 0.8rem; margin-top: 1.5rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<header>
+  <h1>BenchPilot — Tech Stack &amp; Quality Gate</h1>
+  <div class="subtitle">Request flow · Data &amp; exports · Quality gate</div>
+</header>
+
+<h2>1 · Request flow — front end, back end, two paths to Claude</h2>
+<div class="diagram-card">
+<pre class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif",
+    "primaryColor": "#161b22",
+    "primaryTextColor": "#e6edf3",
+    "primaryBorderColor": "#30363d",
+    "lineColor": "#58a6ff",
+    "secondaryColor": "#21262d",
+    "tertiaryColor": "#0d1117",
+    "clusterBkg": "#0d1117",
+    "clusterBorder": "#30363d"
+  },
+  "flowchart": { "curve": "basis", "htmlLabels": true, "padding": 14 }
+}}%%
+flowchart LR
+    User(["🧑‍🔬 Scientist<br/><sub>browser</sub>"]):::actor
+
+    subgraph FE["🖥️ Frontend &nbsp;·&nbsp; Next.js 16 App Router"]
+        direction TB
+        FEUI["React 19 + Tailwind v4"]:::feCore
+        FEAPI["app/api/*/route.ts"]:::feApi
+        FEChat["app/api/chat<br/><sub>spawns <code>claude -p</code></sub>"]:::feChat
+        FEUI --> FEAPI
+        FEUI --> FEChat
+    end
+
+    subgraph BE["⚙️ Backend &nbsp;·&nbsp; Node 20 + Express 5"]
+        direction TB
+        BECore["TypeScript services<br/><sub>bench · component · workspace-store</sub>"]:::beCore
+        BEPi["session-pool<br/><sub>@mariozechner/pi-coding-agent</sub>"]:::bePi
+        BECore --> BEPi
+    end
+
+    ClaudeCLI(["✨ <code>claude</code> CLI"]):::ai
+    PiAgent(["✨ pi agent loop<br/><sub>streaming · tools · compaction</sub>"]):::ai
+    Anthro[("Anthropic API")]:::ext
+
+    User -- "HTTPS" --> FEUI
+    FEAPI -- "fetch JSON / SSE" --> BECore
+    BECore -- "stream events" --> FEAPI
+
+    FEChat -- "child_process.spawn" --> ClaudeCLI
+    BEPi -- "createAgentSession" --> PiAgent
+    ClaudeCLI -. "Anthropic API" .-> Anthro
+    PiAgent -. "Anthropic API" .-> Anthro
+
+    classDef actor   fill:#1f2937,stroke:#9ca3af,stroke-width:2px,color:#f3f4f6
+    classDef ai      fill:#3b1f5e,stroke:#a371f7,stroke-width:2px,color:#e9d5ff
+    classDef feCore  fill:#0c2a4a,stroke:#58a6ff,stroke-width:2px,color:#cfe7ff
+    classDef feApi   fill:#0c3a52,stroke:#39d0d8,stroke-width:2px,color:#cdf2f5
+    classDef feChat  fill:#1f2a52,stroke:#bc8cff,stroke-width:2px,color:#e3d3ff
+    classDef beCore  fill:#0e3320,stroke:#56d364,stroke-width:2px,color:#d0f0d6
+    classDef bePi    fill:#1a3d2a,stroke:#7ee787,stroke-width:2px,color:#d6f5d6
+    classDef ext     fill:#3a2c0d,stroke:#d29922,stroke-width:2px,color:#f5deb0
+
+    style FE fill:#0d1f33,stroke:#58a6ff,stroke-width:2px,color:#cfe7ff,rx:12,ry:12
+    style BE fill:#0d2418,stroke:#56d364,stroke-width:2px,color:#d0f0d6,rx:12,ry:12
+</pre>
+</div>
+
+<h2>2 · Data pipelines, storage &amp; exports</h2>
+<div class="diagram-card">
+<pre class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif",
+    "primaryColor": "#161b22",
+    "primaryTextColor": "#e6edf3",
+    "primaryBorderColor": "#30363d",
+    "lineColor": "#56d364",
+    "clusterBkg": "#0d1117",
+    "clusterBorder": "#30363d"
+  },
+  "flowchart": { "curve": "basis", "htmlLabels": true, "padding": 14 }
+}}%%
+flowchart LR
+    BECore["⚙️ Backend services"]:::beCore
+
+    subgraph PIPE["🧪 Pipelines"]
+        direction TB
+        BEProto["Protocol pipeline<br/><sub>bioschemas · JATS · protocols.io · Crossref · MediaWiki</sub>"]:::beAdapter
+        BELit["Literature pipeline<br/><sub>Semantic Scholar</sub>"]:::beAdapter
+        BEZod["Validation<br/><sub>zod · fast-xml-parser · pdf-parse</sub>"]:::beUtil
+        BEProto --> BEZod
+        BELit --> BEZod
+    end
+
+    subgraph EXT["🌐 External APIs"]
+        direction TB
+        ProtocolsIO[("protocols.io")]:::ext
+        Crossref[("Crossref")]:::ext
+        OWW[("OpenWetWare")]:::ext
+        S2[("Semantic Scholar")]:::ext
+    end
+
+    subgraph STORE["💾 Storage"]
+        direction TB
+        WS["workspace/<br/><sub>per-hypothesis FS</sub>"]:::store
+        SESS[".benchpilot/sessions<br/><sub>pi session store</sub>"]:::store
+    end
+
+    subgraph EXP["📤 Exports"]
+        direction TB
+        ExpPDF["PDF<br/><sub>printable hypothesis report</sub>"]:::export
+        ExpJSON["JSON<br/><sub>full hypothesis snapshot</sub>"]:::export
+    end
+
+    BECore --> BEProto
+    BECore --> BELit
+    BEProto --> ProtocolsIO
+    BEProto --> Crossref
+    BEProto --> OWW
+    BELit --> S2
+    BECore --> WS
+    BECore --> SESS
+    BECore --> ExpPDF
+    BECore --> ExpJSON
+
+    classDef beCore    fill:#0e3320,stroke:#56d364,stroke-width:2px,color:#d0f0d6
+    classDef beAdapter fill:#13402a,stroke:#3fb950,stroke-width:1.5px,color:#c4ecce
+    classDef beUtil    fill:#16321f,stroke:#2ea043,stroke-width:1px,color:#bfe5c7
+    classDef ext       fill:#3a2c0d,stroke:#d29922,stroke-width:2px,color:#f5deb0
+    classDef store     fill:#3d1f25,stroke:#f85149,stroke-width:2px,color:#fbcad0
+    classDef export    fill:#2c1f3d,stroke:#d2a8ff,stroke-width:2px,color:#e9d5ff
+
+    style PIPE fill:#0d2418,stroke:#56d364,stroke-width:2px,color:#d0f0d6,rx:12,ry:12
+    style EXT fill:#2a200a,stroke:#d29922,stroke-width:1.5px,color:#f5deb0,rx:12,ry:12
+    style STORE fill:#2a141a,stroke:#f85149,stroke-width:1.5px,color:#fbcad0,rx:12,ry:12
+    style EXP fill:#1f1633,stroke:#d2a8ff,stroke-width:1.5px,color:#e9d5ff,rx:12,ry:12
+</pre>
+</div>
+
+<h2>3 · Quality gate</h2>
+<div class="diagram-card">
+<pre class="mermaid">
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif",
+    "primaryColor": "#161b22",
+    "primaryTextColor": "#e6edf3",
+    "primaryBorderColor": "#30363d",
+    "lineColor": "#bc8cff",
+    "clusterBkg": "#0d1117",
+    "clusterBorder": "#30363d"
+  },
+  "flowchart": { "curve": "basis", "htmlLabels": true, "padding": 14 }
+}}%%
+flowchart LR
+    Dev(["👩‍💻 Developer"]):::actor
+
+    subgraph QG["🛠️ scripts/quality/quality-check.sh"]
+        direction TB
+        Modes["Modes<br/><sub>--quick · --full · --report · --all</sub>"]:::mode
+        Runner["Runner<br/><sub>run_capture · emit_check · reclassify_last</sub>"]:::core
+        Modes --> Runner
+    end
+
+    subgraph CHK["✔️ Checks"]
+        direction TB
+        TC["Typecheck"]:::check
+        Lint["ESLint 9"]:::check
+        Test["Vitest + RTL + axe"]:::check
+        Cov["Coverage v8"]:::check
+        Audit["npm audit"]:::check
+        Build["Build"]:::check
+        CPD["jscpd · fails on clones"]:::checkFail
+        Knip["knip · informational"]:::check
+    end
+
+    subgraph OUT["📊 Outputs"]
+        direction TB
+        Data[".local/quality-data/data.js"]:::out
+        Dash["dashboard.html"]:::out
+        Log[".local/quality-check.log"]:::out
+    end
+
+    Dev --> Modes
+    Runner --> TC
+    Runner --> Lint
+    Runner --> Test
+    Test --> Cov
+    Runner --> Audit
+    Runner --> Build
+    Runner --> CPD
+    Runner --> Knip
+    Runner --> Data
+    Runner --> Log
+    Data --> Dash
+
+    classDef actor   fill:#1f2937,stroke:#9ca3af,stroke-width:2px,color:#f3f4f6
+    classDef mode    fill:#352a4a,stroke:#bc8cff,stroke-width:2px,color:#e3d3ff
+    classDef core    fill:#2a214a,stroke:#a371f7,stroke-width:2px,color:#e9d5ff
+    classDef check   fill:#1e2a3d,stroke:#79c0ff,stroke-width:1.5px,color:#cfe7ff
+    classDef checkFail fill:#3d1f25,stroke:#f85149,stroke-width:2px,color:#fbcad0
+    classDef out     fill:#0e3320,stroke:#56d364,stroke-width:1.5px,color:#d0f0d6
+
+    style QG fill:#1d1c2c,stroke:#bc8cff,stroke-width:2px,color:#e3d3ff,rx:12,ry:12
+    style CHK fill:#0d1f33,stroke:#58a6ff,stroke-width:2px,color:#cfe7ff,rx:12,ry:12
+    style OUT fill:#0d2418,stroke:#56d364,stroke-width:2px,color:#d0f0d6,rx:12,ry:12
+</pre>
+</div>
+
+<footer>
+  Sources: <a href="tech-stack.mermaid">tech-stack.mermaid</a> · <a href="quality-gate.mermaid">quality-gate.mermaid</a> · render: mermaid 10
+</footer>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "base" });
+</script>
+</body>
+</html>

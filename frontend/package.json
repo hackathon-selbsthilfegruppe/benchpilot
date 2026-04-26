@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:install": "playwright install --with-deps chromium",
-    "e2e:screencast": "E2E_MODE=screencast playwright test demo-scientist"
+    "e2e:screencast": "E2E_MODE=screencast playwright test demo-scientist",
+    "e2e:architecture": "E2E_SUITE=architecture E2E_MODE=screencast playwright test architecture-screencast"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

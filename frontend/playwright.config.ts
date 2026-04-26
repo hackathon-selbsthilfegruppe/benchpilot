@@ -9,6 +9,11 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [["list"]],
+  // Architecture screencast needs a fresh quality-gate dashboard data file.
+  // The setup checks for .local/quality-data/data.js and runs quality-check.sh
+  // if it's missing. Gated on E2E_SUITE=architecture so the scientist demo
+  // doesn't pay this cost.
+  globalSetup: require.resolve("./e2e/architecture.global-setup"),
   // Per-test budget. The screencast budget is generous because the
   // spec waits for one real LLM round-trip (the finalize template
   // draft); every other beat resolves on a deterministic UI signal

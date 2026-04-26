@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BenchPilot — Data, storage & exports</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 1.5rem 2.5rem; box-sizing: border-box;
+    overflow: hidden;
+  }
+  h2 { color: #56d364; font-size: 1.3rem; margin: 0 0 1rem; letter-spacing: 0.3px; }
+  .mermaid {
+    width: 100%; max-width: 1500px;
+    flex: 1 1 auto; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mermaid svg { max-width: 100% !important; max-height: 70vh !important; width: auto !important; height: auto !important; }
+</style>
+</head>
+<body>
+<h2>Data pipelines, storage &amp; exports</h2>
+<pre class="mermaid">
+%%{init: { "theme": "base", "themeVariables": { "fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "primaryColor": "#161b22", "primaryTextColor": "#e6edf3", "primaryBorderColor": "#30363d", "lineColor": "#56d364", "clusterBkg": "#0d1117", "clusterBorder": "#30363d" }, "flowchart": { "curve": "basis", "htmlLabels": true, "padding": 14 } }}%%
+flowchart LR
+    BECore["⚙️ Backend services"]:::beCore
+
+    subgraph PIPE["🧪 Pipelines"]
+        direction TB
+        BEProto["Protocol pipeline<br/><sub>bioschemas · JATS · protocols.io · Crossref · MediaWiki</sub>"]:::beAdapter
+        BELit["Literature pipeline<br/><sub>Semantic Scholar</sub>"]:::beAdapter
+        BEZod["Validation<br/><sub>zod · fast-xml-parser · pdf-parse</sub>"]:::beUtil
+        BEProto --> BEZod
+        BELit --> BEZod
+    end
+
+    subgraph EXT["🌐 External APIs"]
+        direction TB
+        ProtocolsIO[("protocols.io")]:::ext
+        Crossref[("Crossref")]:::ext
+        OWW[("OpenWetWare")]:::ext
+        S2[("Semantic Scholar")]:::ext
+    end
+
+    subgraph STORE["💾 Storage"]
+        direction TB
+        WS["workspace/<br/><sub>per-hypothesis FS</sub>"]:::store
+        SESS[".benchpilot/sessions<br/><sub>pi session store</sub>"]:::store
+    end
+
+    subgraph EXP["📤 Exports"]
+        direction TB
+        ExpPDF["PDF<br/><sub>printable hypothesis report</sub>"]:::export
+        ExpJSON["JSON<br/><sub>full hypothesis snapshot</sub>"]:::export
+    end
+
+    BECore --> BEProto
+    BECore --> BELit
+    BEProto --> ProtocolsIO
+    BEProto --> Crossref
+    BEProto --> OWW
+    BELit --> S2
+    BECore --> WS
+    BECore --> SESS
+    BECore --> ExpPDF
+    BECore --> ExpJSON
+
+    classDef beCore    fill:#0e3320,stroke:#56d364,stroke-width:2px,color:#d0f0d6
+    classDef beAdapter fill:#13402a,stroke:#3fb950,stroke-width:1.5px,color:#c4ecce
+    classDef beUtil    fill:#16321f,stroke:#2ea043,stroke-width:1px,color:#bfe5c7
+    classDef ext       fill:#3a2c0d,stroke:#d29922,stroke-width:2px,color:#f5deb0
+    classDef store     fill:#3d1f25,stroke:#f85149,stroke-width:2px,color:#fbcad0
+    classDef export    fill:#2c1f3d,stroke:#d2a8ff,stroke-width:2px,color:#e9d5ff
+
+    style PIPE fill:#0d2418,stroke:#56d364,stroke-width:2px,color:#d0f0d6,rx:12,ry:12
+    style EXT fill:#2a200a,stroke:#d29922,stroke-width:1.5px,color:#f5deb0,rx:12,ry:12
+    style STORE fill:#2a141a,stroke:#f85149,stroke-width:1.5px,color:#fbcad0,rx:12,ry:12
+    style EXP fill:#1f1633,stroke:#d2a8ff,stroke-width:1.5px,color:#e9d5ff,rx:12,ry:12
+</pre>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "base" });
+</script>
+</body>
+</html>

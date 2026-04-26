@@ -8,10 +8,10 @@
 #
 # Modes:
 #   --quick     Typecheck + lint only (fast — used by pre-commit).
-#   --full      Default. Typecheck + lint + tests + jscpd + knip on
-#               both workspaces.
+#   --full      Typecheck + lint + tests + jscpd + knip on both workspaces.
 #   --report    Same checks as --full + coverage + audit. Never fails.
-#   --all       Full + coverage + audit + build. Slowest standard mode.
+#   --all       Default. Full + coverage + audit + build. Always opens the
+#               HTML dashboard (use --no-open to suppress).
 #
 # Scope:
 #   --backend           Backend workspace only.
@@ -55,7 +55,7 @@ else
 fi
 
 # ─── Defaults ─────────────────────────────────────────────────────────────────
-MODE="full"
+MODE="all"
 BACKEND=true
 FRONTEND=true
 RUN_TYPECHECK=""
@@ -68,7 +68,7 @@ RUN_CPD=""
 RUN_DEADCODE=""
 RUN_A11Y=""
 RUN_E2E=""
-HTML=false
+HTML=true
 OPEN_HTML=true
 
 while (( "$#" )); do

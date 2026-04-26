@@ -1,0 +1,71 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif",
+    "primaryColor": "#161b22",
+    "primaryTextColor": "#e6edf3",
+    "primaryBorderColor": "#30363d",
+    "lineColor": "#bc8cff",
+    "secondaryColor": "#21262d",
+    "tertiaryColor": "#0d1117",
+    "clusterBkg": "#0d1117",
+    "clusterBorder": "#30363d"
+  },
+  "flowchart": { "curve": "basis", "htmlLabels": true, "padding": 14 }
+}}%%
+flowchart LR
+    Dev(["👩‍💻 Developer<br/><sub>local · pre-commit · CI</sub>"]):::actor
+
+    subgraph QG["🛠️ Quality gate &nbsp;·&nbsp; scripts/quality/quality-check.sh"]
+        direction TB
+        Modes["Modes<br/><sub>--quick · --full · --report · --all</sub>"]:::mode
+        Runner["Runner<br/><sub>run_capture · emit_check · reclassify_last</sub>"]:::core
+        Modes --> Runner
+    end
+
+    subgraph CHK["✔️ Checks"]
+        direction TB
+        TC["Typecheck<br/><sub>tsc --noEmit · backend + frontend</sub>"]:::check
+        Lint["ESLint 9<br/><sub>eslint-config-next + jsx-a11y</sub>"]:::check
+        Test["Vitest<br/><sub>backend + frontend · RTL · axe-core</sub>"]:::check
+        Cov["Coverage v8<br/><sub>--coverage.reporter=json-summary</sub>"]:::check
+        Audit["npm audit<br/><sub>fails on high/critical</sub>"]:::check
+        Build["Build<br/><sub>next build · tsc -p</sub>"]:::check
+        CPD["jscpd<br/><sub>copy-paste · fails on clones</sub>"]:::checkFail
+        Knip["knip<br/><sub>dead code · informational</sub>"]:::check
+        A11y["axe + RTL<br/><sub>opt-in subset</sub>"]:::check
+        E2E["Playwright<br/><sub>opt-in · needs dev stack</sub>"]:::check
+    end
+
+    subgraph OUT["📊 Outputs"]
+        direction TB
+        Data[".local/quality-data/data.js<br/><sub>structured check results</sub>"]:::out
+        Dash["scripts/quality/dashboard.html<br/><sub>sticky header · KPIs · dark mode</sub>"]:::out
+        Log[".local/quality-check.log<br/><sub>full per-check stdout</sub>"]:::out
+    end
+
+    Dev --> Modes
+    Runner --> TC
+    Runner --> Lint
+    Runner --> Test
+    Test --> Cov
+    Runner --> Audit
+    Runner --> Build
+    Runner --> CPD
+    Runner --> Knip
+    Runner --> A11y
+    Runner --> E2E
+    Runner --> Data
+    Runner --> Log
+    Data --> Dash
+
+    classDef actor   fill:#1f2937,stroke:#9ca3af,stroke-width:2px,color:#f3f4f6
+    classDef mode    fill:#352a4a,stroke:#bc8cff,stroke-width:2px,color:#e3d3ff
+    classDef core    fill:#2a214a,stroke:#a371f7,stroke-width:2px,color:#e9d5ff
+    classDef check   fill:#1e2a3d,stroke:#79c0ff,stroke-width:1.5px,color:#cfe7ff
+    classDef checkFail fill:#3d1f25,stroke:#f85149,stroke-width:2px,color:#fbcad0
+    classDef out     fill:#0e3320,stroke:#56d364,stroke-width:1.5px,color:#d0f0d6
+
+    style QG fill:#1d1c2c,stroke:#bc8cff,stroke-width:2px,color:#e3d3ff,rx:12,ry:12
+    style CHK fill:#0d1f33,stroke:#58a6ff,stroke-width:2px,color:#cfe7ff,rx:12,ry:12
+    style OUT fill:#0d2418,stroke:#56d364,stroke-width:2px,color:#d0f0d6,rx:12,ry:12

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BenchPilot — Request flow</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 1.5rem 2.5rem; box-sizing: border-box;
+    overflow: hidden;
+  }
+  h2 { color: #58a6ff; font-size: 1.3rem; margin: 0 0 1rem; letter-spacing: 0.3px; }
+  .mermaid {
+    width: 100%; max-width: 1500px;
+    flex: 1 1 auto; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mermaid svg { max-width: 100% !important; max-height: 70vh !important; width: auto !important; height: auto !important; }
+</style>
+</head>
+<body>
+<h2>Request flow — front end, back end, two paths to Claude</h2>
+<pre class="mermaid">
+%%{init: { "theme": "base", "themeVariables": { "fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "primaryColor": "#161b22", "primaryTextColor": "#e6edf3", "primaryBorderColor": "#30363d", "lineColor": "#58a6ff", "clusterBkg": "#0d1117", "clusterBorder": "#30363d" }, "flowchart": { "curve": "basis", "htmlLabels": true, "padding": 14 } }}%%
+flowchart LR
+    User(["🧑‍🔬 Scientist<br/><sub>browser</sub>"]):::actor
+
+    subgraph FE["🖥️ Frontend &nbsp;·&nbsp; Next.js 16 App Router"]
+        direction TB
+        FEUI["React 19 + Tailwind v4"]:::feCore
+        FEAPI["app/api/*/route.ts"]:::feApi
+        FEUI --> FEAPI
+    end
+
+    subgraph BE["⚙️ Backend &nbsp;·&nbsp; Node 20 + Express 5"]
+        direction TB
+        BECore["TypeScript services<br/><sub>bench · component · workspace-store</sub>"]:::beCore
+        BEPi["session-pool<br/><sub>@mariozechner/pi-coding-agent</sub>"]:::bePi
+        BECore --> BEPi
+    end
+
+    PiAgent(["✨ pi agent loop<br/><sub>streaming · tools · compaction</sub>"]):::ai
+    LLM[("LLM<br/><sub>provider-agnostic — configured per session</sub>")]:::ext
+
+    User -- "HTTPS" --> FEUI
+    FEAPI -- "fetch JSON / SSE" --> BECore
+    BECore -- "stream events" --> FEAPI
+    BEPi -- "createAgentSession" --> PiAgent
+    PiAgent -. "chat completions" .-> LLM
+
+    classDef actor   fill:#1f2937,stroke:#9ca3af,stroke-width:2px,color:#f3f4f6
+    classDef ai      fill:#3b1f5e,stroke:#a371f7,stroke-width:2px,color:#e9d5ff
+    classDef feCore  fill:#0c2a4a,stroke:#58a6ff,stroke-width:2px,color:#cfe7ff
+    classDef feApi   fill:#0c3a52,stroke:#39d0d8,stroke-width:2px,color:#cdf2f5
+    classDef beCore  fill:#0e3320,stroke:#56d364,stroke-width:2px,color:#d0f0d6
+    classDef bePi    fill:#1a3d2a,stroke:#7ee787,stroke-width:2px,color:#d6f5d6
+    classDef ext     fill:#3a2c0d,stroke:#d29922,stroke-width:2px,color:#f5deb0
+
+    style FE fill:#0d1f33,stroke:#58a6ff,stroke-width:2px,color:#cfe7ff,rx:12,ry:12
+    style BE fill:#0d2418,stroke:#56d364,stroke-width:2px,color:#d0f0d6,rx:12,ry:12
+</pre>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "base" });
+</script>
+</body>
+</html>

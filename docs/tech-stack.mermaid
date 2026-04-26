@@ -1,0 +1,105 @@
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif",
+    "primaryColor": "#161b22",
+    "primaryTextColor": "#e6edf3",
+    "primaryBorderColor": "#30363d",
+    "lineColor": "#58a6ff",
+    "secondaryColor": "#21262d",
+    "tertiaryColor": "#0d1117",
+    "clusterBkg": "#0d1117",
+    "clusterBorder": "#30363d"
+  },
+  "flowchart": { "curve": "basis", "htmlLabels": true, "padding": 14 }
+}}%%
+flowchart LR
+    User(["🧑‍🔬 Scientist<br/><sub>browser</sub>"]):::actor
+
+    subgraph FE["🖥️ Frontend &nbsp;·&nbsp; Next.js 16 App Router"]
+        direction TB
+        FEUI["React 19 + Tailwind v4<br/><sub>app/ · components · lib</sub>"]:::feCore
+        FEAPI["Route handlers<br/><sub>app/api/*/route.ts</sub>"]:::feApi
+        FEChat["app/api/chat<br/><sub>spawns <code>claude -p</code> CLI<br/>orchestrator chat</sub>"]:::feChat
+        FEUI --> FEAPI
+        FEUI --> FEChat
+    end
+
+    subgraph BE["⚙️ Backend &nbsp;·&nbsp; Node.js 20 + Express 5"]
+        direction TB
+        BECore["TypeScript services<br/><sub>bench · component · workspace-store</sub>"]:::beCore
+        BEPi["session-pool<br/><sub>@mariozechner/pi-coding-agent<br/>per-component agent sessions</sub>"]:::bePi
+        BEProto["Protocol pipeline<br/><sub>bioschemas · JATS · protocols.io · Crossref · MediaWiki</sub>"]:::beAdapter
+        BELit["Literature pipeline<br/><sub>Semantic Scholar</sub>"]:::beAdapter
+        BEZod["Validation<br/><sub>zod · fast-xml-parser · pdf-parse</sub>"]:::beUtil
+        BECore --> BEPi
+        BECore --> BEProto
+        BECore --> BELit
+        BEProto --> BEZod
+        BELit --> BEZod
+    end
+
+    ClaudeCLI(["✨ <code>claude</code> CLI<br/><sub>spawned per chat request</sub>"]):::ai
+    PiAgent(["✨ pi agent loop<br/><sub>streaming · tools · compaction</sub>"]):::ai
+
+    subgraph EXT["🌐 External APIs"]
+        direction TB
+        ProtocolsIO[("protocols.io")]:::ext
+        Crossref[("Crossref")]:::ext
+        OWW[("OpenWetWare<br/>MediaWiki")]:::ext
+        S2[("Semantic Scholar")]:::ext
+        Anthro[("Anthropic API")]:::ext
+    end
+
+    subgraph STORE["💾 Storage"]
+        direction TB
+        WS["workspace/<br/><sub>per-hypothesis FS<br/>components · tasks · index</sub>"]:::store
+        SESS[".benchpilot/sessions<br/><sub>pi session store</sub>"]:::store
+    end
+
+    subgraph EXP["📤 Exports"]
+        direction TB
+        ExpPDF["PDF<br/><sub>printable hypothesis report</sub>"]:::export
+        ExpJSON["JSON<br/><sub>full hypothesis snapshot</sub>"]:::export
+    end
+
+    User -- "HTTPS" --> FEUI
+    FEAPI -- "fetch JSON / SSE" --> BECore
+    BECore -- "stream events" --> FEAPI
+
+    FEChat -- "child_process.spawn" --> ClaudeCLI
+    BEPi -- "createAgentSession" --> PiAgent
+
+    ClaudeCLI -. "Anthropic API" .-> Anthro
+    PiAgent -. "Anthropic API" .-> Anthro
+
+    BEProto --> ProtocolsIO
+    BEProto --> Crossref
+    BEProto --> OWW
+    BELit --> S2
+
+    BECore --> WS
+    FEAPI --> WS
+    BEPi --> SESS
+
+    FEUI --> ExpPDF
+    FEUI --> ExpJSON
+
+    classDef actor      fill:#1f2937,stroke:#9ca3af,stroke-width:2px,color:#f3f4f6
+    classDef ai         fill:#3b1f5e,stroke:#a371f7,stroke-width:2px,color:#e9d5ff
+    classDef feCore     fill:#0c2a4a,stroke:#58a6ff,stroke-width:2px,color:#cfe7ff
+    classDef feApi      fill:#0c3a52,stroke:#39d0d8,stroke-width:2px,color:#cdf2f5
+    classDef feChat     fill:#1f2a52,stroke:#bc8cff,stroke-width:2px,color:#e3d3ff
+    classDef beCore     fill:#0e3320,stroke:#56d364,stroke-width:2px,color:#d0f0d6
+    classDef bePi       fill:#1a3d2a,stroke:#7ee787,stroke-width:2px,color:#d6f5d6
+    classDef beAdapter  fill:#13402a,stroke:#3fb950,stroke-width:1.5px,color:#c4ecce
+    classDef beUtil     fill:#16321f,stroke:#2ea043,stroke-width:1px,color:#bfe5c7
+    classDef ext        fill:#3a2c0d,stroke:#d29922,stroke-width:2px,color:#f5deb0
+    classDef store      fill:#3d1f25,stroke:#f85149,stroke-width:2px,color:#fbcad0
+    classDef export     fill:#2c1f3d,stroke:#d2a8ff,stroke-width:2px,color:#e9d5ff
+
+    style FE fill:#0d1f33,stroke:#58a6ff,stroke-width:2px,color:#cfe7ff,rx:12,ry:12
+    style BE fill:#0d2418,stroke:#56d364,stroke-width:2px,color:#d0f0d6,rx:12,ry:12
+    style EXT fill:#2a200a,stroke:#d29922,stroke-width:1.5px,color:#f5deb0,rx:12,ry:12
+    style STORE fill:#2a141a,stroke:#f85149,stroke-width:1.5px,color:#fbcad0,rx:12,ry:12
+    style EXP fill:#1f1633,stroke:#d2a8ff,stroke-width:1.5px,color:#e9d5ff,rx:12,ry:12
