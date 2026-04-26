@@ -7,8 +7,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createBench } from "../src/bench.js";
 import { createComponentInstance } from "../src/component.js";
 import { type TaskMetadata } from "../src/task.js";
-import { TaskDispatcher } from "../src/task-dispatcher.js";
+import { evaluateTaskTimeout, TaskDispatcher } from "../src/task-dispatcher.js";
 import { TaskService } from "../src/task-service.js";
+import {
+  DEFAULT_TASK_TIMEOUT_POLICY,
+  type TaskTimeoutPolicy,
+} from "../src/task-timeout-policy.js";
 import { WorkspaceStore } from "../src/workspace-store.js";
 
 const tempDirs: string[] = [];
@@ -347,5 +351,309 @@ describe("task dispatcher", () => {
     expect(stored.failureKind).toBe("prompt_error");
     expect(stored.failureMessage).toBe("budget session failed");
     expect(stored.resultText).toBeUndefined();
+  });
+
+  it("fails inactive running tasks with inactivity_timeout via the watchdog scan", async () => {
+    const baseDir = await mkdtemp(path.join(os.tmpdir(), "benchpilot-task-dispatcher-inactivity-"));
+    tempDirs.push(baseDir);
+
+    const store = new WorkspaceStore(baseDir);
+    const bench = createBench({
+      title: "CRP biosensor",
+      question: "Can we build a paper-based electrochemical biosensor for CRP?",
+    });
+    const sender = createComponentInstance({
+      benchId: bench.id,
+      presetId: "orchestrator",
+      name: "Orchestrator — CRP biosensor",
+      summary: "Coordinates the bench.",
+    });
+    const target = createComponentInstance({
+      benchId: bench.id,
+      presetId: "literature",
+      name: "Literature — CRP biosensor",
+      summary: "Tracks prior work and novelty.",
+      toolMode: "read-only",
+    });
+
+    await store.writeBench(bench);
+    await store.writeComponent(sender);
+    await store.writeComponent(target);
+
+    const taskService = new TaskService(store, {
+      createTaskRunSession: async (task: TaskMetadata) => ({
+        id: `task-session-${task.id}`,
+        role: {
+          id: `${task.toComponentInstanceId}-${task.id}`,
+          name: `${task.toComponentInstanceId} Task Run`,
+          description: "Task-run session",
+          instructions: "task prompt",
+          cwd: "/tmp/task-run",
+          toolMode: "read-only",
+        },
+        cwd: "/tmp/task-run",
+        status: "idle",
+        createdAt: "2026-04-25T19:20:00.000Z",
+      }),
+    } as any);
+
+    const task = await taskService.createTask({
+      actor: {
+        benchId: bench.id,
+        componentInstanceId: sender.id,
+        presetId: "orchestrator",
+      },
+      fromComponentInstanceId: sender.id,
+      toComponentInstanceId: target.id,
+      title: "Stalled review",
+      request: "Review without responding.",
+    });
+
+    // Simulate a task whose dispatch already ran but never produced events
+    await taskService.startTaskExecution(task.id, bench.id);
+
+    const policy: TaskTimeoutPolicy = {
+      runtimeTimeoutMs: 60_000,
+      inactivityTimeoutMs: 100,
+      maxAttempts: 2,
+    };
+
+    const promptCalls: string[] = [];
+    const dispatcher = new TaskDispatcher(
+      store,
+      taskService,
+      {
+        prompt: async (sessionId) => {
+          promptCalls.push(sessionId);
+        },
+      },
+      {
+        policy,
+        // Advance "now" by 1s past the inactivity threshold
+        now: () => new Date(Date.now() + 1_000),
+      },
+    );
+
+    const dispatched = await dispatcher.dispatchRunnableTasksOnce();
+    // Already-started tasks are not picked up again because executionStartedAt is set
+    expect(dispatched).toEqual([]);
+
+    const stored = await store.readTask(bench.id, target.id, task.id);
+    expect(stored.status).toBe("error");
+    expect(stored.failureKind).toBe("inactivity_timeout");
+    expect(stored.failureMessage).toMatch(/no activity/);
+    expect(promptCalls).toHaveLength(0);
+  });
+
+  it("fails tasks past the runtime budget with runtime_timeout", async () => {
+    const baseDir = await mkdtemp(path.join(os.tmpdir(), "benchpilot-task-dispatcher-runtime-"));
+    tempDirs.push(baseDir);
+
+    const store = new WorkspaceStore(baseDir);
+    const bench = createBench({
+      title: "CRP biosensor",
+      question: "Can we build a paper-based electrochemical biosensor for CRP?",
+    });
+    const sender = createComponentInstance({
+      benchId: bench.id,
+      presetId: "orchestrator",
+      name: "Orchestrator — CRP biosensor",
+      summary: "Coordinates the bench.",
+    });
+    const target = createComponentInstance({
+      benchId: bench.id,
+      presetId: "literature",
+      name: "Literature — CRP biosensor",
+      summary: "Tracks prior work and novelty.",
+      toolMode: "read-only",
+    });
+
+    await store.writeBench(bench);
+    await store.writeComponent(sender);
+    await store.writeComponent(target);
+
+    const taskService = new TaskService(store, {
+      createTaskRunSession: async (task: TaskMetadata) => ({
+        id: `task-session-${task.id}`,
+        role: {
+          id: `${task.toComponentInstanceId}-${task.id}`,
+          name: `${task.toComponentInstanceId} Task Run`,
+          description: "Task-run session",
+          instructions: "task prompt",
+          cwd: "/tmp/task-run",
+          toolMode: "read-only",
+        },
+        cwd: "/tmp/task-run",
+        status: "idle",
+        createdAt: "2026-04-25T19:20:00.000Z",
+      }),
+    } as any);
+
+    const task = await taskService.createTask({
+      actor: {
+        benchId: bench.id,
+        componentInstanceId: sender.id,
+        presetId: "orchestrator",
+      },
+      fromComponentInstanceId: sender.id,
+      toComponentInstanceId: target.id,
+      title: "Long running",
+      request: "Take forever.",
+    });
+    await taskService.startTaskExecution(task.id, bench.id);
+    // Pretend the task has been "active" recently but exceeded total runtime
+    await taskService.recordTaskActivity(task.id, bench.id);
+
+    const policy: TaskTimeoutPolicy = {
+      runtimeTimeoutMs: 50,
+      inactivityTimeoutMs: 60_000,
+      maxAttempts: 2,
+    };
+
+    const dispatcher = new TaskDispatcher(
+      store,
+      taskService,
+      {
+        prompt: async () => {
+          throw new Error("should not be called");
+        },
+      },
+      {
+        policy,
+        now: () => new Date(Date.now() + 5_000),
+      },
+    );
+
+    await dispatcher.dispatchRunnableTasksOnce();
+
+    const stored = await store.readTask(bench.id, target.id, task.id);
+    expect(stored.status).toBe("error");
+    expect(stored.failureKind).toBe("runtime_timeout");
+  });
+
+  it("does not re-fail already errored tasks", async () => {
+    const baseDir = await mkdtemp(path.join(os.tmpdir(), "benchpilot-task-dispatcher-idempotent-"));
+    tempDirs.push(baseDir);
+
+    const store = new WorkspaceStore(baseDir);
+    const bench = createBench({
+      title: "CRP biosensor",
+      question: "Can we build a paper-based electrochemical biosensor for CRP?",
+    });
+    const sender = createComponentInstance({
+      benchId: bench.id,
+      presetId: "orchestrator",
+      name: "Orchestrator — CRP biosensor",
+      summary: "Coordinates the bench.",
+    });
+    const target = createComponentInstance({
+      benchId: bench.id,
+      presetId: "literature",
+      name: "Literature — CRP biosensor",
+      summary: "Tracks prior work and novelty.",
+      toolMode: "read-only",
+    });
+    await store.writeBench(bench);
+    await store.writeComponent(sender);
+    await store.writeComponent(target);
+
+    const taskService = new TaskService(store, {
+      createTaskRunSession: async (task: TaskMetadata) => ({
+        id: `task-session-${task.id}`,
+        role: {
+          id: `${task.toComponentInstanceId}-${task.id}`,
+          name: `${task.toComponentInstanceId} Task Run`,
+          description: "Task-run session",
+          instructions: "task prompt",
+          cwd: "/tmp/task-run",
+          toolMode: "read-only",
+        },
+        cwd: "/tmp/task-run",
+        status: "idle",
+        createdAt: "2026-04-25T19:20:00.000Z",
+      }),
+    } as any);
+
+    const task = await taskService.createTask({
+      actor: {
+        benchId: bench.id,
+        componentInstanceId: sender.id,
+        presetId: "orchestrator",
+      },
+      fromComponentInstanceId: sender.id,
+      toComponentInstanceId: target.id,
+      title: "Already errored",
+      request: "Already errored.",
+    });
+    await taskService.failTask(task.id, bench.id, "prompt_error", "boom");
+    const beforeUpdatedAt = (await store.readTask(bench.id, target.id, task.id)).updatedAt;
+
+    const dispatcher = new TaskDispatcher(
+      store,
+      taskService,
+      {
+        prompt: async () => {
+          /* unused */
+        },
+      },
+    );
+
+    await dispatcher.dispatchRunnableTasksOnce();
+
+    const after = await store.readTask(bench.id, target.id, task.id);
+    expect(after.status).toBe("error");
+    expect(after.failureKind).toBe("prompt_error");
+    expect(after.updatedAt).toBe(beforeUpdatedAt);
+  });
+});
+
+describe("evaluateTaskTimeout", () => {
+  const policy = DEFAULT_TASK_TIMEOUT_POLICY;
+  const baseTask = {
+    id: "task-1",
+    benchId: "bench-1",
+    fromComponentInstanceId: "from-1",
+    toComponentInstanceId: "to-1",
+    title: "T",
+    request: "R",
+    attemptCount: 1,
+    createdResourceIds: [],
+    modifiedResourceIds: [],
+    createdAt: "2026-04-26T08:00:00.000Z",
+    updatedAt: "2026-04-26T08:00:00.000Z",
+  } as const;
+
+  it("returns null for non-running tasks", () => {
+    expect(evaluateTaskTimeout({ ...baseTask, status: "pending" }, Date.now(), policy)).toBeNull();
+  });
+
+  it("flags runtime timeouts", () => {
+    const verdict = evaluateTaskTimeout(
+      {
+        ...baseTask,
+        status: "running",
+        taskSessionId: "task-run-1",
+        executionStartedAt: "2026-04-26T08:00:00.000Z",
+        lastActivityAt: "2026-04-26T08:00:00.000Z",
+      },
+      Date.parse("2026-04-26T08:00:00.000Z") + policy.runtimeTimeoutMs + 1,
+      policy,
+    );
+    expect(verdict?.kind).toBe("runtime_timeout");
+  });
+
+  it("flags inactivity timeouts", () => {
+    const verdict = evaluateTaskTimeout(
+      {
+        ...baseTask,
+        status: "running",
+        taskSessionId: "task-run-1",
+        executionStartedAt: "2026-04-26T08:00:00.000Z",
+        lastActivityAt: "2026-04-26T08:00:00.000Z",
+      },
+      Date.parse("2026-04-26T08:00:00.000Z") + policy.inactivityTimeoutMs + 1,
+      policy,
+    );
+    expect(verdict?.kind).toBe("inactivity_timeout");
   });
 });

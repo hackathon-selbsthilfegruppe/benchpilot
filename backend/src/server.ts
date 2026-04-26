@@ -11,6 +11,7 @@ import { logger } from "./logger.js";
 import { SessionPool } from "./session-pool.js";
 import { TaskDispatcher } from "./task-dispatcher.js";
 import { TaskService } from "./task-service.js";
+import { getTaskTimeoutPolicyFromEnv } from "./task-timeout-policy.js";
 import { WorkspaceStore } from "./workspace-store.js";
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -24,7 +25,9 @@ const benchMaterializationService = new BenchMaterializationService(workspaceSto
 const componentSessionService = new ComponentSessionService(pool, benchReadService, workspaceStore, projectRoot);
 const intakeService = new IntakeService(workspaceStore, benchMaterializationService, benchReadService, componentSessionService);
 const taskService = new TaskService(workspaceStore, componentSessionService);
-const taskDispatcher = new TaskDispatcher(workspaceStore, taskService, pool);
+const taskDispatcher = new TaskDispatcher(workspaceStore, taskService, pool, {
+  policy: getTaskTimeoutPolicyFromEnv(),
+});
 const taskDispatchEnabled = process.env.BENCHPILOT_TASK_DISPATCH_ENABLED?.trim().toLowerCase() !== "false";
 const taskDispatchIntervalMs = Number(process.env.BENCHPILOT_TASK_DISPATCH_INTERVAL_MS ?? 2000);
 const app = createApp(
