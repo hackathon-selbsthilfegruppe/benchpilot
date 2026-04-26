@@ -37,10 +37,10 @@ It also reduces pressure to invent custom tool integrations too early.
 
 ## Candidate child issues
 
-- CLI command layout
-- JSON output contract
-- backend API client for CLI
-- smoke tests through `bash`
+- `06_001` cli skeleton and backend endpoint resolution
+- `06_002` bench requirement component and resource read commands
+- `06_003` task cli commands for create poll and result
+- `06_004` cli smoke tests and json contract verification
 
 ## Exit criteria
 
