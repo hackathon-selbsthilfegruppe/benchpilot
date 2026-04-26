@@ -488,44 +488,17 @@ function AppHeader({
 }) {
   return (
     <header className="flex items-center gap-3 border-b border-border bg-surface px-6 py-3">
-      <BenchPilotLogo />
-      <div className="flex flex-col leading-tight">
-        <span className="text-sm font-semibold tracking-wide text-foreground">
-          BenchPilot
-        </span>
-        <span className="text-[10px] uppercase tracking-wider text-subtle">
-          a bench for scientific engineers
-        </span>
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/benchpilot-logo.svg"
+        alt="BenchPilot — protocol generation engine"
+        className="h-10 w-auto"
+      />
       <div className="ml-auto flex items-center gap-3">
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
         <ProfileBadge />
       </div>
     </header>
-  );
-}
-
-function BenchPilotLogo() {
-  return (
-    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-accent bg-accent-soft text-accent-soft-fg">
-      <svg
-        viewBox="0 0 24 24"
-        width="18"
-        height="18"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden
-      >
-        <path d="M4 4v12a4 4 0 0 0 4 4h8a4 4 0 0 0 4-4V4" />
-        <path d="M4 4h16" />
-        <path d="M9 4v6" />
-        <path d="M15 4v6" />
-        <circle cx="12" cy="14" r="2" />
-      </svg>
-    </span>
   );
 }
 

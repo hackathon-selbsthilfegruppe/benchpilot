@@ -226,7 +226,13 @@ export default function Start({
   return (
     <div data-testid="start-page" className="flex min-h-screen flex-col bg-background text-foreground">
       <header data-testid="start-header" className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-6 py-3">
-        <span className="text-sm font-semibold">BenchPilot — start</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/benchpilot-logo.svg"
+          alt="BenchPilot"
+          data-testid="benchpilot-logo"
+          className="h-10 w-auto"
+        />
         <div data-testid="step-tabs" className="ml-3 flex items-center gap-1 rounded-md border border-border-strong bg-surface p-0.5 text-xs">
           <StepButton testId="step-tab-hypothesis" active={step === "hypothesis"} onClick={() => setStep("hypothesis")}>
             1. Hypothesis
