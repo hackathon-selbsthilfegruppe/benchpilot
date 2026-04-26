@@ -1,9 +1,11 @@
+import { Buffer } from "node:buffer";
 import type { Server } from "node:http";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createApp, type SessionService } from "../src/app.js";
 import type { BenchReadService } from "../src/bench-read-service.js";
+import type { BenchWriteService } from "../src/bench-write-service.js";
 import type { RoleDefinition, SessionSummary, StreamEnvelope } from "../src/types.js";
 
 const createdServers: Server[] = [];
@@ -454,6 +456,101 @@ describe("createApp", () => {
       },
     });
   });
+
+  it("creates resources through the bench write service", async () => {
+    const benchWriteService = createFakeBenchWriteService({
+      createResource: async () => ({
+        id: "manual-notes",
+        benchId: "bench-crp-biosensor",
+        componentInstanceId: "literature-crp-biosensor",
+        producedByComponentInstanceId: "literature-crp-biosensor",
+        title: "Manual notes",
+        kind: "lab-note",
+        description: "Markdown notes for later browsing.",
+        summary: "Notes about the experimental setup.",
+        tags: [],
+        files: [
+          {
+            filename: "notes.md",
+            mediaType: "text/markdown",
+            description: "Primary markdown notes",
+            role: "primary",
+          },
+        ],
+        primaryFile: "notes.md",
+        contentType: "text/markdown",
+        supportsRequirementIds: [],
+        derivedFromResourceIds: [],
+        status: "ready",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:10:00.000Z",
+      }),
+    });
+
+    const response = await request(
+      createApp(createFakePool({}), undefined, benchWriteService),
+      "/api/benches/bench-crp-biosensor/components/literature-crp-biosensor/resources",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          actor: {
+            benchId: "bench-crp-biosensor",
+            componentInstanceId: "literature-crp-biosensor",
+            presetId: "literature",
+          },
+          resource: {
+            benchId: "bench-crp-biosensor",
+            componentInstanceId: "literature-crp-biosensor",
+            title: "Manual notes",
+            kind: "lab-note",
+            description: "Markdown notes for later browsing.",
+            summary: "Notes about the experimental setup.",
+          },
+          files: [
+            {
+              filename: "notes.md",
+              mediaType: "text/markdown",
+              description: "Primary markdown notes",
+              role: "primary",
+              contentBase64: Buffer.from("# Notes\nhello", "utf8").toString("base64"),
+            },
+          ],
+          primaryFilename: "notes.md",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      resource: {
+        id: "manual-notes",
+        benchId: "bench-crp-biosensor",
+        componentInstanceId: "literature-crp-biosensor",
+        producedByComponentInstanceId: "literature-crp-biosensor",
+        title: "Manual notes",
+        kind: "lab-note",
+        description: "Markdown notes for later browsing.",
+        summary: "Notes about the experimental setup.",
+        tags: [],
+        files: [
+          {
+            filename: "notes.md",
+            mediaType: "text/markdown",
+            description: "Primary markdown notes",
+            role: "primary",
+          },
+        ],
+        primaryFile: "notes.md",
+        contentType: "text/markdown",
+        supportsRequirementIds: [],
+        derivedFromResourceIds: [],
+        status: "ready",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:10:00.000Z",
+      },
+    });
+  });
 });
 
 function createFakePool(overrides: Partial<SessionService>): SessionService {
@@ -486,6 +583,15 @@ function createFakeBenchReadService(overrides: Partial<BenchReadService>): Bench
     },
     ...overrides,
   } satisfies BenchReadService;
+}
+
+function createFakeBenchWriteService(overrides: Partial<BenchWriteService>): BenchWriteService {
+  return {
+    createResource: async () => {
+      throw new Error("missing createResource");
+    },
+    ...overrides,
+  } as BenchWriteService;
 }
 
 function createSessionSummary(role: RoleDefinition): SessionSummary {

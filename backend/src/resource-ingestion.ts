@@ -61,7 +61,7 @@ export const resourceIngestionFileSchema = z.object({
 
 export type ResourceIngestionFile = z.infer<typeof resourceIngestionFileSchema>;
 
-const resourceIngestionMetadataSchema = createResourceInputSchema.omit({
+export const resourceIngestionMetadataSchema = createResourceInputSchema.omit({
   files: true,
   primaryFile: true,
   contentType: true,

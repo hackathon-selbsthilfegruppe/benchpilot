@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { RoleDefinition, SessionSummary, StreamEnvelope } from "./types.js";
 import { WorkspaceNotFoundError } from "./workspace-store.js";
 import type { BenchReadService } from "./bench-read-service.js";
+import type { BenchWriteService } from "./bench-write-service.js";
 import {
   fetchProtocolIo,
   searchProtocolsIo,
@@ -39,7 +40,7 @@ const promptSchema = z.object({
   message: z.string().min(1),
 });
 
-export function createApp(pool: SessionService, benchReadService?: BenchReadService) {
+export function createApp(pool: SessionService, benchReadService?: BenchReadService, benchWriteService?: BenchWriteService) {
   const app = express();
 
   app.use(cors());
@@ -99,6 +100,16 @@ export function createApp(pool: SessionService, benchReadService?: BenchReadServ
     ensureBenchReadService(benchReadService);
     const context = await benchReadService.getComponentContext(requireBenchId(req), requireComponentInstanceId(req));
     res.json({ context });
+  }));
+
+  app.post("/api/benches/:benchId/components/:componentInstanceId/resources", asyncHandler(async (req, res) => {
+    ensureBenchWriteService(benchWriteService);
+    const resource = await benchWriteService.createResource(
+      requireBenchId(req),
+      requireComponentInstanceId(req),
+      req.body,
+    );
+    res.status(201).json({ resource });
   }));
 
   app.get("/api/agent-sessions", (_req, res) => {
@@ -211,6 +222,12 @@ function asyncHandler(handler: (req: Request, res: Response, next: NextFunction)
 function ensureBenchReadService(service: BenchReadService | undefined): asserts service is BenchReadService {
   if (!service) {
     throw new Error("Bench read service is not configured");
+  }
+}
+
+function ensureBenchWriteService(service: BenchWriteService | undefined): asserts service is BenchWriteService {
+  if (!service) {
+    throw new Error("Bench write service is not configured");
   }
 }
 
