@@ -1,0 +1,44 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignore": [
+    ".local/**",
+    "**/coverage/**",
+    "**/.next/**",
+    "**/dist/**"
+  ],
+  "workspaces": {
+    "frontend": {
+      "entry": [
+        "src/app/**/page.tsx",
+        "src/app/**/layout.tsx",
+        "src/app/**/route.ts",
+        "src/app/**/loading.tsx",
+        "src/app/**/error.tsx",
+        "src/app/**/not-found.tsx",
+        "src/test/setup.ts",
+        "next.config.ts",
+        "vitest.config.ts",
+        "playwright.config.ts",
+        "eslint.config.mjs"
+      ],
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignore": ["src/**/__fixtures__/**", "e2e/helpers/**"]
+    },
+    "backend": {
+      "entry": [
+        "src/server.ts",
+        "src/app.ts"
+      ],
+      "project": ["src/**/*.ts"],
+      "ignore": ["src/protocols/__fixtures__/**"]
+    }
+  },
+  "ignoreDependencies": [
+    "@types/*",
+    "@vitest/coverage-v8",
+    "eslint-config-next",
+    "tailwindcss",
+    "@tailwindcss/postcss",
+    "tsx"
+  ]
+}

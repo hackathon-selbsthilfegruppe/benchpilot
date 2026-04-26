@@ -1,4 +1,5 @@
 node_modules/
+.local/
 backend/dist/
 backend/coverage/
 frontend/dist/

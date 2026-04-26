@@ -9,7 +9,7 @@
     "start": "node --env-file-if-exists=.env dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest --run",
-    "test:coverage": "vitest --run --coverage --coverage.include='src/protocols/**' --coverage.exclude='**/*.test.ts' --coverage.exclude='**/__fixtures__/**'"
+    "test:coverage": "vitest --run --coverage --coverage.include='src/protocols/**' --coverage.exclude='**/*.test.ts' --coverage.exclude='**/__fixtures__/**' --coverage.reporter=text --coverage.reporter=html --coverage.reporter=json-summary"
   },
   "dependencies": {
     "@mariozechner/pi-coding-agent": "^0.70.2",

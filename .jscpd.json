@@ -1,0 +1,22 @@
+{
+  "pattern": "{backend,frontend}/src/**/*.{ts,tsx}",
+  "ignore": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "**/__fixtures__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/*.a11y.test.tsx"
+  ],
+  "min-lines": 5,
+  "min-tokens": 50,
+  "format": ["typescript", "tsx"],
+  "reporters": ["json", "console"],
+  "output": ".local/quality-data/jscpd",
+  "absolute": false,
+  "gitignore": true
+}

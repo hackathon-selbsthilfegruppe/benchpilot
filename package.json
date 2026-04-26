@@ -20,5 +20,9 @@
     "remote:stop": "./scripts/stop-remote.sh",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "jscpd": "^4.0.9",
+    "knip": "^6.7.0"
   }
 }
