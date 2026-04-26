@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import {
-  buildResourceMetadataFromIngestion,
   ingestibleFileRoleSchema,
   parseResourceIngestionRequest,
   resourceIngestionMetadataSchema,
@@ -11,7 +10,7 @@ import { buildExtractedTextFile, extractTextFromPdf } from "./pdf-extraction.js"
 import { ResourceIngestionService } from "./resource-ingestion-service.js";
 import { resourceMetadataSchema, type ResourceFile, type ResourceMetadata } from "./resource.js";
 import { assertWriteAccess, componentWriteActorSchema, type ComponentWriteActor } from "./write-actor.js";
-import { WorkspaceStore } from "./workspace-store.js";
+import { WorkspaceStore, WorkspaceValidationError } from "./workspace-store.js";
 
 const base64ContentSchema = z.string().min(1).refine((value) => {
   try {
@@ -200,10 +199,10 @@ export class BenchWriteService {
     componentInstanceId: string,
   ): ComponentWriteActor {
     if (actor.benchId !== benchId) {
-      throw new Error("Write actor benchId must match the route benchId");
+      throw new WorkspaceValidationError("Write actor benchId must match the route benchId");
     }
     if (actor.componentInstanceId !== componentInstanceId) {
-      throw new Error("Write actor componentInstanceId must match the route componentInstanceId");
+      throw new WorkspaceValidationError("Write actor componentInstanceId must match the route componentInstanceId");
     }
     return actor;
   }

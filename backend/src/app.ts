@@ -3,9 +3,10 @@ import cors from "cors";
 import { z } from "zod";
 
 import type { RoleDefinition, SessionSummary, StreamEnvelope } from "./types.js";
-import { WorkspaceNotFoundError } from "./workspace-store.js";
+import { WorkspaceNotFoundError, WorkspaceValidationError } from "./workspace-store.js";
 import type { BenchReadService } from "./bench-read-service.js";
 import type { BenchWriteService } from "./bench-write-service.js";
+import { OwnershipRuleError } from "./ownership.js";
 import {
   fetchProtocolIo,
   searchProtocolsIo,
@@ -220,11 +221,13 @@ export function createApp(pool: SessionService, benchReadService?: BenchReadServ
   }));
 
   app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    const status = error instanceof z.ZodError
+    const status = error instanceof z.ZodError || error instanceof WorkspaceValidationError
       ? 400
-      : error instanceof WorkspaceNotFoundError
-        ? 404
-        : 500;
+      : error instanceof OwnershipRuleError
+        ? 403
+        : error instanceof WorkspaceNotFoundError
+          ? 404
+          : 500;
     res.status(status).json({
       error: error instanceof Error ? error.message : "Unknown server error",
       details: error instanceof z.ZodError ? error.flatten() : undefined,
