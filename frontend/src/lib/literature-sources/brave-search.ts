@@ -41,6 +41,14 @@ async function callBackend(query: string, pageSize: number): Promise<LiteratureH
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
+    // The backend brave-search adapter shells out to a `bx` CLI that
+    // isn't bundled with the project. Surface a clear "not installed"
+    // message instead of the raw spawn-ENOENT trace.
+    if (detail.includes("ENOENT") && detail.includes("bx")) {
+      throw new Error(
+        "brave-search CLI (`bx`) is not installed on this machine — skipping. Other literature sources still work.",
+      );
+    }
     throw new Error(
       `brave-search fallback failed (HTTP ${res.status}): ${detail.slice(0, 300) || "no body"}`,
     );
