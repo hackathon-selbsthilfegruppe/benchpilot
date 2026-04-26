@@ -133,13 +133,15 @@ export class TaskDispatcher {
 
   private async createAutoResultResource(task: TaskMetadata, resultText: string) {
     const existingResourceIds = (await this.store.listResources(task.benchId, task.toComponentInstanceId)).map((entry) => entry.id);
+    const targetComponent = await this.store.readComponent(task.benchId, task.toComponentInstanceId);
+    const descriptor = deriveTaskResultDescriptor(targetComponent.presetId, task.title, resultText);
     const body = buildTaskResultMarkdown(task, resultText);
     const resource = createResource({
       benchId: task.benchId,
       componentInstanceId: task.toComponentInstanceId,
-      title: `${task.title} Result`,
-      kind: "task-result",
-      description: `Auto-recorded result for task ${task.id}`,
+      title: descriptor.title,
+      kind: descriptor.kind,
+      description: descriptor.description,
       summary: resultText.length <= 240 ? resultText : `${resultText.slice(0, 237)}...`,
       tags: ["task-result"],
       primaryFile: "result.md",
@@ -170,6 +172,33 @@ function buildTaskDispatchMessage(task: { id: string; title: string; request: st
     `Request: ${task.request}`,
     "Carry out the work now. Create durable artifacts if needed. If you explicitly complete the task via BenchPilot CLI, use a concise result summary.",
   ].join("\n");
+}
+
+function deriveTaskResultDescriptor(presetId: string | undefined, taskTitle: string, resultText: string) {
+  if (presetId === "reviewer") {
+    return {
+      title: `${taskTitle} Review`,
+      kind: "review-report",
+      description: `Auto-recorded review report for task ${taskTitle}`,
+    };
+  }
+
+  if (presetId === "experiment-planner") {
+    const isGapReport = /\bgap\b|\bmissing\b/i.test(resultText);
+    return {
+      title: isGapReport ? `${taskTitle} Gap Report` : `${taskTitle} Experiment Plan`,
+      kind: isGapReport ? "gap-report" : "experiment-plan",
+      description: isGapReport
+        ? `Auto-recorded gap report for task ${taskTitle}`
+        : `Auto-recorded experiment plan for task ${taskTitle}`,
+    };
+  }
+
+  return {
+    title: `${taskTitle} Result`,
+    kind: "task-result",
+    description: `Auto-recorded result for task ${taskTitle}`,
+  };
 }
 
 function buildTaskResultMarkdown(task: TaskMetadata, resultText: string): string {
