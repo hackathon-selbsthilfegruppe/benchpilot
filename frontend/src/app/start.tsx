@@ -332,7 +332,7 @@ function StepButton({
 
 const EXAMPLE_QUESTIONS = [
   // Short — fits comfortably in the protocols-step header.
-  "Does 100 nM rapamycin extend median lifespan in C57BL/6J male mice when started at 12 months of age?",
+  "Does encapsulated rapamycin (14 ppm in chow, ≈2.24 mg/kg/day) extend median lifespan in male C57BL/6J mice vs eudragit-only control chow when treatment starts at 12 months of age?",
   // Medium.
   "Does the H148A mutant of E. coli alkaline phosphatase (PhoA) retain ≥70% of wild-type activity at pH 5, measured by p-nitrophenyl phosphate hydrolysis at 37 °C with 1 mM substrate?",
   // Medium-long.
