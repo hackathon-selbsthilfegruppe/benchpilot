@@ -41,15 +41,11 @@ This also enables the TOC-first, details-on-demand access pattern described in t
 
 ## Candidate child issues
 
-- `GET /api/benches`
-- `GET /api/benches/:benchId`
-- `GET /api/benches/:benchId/requirements`
-- `GET /api/benches/:benchId/components`
-- `GET /api/benches/:benchId/components/:componentInstanceId`
-- `GET /api/benches/:benchId/components/:componentInstanceId/resources`
-- `GET /api/benches/:benchId/components/:componentInstanceId/resources/:resourceId`
-- `GET /api/benches/:benchId/context/components/:componentInstanceId`
-- loader-backed read services
+- `02_001` bench and requirement read endpoints
+- `02_002` component instance read endpoints
+- `02_003` resource TOC and detail read endpoints
+- `02_004` cross-component context endpoint
+- `02_005` loader-backed read services and app integration tests
 
 ## Exit criteria
 
