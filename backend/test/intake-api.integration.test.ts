@@ -80,12 +80,16 @@ describe("intake api integration", () => {
     const finalizeBody = await finalizeResponse.json();
 
     expect(finalizeBody.bench.status).toBe("active");
-    expect(finalizeBody.requirements).toHaveLength(5);
+    expect(finalizeBody.requirements).toHaveLength(7);
 
     const literatureComponent = finalizeBody.components.find((component: { presetId: string }) => component.presetId === "literature");
     const protocolComponent = finalizeBody.components.find((component: { presetId: string }) => component.presetId === "protocols");
+    const reviewerComponent = finalizeBody.components.find((component: { presetId: string }) => component.presetId === "reviewer");
+    const experimentPlannerComponent = finalizeBody.components.find((component: { presetId: string }) => component.presetId === "experiment-planner");
     expect(literatureComponent.requirementIds).toHaveLength(1);
     expect(protocolComponent.requirementIds).toHaveLength(1);
+    expect(reviewerComponent.requirementIds).toHaveLength(1);
+    expect(experimentPlannerComponent.requirementIds).toHaveLength(1);
 
     const literatureResources = await store.listResources(finalizeBody.bench.id, literatureComponent.id);
     const protocolResources = await store.listResources(finalizeBody.bench.id, protocolComponent.id);

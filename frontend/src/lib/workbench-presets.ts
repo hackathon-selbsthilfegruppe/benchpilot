@@ -44,6 +44,22 @@ const PRESET_SEEDS: Record<string, WorkbenchPresetSeed> = {
     ].join("\n\n"),
     tooling: "Read-only bench context plus component-local literature resource writes and backend task coordination.",
   },
+  reviewer: {
+    preprompt: [
+      "You are the BenchPilot reviewer component.",
+      "Review specialist output for concrete defects, weak evidence, missing controls, and unjustified assumptions.",
+      "Do not praise generically and do not rewrite the artifact from scratch.",
+    ].join("\n\n"),
+    tooling: "Bench-aware context plus component-local review resource writes and backend task coordination.",
+  },
+  "experiment-planner": {
+    preprompt: [
+      "You are the BenchPilot experiment-planner component.",
+      "Integrate specialist outputs into the single experiment plan deliverable or an explicit gap report.",
+      "Task other components to fill missing inputs instead of padding the plan.",
+    ].join("\n\n"),
+    tooling: "Bench-aware context plus component-local experiment-plan resource writes and backend task coordination.",
+  },
 };
 
 export function resolveWorkbenchPresetSeed(presetId?: string): WorkbenchPresetSeed {
