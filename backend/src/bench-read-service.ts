@@ -32,11 +32,13 @@ export class BenchReadService {
   }
 
   async listComponents(benchId: string): Promise<ComponentInstance[]> {
-    return this.store.listComponents(benchId);
+    const components = await this.store.listComponents(benchId);
+    return Promise.all(components.map((component) => this.withResourceCount(benchId, component)));
   }
 
   async getComponent(benchId: string, componentInstanceId: string): Promise<ComponentInstance> {
-    return this.store.readComponent(benchId, componentInstanceId);
+    const component = await this.store.readComponent(benchId, componentInstanceId);
+    return this.withResourceCount(benchId, component);
   }
 
   async listComponentResources(benchId: string, componentInstanceId: string): Promise<ResourceTocEntry[]> {
@@ -79,6 +81,14 @@ export class BenchReadService {
       self,
       selfSummary,
       others,
+    };
+  }
+
+  private async withResourceCount(benchId: string, component: ComponentInstance): Promise<ComponentInstance> {
+    const toc = await this.store.readComponentToc(benchId, component.id).catch(() => []);
+    return {
+      ...component,
+      resourceCount: toc.length,
     };
   }
 }

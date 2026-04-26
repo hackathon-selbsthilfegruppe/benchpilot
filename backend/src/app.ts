@@ -66,6 +66,18 @@ export function createApp(pool: SessionService, benchReadService?: BenchReadServ
     res.json({ requirements });
   }));
 
+  app.get("/api/benches/:benchId/components", asyncHandler(async (req, res) => {
+    ensureBenchReadService(benchReadService);
+    const components = await benchReadService.listComponents(requireBenchId(req));
+    res.json({ components });
+  }));
+
+  app.get("/api/benches/:benchId/components/:componentInstanceId", asyncHandler(async (req, res) => {
+    ensureBenchReadService(benchReadService);
+    const component = await benchReadService.getComponent(requireBenchId(req), requireComponentInstanceId(req));
+    res.json({ component });
+  }));
+
   app.get("/api/agent-sessions", (_req, res) => {
     res.json({ sessions: pool.list() });
   });
@@ -172,6 +184,14 @@ function requireBenchId(req: Request): string {
   const value = req.params.benchId;
   if (typeof value !== "string" || value.length === 0) {
     throw new Error("Missing benchId route parameter");
+  }
+  return value;
+}
+
+function requireComponentInstanceId(req: Request): string {
+  const value = req.params.componentInstanceId;
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error("Missing componentInstanceId route parameter");
   }
   return value;
 }

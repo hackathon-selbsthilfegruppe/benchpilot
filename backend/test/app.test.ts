@@ -96,7 +96,7 @@ describe("createApp", () => {
     });
   });
 
-  it("serves bench and requirement reads through the bench read service", async () => {
+  it("serves bench, requirement, and component reads through the bench read service", async () => {
     const benchReadService = createFakeBenchReadService({
       listBenches: async () => [
         {
@@ -129,6 +129,34 @@ describe("createApp", () => {
           updatedAt: "2026-04-25T19:12:00.000Z",
         },
       ],
+      listComponents: async () => [
+        {
+          id: "literature-crp-biosensor",
+          benchId: "bench-crp-biosensor",
+          presetId: "literature",
+          name: "Literature — CRP biosensor",
+          summary: "Tracks prior work, novelty signal, and references relevant to the CRP biosensor hypothesis.",
+          requirementIds: ["req-assess-novelty"],
+          toolMode: "read-only",
+          resourceCount: 1,
+          status: "active",
+          createdAt: "2026-04-25T19:10:00.000Z",
+          updatedAt: "2026-04-25T19:12:00.000Z",
+        },
+      ],
+      getComponent: async () => ({
+        id: "literature-crp-biosensor",
+        benchId: "bench-crp-biosensor",
+        presetId: "literature",
+        name: "Literature — CRP biosensor",
+        summary: "Tracks prior work, novelty signal, and references relevant to the CRP biosensor hypothesis.",
+        requirementIds: ["req-assess-novelty"],
+        toolMode: "read-only",
+        resourceCount: 1,
+        status: "active",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:12:00.000Z",
+      }),
     });
 
     const app = createApp(createFakePool({}), benchReadService);
@@ -177,6 +205,44 @@ describe("createApp", () => {
           updatedAt: "2026-04-25T19:12:00.000Z",
         },
       ],
+    });
+
+    const componentsResponse = await request(app, "/api/benches/bench-crp-biosensor/components", { method: "GET" });
+    expect(componentsResponse.status).toBe(200);
+    expect(await componentsResponse.json()).toEqual({
+      components: [
+        {
+          id: "literature-crp-biosensor",
+          benchId: "bench-crp-biosensor",
+          presetId: "literature",
+          name: "Literature — CRP biosensor",
+          summary: "Tracks prior work, novelty signal, and references relevant to the CRP biosensor hypothesis.",
+          requirementIds: ["req-assess-novelty"],
+          toolMode: "read-only",
+          resourceCount: 1,
+          status: "active",
+          createdAt: "2026-04-25T19:10:00.000Z",
+          updatedAt: "2026-04-25T19:12:00.000Z",
+        },
+      ],
+    });
+
+    const componentResponse = await request(app, "/api/benches/bench-crp-biosensor/components/literature-crp-biosensor", { method: "GET" });
+    expect(componentResponse.status).toBe(200);
+    expect(await componentResponse.json()).toEqual({
+      component: {
+        id: "literature-crp-biosensor",
+        benchId: "bench-crp-biosensor",
+        presetId: "literature",
+        name: "Literature — CRP biosensor",
+        summary: "Tracks prior work, novelty signal, and references relevant to the CRP biosensor hypothesis.",
+        requirementIds: ["req-assess-novelty"],
+        toolMode: "read-only",
+        resourceCount: 1,
+        status: "active",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:12:00.000Z",
+      },
     });
   });
 });
