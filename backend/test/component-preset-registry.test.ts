@@ -43,6 +43,7 @@ describe("component preset registry", () => {
     expect(registry["experiment-planner"].defaultToolMode).toBe("full");
     expect(registry.reviewer.source.kind).toBe("inline-provisional");
     expect(registry.orchestrator.source.kind).toBe("inline-provisional");
+    expect(registry.orchestrator.preprompt).toContain("task the reviewer");
     expect(registry.literature.source.kind).toBe("inline-provisional");
   });
 
