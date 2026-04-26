@@ -326,6 +326,12 @@ export function createApp(
     res.json({ task });
   }));
 
+  app.post("/api/tasks/:taskId/retry", asyncHandler(async (req, res) => {
+    ensureTaskService(taskService);
+    const task = await taskService.retryTask(requireTaskId(req), req.body);
+    res.json({ task });
+  }));
+
   app.get("/api/tasks/:taskId/result", asyncHandler(async (req, res) => {
     ensureTaskService(taskService);
     const query = listTasksQuerySchema.pick({ benchId: true }).parse(req.query);

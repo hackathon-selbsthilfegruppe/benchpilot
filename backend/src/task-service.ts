@@ -11,6 +11,10 @@ import {
   type TaskMetadata,
   type TaskStatus,
 } from "./task.js";
+import {
+  DEFAULT_TASK_TIMEOUT_POLICY,
+  type TaskTimeoutPolicy,
+} from "./task-timeout-policy.js";
 import type { ComponentSessionService } from "./component-session-service.js";
 import { parseComponentWriteActor } from "./write-actor.js";
 import { WorkspaceNotFoundError, WorkspaceStore, WorkspaceValidationError } from "./workspace-store.js";
@@ -46,13 +50,30 @@ export const completeTaskRequestSchema = z.object({
   modifiedResourceIds: z.array(z.string().trim().min(1)).default([]),
 }).strict();
 
+export const retryTaskRequestSchema = z.object({
+  benchId: benchIdSchema,
+  actor: z.object({
+    benchId: benchIdSchema,
+    componentInstanceId: componentInstanceIdSchema,
+    presetId: z.string().trim().min(1).optional(),
+  }).strict(),
+}).strict();
+
+export interface TaskServiceOptions {
+  policy?: TaskTimeoutPolicy;
+}
+
 export class TaskService {
   private readonly logger = rootLogger.child({ scope: "task_service" });
+  private readonly policy: TaskTimeoutPolicy;
 
   constructor(
     private readonly store: WorkspaceStore,
     private readonly componentSessionService?: ComponentSessionService,
-  ) {}
+    options: TaskServiceOptions = {},
+  ) {
+    this.policy = options.policy ?? DEFAULT_TASK_TIMEOUT_POLICY;
+  }
 
   async createTask(input: unknown): Promise<TaskMetadata> {
     const request = createTaskRequestSchema.parse(input);
@@ -257,6 +278,68 @@ export class TaskService {
       failureMessage,
     });
     return failed;
+  }
+
+  async retryTask(taskId: string, input: unknown): Promise<TaskMetadata> {
+    const request = retryTaskRequestSchema.parse(input);
+    const actor = parseComponentWriteActor(request.actor);
+    if (actor.benchId !== request.benchId) {
+      throw new WorkspaceValidationError("Task retry actor benchId mismatch");
+    }
+
+    const task = await this.getTask(taskId, request.benchId);
+    if (task.status !== "error") {
+      throw new WorkspaceValidationError(
+        `Only failed tasks can be retried (got status ${task.status})`,
+      );
+    }
+    if (actor.componentInstanceId !== task.fromComponentInstanceId) {
+      throw new WorkspaceValidationError(
+        "Only the requesting component (fromComponentInstanceId) may retry the task",
+      );
+    }
+    if (task.attemptCount >= this.policy.maxAttempts) {
+      throw new WorkspaceValidationError(
+        `Task ${task.id} has reached the retry cap (${this.policy.maxAttempts} attempts)`,
+      );
+    }
+    if (!this.componentSessionService) {
+      throw new WorkspaceValidationError(
+        "Retry requires a component session service to allocate a fresh task-run session",
+      );
+    }
+
+    this.logger.info("task.retry.requested", {
+      taskId: task.id,
+      benchId: task.benchId,
+      previousFailureKind: task.failureKind ?? null,
+      attemptCount: task.attemptCount,
+    });
+
+    const taskSession = await this.componentSessionService.createTaskRunSession(task);
+    const timestamp = new Date().toISOString();
+    const retried = taskMetadataSchema.parse({
+      ...task,
+      status: "running",
+      taskSessionId: taskSession.id,
+      attemptCount: task.attemptCount + 1,
+      executionStartedAt: undefined,
+      lastActivityAt: timestamp,
+      failureKind: undefined,
+      failureMessage: undefined,
+      resultText: undefined,
+      updatedAt: timestamp,
+    });
+    await this.store.writeTask(retried);
+    this.logger.info("task.state_changed", {
+      taskId: retried.id,
+      benchId: retried.benchId,
+      fromStatus: task.status,
+      toStatus: retried.status,
+      attemptCount: retried.attemptCount,
+      taskSessionId: retried.taskSessionId,
+    });
+    return retried;
   }
 
   async completeTask(taskId: string, input: unknown): Promise<TaskMetadata> {

@@ -24,9 +24,12 @@ const benchWriteService = new BenchWriteService(workspaceStore);
 const benchMaterializationService = new BenchMaterializationService(workspaceStore, projectRoot);
 const componentSessionService = new ComponentSessionService(pool, benchReadService, workspaceStore, projectRoot);
 const intakeService = new IntakeService(workspaceStore, benchMaterializationService, benchReadService, componentSessionService);
-const taskService = new TaskService(workspaceStore, componentSessionService);
+const taskTimeoutPolicy = getTaskTimeoutPolicyFromEnv();
+const taskService = new TaskService(workspaceStore, componentSessionService, {
+  policy: taskTimeoutPolicy,
+});
 const taskDispatcher = new TaskDispatcher(workspaceStore, taskService, pool, {
-  policy: getTaskTimeoutPolicyFromEnv(),
+  policy: taskTimeoutPolicy,
 });
 const taskDispatchEnabled = process.env.BENCHPILOT_TASK_DISPATCH_ENABLED?.trim().toLowerCase() !== "false";
 const taskDispatchIntervalMs = Number(process.env.BENCHPILOT_TASK_DISPATCH_INTERVAL_MS ?? 2000);
