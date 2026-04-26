@@ -139,4 +139,27 @@ describe("benchpilot intake client", () => {
       expect.objectContaining({ method: "POST" }),
     );
   });
+
+  it("surfaces server-supplied error messages on non-2xx responses", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "question is required" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    await expect(createIntakeBrief({ question: "" })).rejects.toThrow(
+      "question is required",
+    );
+  });
+
+  it("falls back to HTTP status + body when the error body is not JSON", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("internal explosion", {
+        status: 500,
+      }),
+    );
+    await expect(
+      updateIntakeBrief("brief-x", { question: "?" }),
+    ).rejects.toThrow("HTTP 500: internal explosion");
+  });
 });
