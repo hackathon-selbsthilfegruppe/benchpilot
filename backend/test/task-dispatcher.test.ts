@@ -1,0 +1,110 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
+
+import { createBench } from "../src/bench.js";
+import { createComponentInstance } from "../src/component.js";
+import { type TaskMetadata } from "../src/task.js";
+import { TaskDispatcher } from "../src/task-dispatcher.js";
+import { TaskService } from "../src/task-service.js";
+import { WorkspaceStore } from "../src/workspace-store.js";
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
+
+describe("task dispatcher", () => {
+  it("prompts runnable task-run sessions and auto-completes them with a durable result resource", async () => {
+    const baseDir = await mkdtemp(path.join(os.tmpdir(), "benchpilot-task-dispatcher-"));
+    tempDirs.push(baseDir);
+
+    const store = new WorkspaceStore(baseDir);
+    const bench = createBench({
+      title: "CRP biosensor",
+      question: "Can we build a paper-based electrochemical biosensor for CRP?",
+    });
+    const sender = createComponentInstance({
+      benchId: bench.id,
+      presetId: "orchestrator",
+      name: "Orchestrator — CRP biosensor",
+      summary: "Coordinates the bench.",
+    });
+    const target = createComponentInstance({
+      benchId: bench.id,
+      presetId: "literature",
+      name: "Literature — CRP biosensor",
+      summary: "Tracks prior work and novelty.",
+      toolMode: "read-only",
+    });
+
+    await store.writeBench(bench);
+    await store.writeComponent(sender);
+    await store.writeComponent(target);
+
+    const taskService = new TaskService(store, {
+      createTaskRunSession: async (task: TaskMetadata) => ({
+        id: `task-session-${task.id}`,
+        role: {
+          id: `${task.toComponentInstanceId}-${task.id}`,
+          name: `${task.toComponentInstanceId} Task Run`,
+          description: "Task-run session",
+          instructions: "task prompt",
+          cwd: "/tmp/task-run",
+          toolMode: "read-only",
+        },
+        cwd: "/tmp/task-run",
+        status: "idle",
+        createdAt: "2026-04-25T19:20:00.000Z",
+      }),
+    } as any);
+
+    const task = await taskService.createTask({
+      actor: {
+        benchId: bench.id,
+        componentInstanceId: sender.id,
+        presetId: "orchestrator",
+      },
+      fromComponentInstanceId: sender.id,
+      toComponentInstanceId: target.id,
+      title: "Review prior work overlap",
+      request: "Check whether closely related CRP protocols already exist.",
+    });
+
+    const prompts: Array<{ sessionId: string; message: string }> = [];
+    const dispatcher = new TaskDispatcher(store, taskService, {
+      prompt: async (sessionId, message, onEvent) => {
+        prompts.push({ sessionId, message });
+        onEvent({
+          type: "message_completed",
+          sessionId,
+          roleId: `${target.id}-${task.id}`,
+          assistantText: "Similar CRP protocols exist, but the whole-blood context still needs a tighter overlap check.",
+        });
+      },
+    });
+
+    const dispatched = await dispatcher.dispatchRunnableTasksOnce();
+    expect(dispatched).toEqual([task.id]);
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]?.sessionId).toBe(task.taskSessionId);
+    expect(prompts[0]?.message).toContain(task.request);
+
+    const stored = await store.readTask(bench.id, target.id, task.id);
+    expect(stored.executionStartedAt).toBeTruthy();
+    expect(stored.status).toBe("completed");
+    expect(stored.resultResourceId).toBeTruthy();
+
+    const resource = await store.readResource(bench.id, target.id, stored.resultResourceId!);
+    const content = await store.readResourceFile(bench.id, target.id, resource.id, "result.md");
+    expect(resource.kind).toBe("task-result");
+    expect(content.toString("utf8")).toContain("## Result");
+    expect(content.toString("utf8")).toContain("Similar CRP protocols exist");
+  });
+});

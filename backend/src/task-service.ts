@@ -177,6 +177,52 @@ export class TaskService {
     return taskMetadataSchema.parse(task);
   }
 
+  async startTaskExecution(taskId: string, benchId: string): Promise<TaskMetadata> {
+    const task = await this.getTask(taskId, benchId);
+    if (task.status !== "running") {
+      throw new WorkspaceValidationError(`Only running tasks may start execution automatically (got ${task.status})`);
+    }
+    if (!task.taskSessionId) {
+      throw new WorkspaceValidationError(`Cannot start task execution without taskSessionId for ${task.id}`);
+    }
+    if (task.executionStartedAt) {
+      return task;
+    }
+
+    const started = taskMetadataSchema.parse({
+      ...task,
+      executionStartedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    await this.store.writeTask(started);
+    this.logger.info("task.execution_started", {
+      taskId: started.id,
+      benchId: started.benchId,
+      taskSessionId: started.taskSessionId,
+      executionStartedAt: started.executionStartedAt,
+    });
+    return started;
+  }
+
+  async failTask(taskId: string, benchId: string, errorMessage: string): Promise<TaskMetadata> {
+    const task = await this.getTask(taskId, benchId);
+    const failed = taskMetadataSchema.parse({
+      ...task,
+      status: "error",
+      resultText: errorMessage,
+      updatedAt: new Date().toISOString(),
+    });
+    await this.store.writeTask(failed);
+    this.logger.error("task.state_changed", {
+      taskId: failed.id,
+      benchId: failed.benchId,
+      fromStatus: task.status,
+      toStatus: failed.status,
+      error: errorMessage,
+    });
+    return failed;
+  }
+
   async completeTask(taskId: string, input: unknown): Promise<TaskMetadata> {
     const request = completeTaskRequestSchema.parse(input);
     const actor = parseComponentWriteActor(request.actor);

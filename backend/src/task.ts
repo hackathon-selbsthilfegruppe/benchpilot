@@ -23,6 +23,7 @@ export const taskMetadataSchema = z.object({
   request: z.string().trim().min(1),
   status: taskStatusSchema,
   taskSessionId: z.string().trim().min(1).optional(),
+  executionStartedAt: isoDateTimeSchema.optional(),
   resultText: z.string().trim().min(1).optional(),
   resultResourceId: resourceIdSchema.optional(),
   createdResourceIds: z.array(resourceIdSchema).default([]),
@@ -33,6 +34,7 @@ export const taskMetadataSchema = z.object({
 }).superRefine((task, ctx) => {
   const createdAt = Date.parse(task.createdAt);
   const updatedAt = Date.parse(task.updatedAt);
+  const executionStartedAt = task.executionStartedAt ? Date.parse(task.executionStartedAt) : undefined;
   const completedAt = task.completedAt ? Date.parse(task.completedAt) : undefined;
 
   if (!Number.isNaN(createdAt) && !Number.isNaN(updatedAt) && updatedAt < createdAt) {
@@ -64,6 +66,19 @@ export const taskMetadataSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["completedAt"],
       message: "completedAt may only be set for completed tasks",
+    });
+  }
+
+  if (
+    executionStartedAt !== undefined
+    && !Number.isNaN(createdAt)
+    && !Number.isNaN(executionStartedAt)
+    && executionStartedAt < createdAt
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["executionStartedAt"],
+      message: "executionStartedAt must be greater than or equal to createdAt",
     });
   }
 
