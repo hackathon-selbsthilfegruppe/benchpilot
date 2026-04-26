@@ -39,13 +39,13 @@ We need to know what a bench is, what a requirement is, what a component is, wha
 
 ## Candidate child issues
 
-- bench schema
-- requirement schema
-- component schema
-- resource schema
-- folder layout
-- loader/writer utilities
-- index generation rules
+- `00_001` bench schema and identity
+- `00_002` requirement schema and lifecycle
+- `00_003` component preset and instance schema
+- `00_004` resource schema and TOC model
+- `00_005` filesystem layout and path conventions
+- `00_006` loader/writer services and validation
+- `00_007` ownership and mutation rules
 
 ## Exit criteria
 
