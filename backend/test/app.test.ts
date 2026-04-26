@@ -573,6 +573,31 @@ describe("createApp", () => {
         createdAt: "2026-04-25T19:20:00.000Z",
         updatedAt: "2026-04-25T19:20:00.000Z",
       }),
+      completeTask: async () => ({
+        id: "task-review-prior-work-overlap",
+        benchId: "bench-crp-biosensor",
+        fromComponentInstanceId: "orchestrator-crp-biosensor",
+        toComponentInstanceId: "literature-crp-biosensor",
+        title: "Review prior work overlap",
+        request: "Check whether closely related CRP protocols already exist.",
+        status: "completed",
+        resultText: "Similar work exists.",
+        resultResourceId: "lit-0007",
+        createdResourceIds: ["lit-0007"],
+        modifiedResourceIds: [],
+        createdAt: "2026-04-25T19:20:00.000Z",
+        updatedAt: "2026-04-25T19:24:00.000Z",
+        completedAt: "2026-04-25T19:24:00.000Z",
+      }),
+      getTaskResult: async () => ({
+        taskId: "task-review-prior-work-overlap",
+        status: "completed",
+        resultText: "Similar work exists.",
+        resultResourceId: "lit-0007",
+        createdResourceIds: ["lit-0007"],
+        modifiedResourceIds: [],
+        completedAt: "2026-04-25T19:24:00.000Z",
+      }),
     });
 
     const app = createApp(createFakePool({}), undefined, benchWriteService, componentSessionService, taskService);
@@ -822,6 +847,60 @@ describe("createApp", () => {
         updatedAt: "2026-04-25T19:20:00.000Z",
       },
     });
+
+    const completeResponse = await request(
+      app,
+      "/api/tasks/task-review-prior-work-overlap/result",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          benchId: "bench-crp-biosensor",
+          actor: {
+            benchId: "bench-crp-biosensor",
+            componentInstanceId: "literature-crp-biosensor",
+            presetId: "literature",
+          },
+          resultText: "Similar work exists.",
+          resultResourceId: "lit-0007",
+          createdResourceIds: ["lit-0007"],
+          modifiedResourceIds: [],
+        }),
+      },
+    );
+    expect(completeResponse.status).toBe(200);
+    expect(await completeResponse.json()).toEqual({
+      task: {
+        id: "task-review-prior-work-overlap",
+        benchId: "bench-crp-biosensor",
+        fromComponentInstanceId: "orchestrator-crp-biosensor",
+        toComponentInstanceId: "literature-crp-biosensor",
+        title: "Review prior work overlap",
+        request: "Check whether closely related CRP protocols already exist.",
+        status: "completed",
+        resultText: "Similar work exists.",
+        resultResourceId: "lit-0007",
+        createdResourceIds: ["lit-0007"],
+        modifiedResourceIds: [],
+        createdAt: "2026-04-25T19:20:00.000Z",
+        updatedAt: "2026-04-25T19:24:00.000Z",
+        completedAt: "2026-04-25T19:24:00.000Z",
+      },
+    });
+
+    const resultResponse = await request(app, "/api/tasks/task-review-prior-work-overlap/result?benchId=bench-crp-biosensor", { method: "GET" });
+    expect(resultResponse.status).toBe(200);
+    expect(await resultResponse.json()).toEqual({
+      result: {
+        taskId: "task-review-prior-work-overlap",
+        status: "completed",
+        resultText: "Similar work exists.",
+        resultResourceId: "lit-0007",
+        createdResourceIds: ["lit-0007"],
+        modifiedResourceIds: [],
+        completedAt: "2026-04-25T19:24:00.000Z",
+      },
+    });
   });
 });
 
@@ -890,6 +969,12 @@ function createFakeTaskService(overrides: Partial<TaskService>): TaskService {
     listTasks: async () => [],
     getTask: async () => {
       throw new Error("missing getTask");
+    },
+    completeTask: async () => {
+      throw new Error("missing completeTask");
+    },
+    getTaskResult: async () => {
+      throw new Error("missing getTaskResult");
     },
     ...overrides,
   } as TaskService;

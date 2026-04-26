@@ -193,6 +193,19 @@ export function createApp(
     res.json({ task });
   }));
 
+  app.post("/api/tasks/:taskId/result", asyncHandler(async (req, res) => {
+    ensureTaskService(taskService);
+    const task = await taskService.completeTask(requireTaskId(req), req.body);
+    res.json({ task });
+  }));
+
+  app.get("/api/tasks/:taskId/result", asyncHandler(async (req, res) => {
+    ensureTaskService(taskService);
+    const query = listTasksQuerySchema.pick({ benchId: true }).parse(req.query);
+    const result = await taskService.getTaskResult(requireTaskId(req), query.benchId);
+    res.json({ result });
+  }));
+
   app.get("/api/agent-sessions", (_req, res) => {
     res.json({ sessions: pool.list() });
   });

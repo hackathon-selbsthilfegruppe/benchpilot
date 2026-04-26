@@ -24,6 +24,7 @@ export const taskMetadataSchema = z.object({
   status: taskStatusSchema,
   taskSessionId: z.string().trim().min(1).optional(),
   resultText: z.string().trim().min(1).optional(),
+  resultResourceId: resourceIdSchema.optional(),
   createdResourceIds: z.array(resourceIdSchema).default([]),
   modifiedResourceIds: z.array(resourceIdSchema).default([]),
   createdAt: isoDateTimeSchema,
@@ -47,6 +48,14 @@ export const taskMetadataSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["completedAt"],
       message: "completed tasks must set completedAt",
+    });
+  }
+
+  if (task.status === "completed" && !task.resultText) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["resultText"],
+      message: "completed tasks must include resultText",
     });
   }
 
