@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  createComponentSession,
   createSession,
+  prewarmComponentSessions,
   prewarmSessions,
   streamSessionPrompt,
   type BenchpilotSessionSummary,
@@ -33,7 +35,6 @@ type ToolActivity = {
 const DEFAULT_SESSION_ROLES: SessionRoleInput[] = [
   { id: "orchestrator", name: "Orchestrator", description: "Routes requests across components." },
   { id: "hypothesis", name: "Hypothesis Generator" },
-  { id: "literature", name: "Literature Research" },
 ];
 
 const TASK_STATUS_SYMBOL: Record<TaskStatus, string> = {
@@ -51,12 +52,14 @@ export default function Workbench({
   hypothesis,
   hypotheses,
   activeHypothesisSlug,
+  backendBenchId,
 }: {
   components: BenchComponent[];
   supporting: BenchComponent[];
   hypothesis: BenchComponent;
   hypotheses: HypothesisOption[];
   activeHypothesisSlug: string;
+  backendBenchId?: string;
 }) {
   const [components, setComponents] = useState<BenchComponent[]>(initialComponents);
   const [supporting, setSupporting] = useState<BenchComponent[]>(initialSupporting);
@@ -118,6 +121,17 @@ export default function Workbench({
         const sessions = await prewarmSessions(DEFAULT_SESSION_ROLES);
         if (cancelled) return;
         setSessionsByRoleId((prev) => mergeSessions(prev, sessions));
+
+        if (backendBenchId) {
+          const componentSessions = await prewarmComponentSessions(
+            [...components, ...supporting].map((component) => ({
+              benchId: backendBenchId,
+              componentInstanceId: component.id,
+            })),
+          );
+          if (cancelled) return;
+          setSessionsByRoleId((prev) => mergeSessions(prev, componentSessions));
+        }
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : String(err);
@@ -138,7 +152,7 @@ export default function Workbench({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [backendBenchId, components, supporting]);
 
   async function send(chatId: ChatId, text: string) {
     if (!text.trim()) return;
@@ -165,6 +179,7 @@ export default function Workbench({
         supporting,
         hypothesisState,
         setSessionsByRoleId,
+        backendBenchId,
       );
 
       await streamSessionPrompt(session.id, trimmed, (event) => {
@@ -397,17 +412,22 @@ async function ensureSession(
   setSessionsByRoleId: (
     updater: (prev: Record<string, BenchpilotSessionSummary>) => Record<string, BenchpilotSessionSummary>,
   ) => void,
+  backendBenchId?: string,
 ): Promise<BenchpilotSessionSummary> {
   const existing = sessionsByRoleId[chatId];
   if (existing) {
     return existing;
   }
 
-  const created = await createSession(
-    resolveRoleInput(chatId, components, supporting, hypothesis),
-  );
+  const created = backendBenchId && isBackendComponentChat(chatId, hypothesis)
+    ? await createComponentSession(backendBenchId, chatId)
+    : await createSession(resolveRoleInput(chatId, components, supporting, hypothesis));
   setSessionsByRoleId((prev) => ({ ...prev, [created.role.id]: created }));
   return created;
+}
+
+function isBackendComponentChat(chatId: ChatId, hypothesis: BenchComponent): chatId is string {
+  return chatId !== "orchestrator" && chatId !== hypothesis.id;
 }
 
 function resolveRoleInput(

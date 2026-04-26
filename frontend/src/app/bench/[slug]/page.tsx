@@ -68,6 +68,7 @@ export default async function BenchPage({
       hypothesis={backendWorkbench.hypothesis}
       hypotheses={idx.hypotheses}
       activeHypothesisSlug={slug}
+      backendBenchId={slug}
     />
   );
 }
