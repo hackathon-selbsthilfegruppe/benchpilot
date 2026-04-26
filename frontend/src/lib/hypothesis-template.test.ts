@@ -53,6 +53,44 @@ describe("parseTemplateDraft", () => {
     });
     expect(() => parseTemplateDraft(text)).toThrow(/components/);
   });
+
+  it("parses toc entries with bodies, normalizes status and slugs", () => {
+    const text = JSON.stringify({
+      hypothesis: { name: "H", summary: "s", preprompt: "p" },
+      components: [
+        {
+          name: "Reagent prep",
+          preprompt: "x",
+          summary: "y",
+          toc: [
+            {
+              title: "Make stock solution",
+              descriptor: "10 mM in DMSO",
+              status: "PENDING",
+              body: "1. Weigh 5.4 mg…\n2. Dissolve in 1 mL DMSO.",
+            },
+            {
+              title: "QC the stock",
+              descriptor: "absorbance check",
+              // missing status → defaults to info
+              body: "Read A280 in triplicate.",
+            },
+          ],
+        },
+      ],
+    });
+    const tpl = parseTemplateDraft(text);
+    const toc = tpl.components[0].toc;
+    expect(toc).toBeDefined();
+    expect(toc).toHaveLength(2);
+    expect(toc?.[0]).toMatchObject({
+      slug: "make-stock-solution",
+      title: "Make stock solution",
+      status: "pending",
+    });
+    expect(toc?.[0].body).toContain("Weigh 5.4 mg");
+    expect(toc?.[1].status).toBe("info");
+  });
 });
 
 describe("slugify", () => {

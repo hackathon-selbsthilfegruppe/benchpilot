@@ -4,7 +4,12 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import type { BenchComponent as FsBenchComponent } from "./components-fs";
 import type { HypothesesIndex } from "./components-fs";
-import type { ProtocolTemplateDraft } from "./hypothesis-template";
+import type { TocEntry } from "./components-shared";
+import type {
+  ProtocolComponentDraft,
+  ProtocolTemplateDraft,
+  TocEntryDraft,
+} from "./hypothesis-template";
 import { slugify } from "./hypothesis-template";
 
 const dataRoot = path.join(process.cwd(), "components-data");
@@ -30,21 +35,63 @@ export async function uniqueHypothesisSlug(base: string): Promise<string> {
   throw new Error(`Could not allocate unique slug for ${base}`);
 }
 
-function emptyComponent(
-  draft: { id: string; name: string; preprompt: string; summary: string },
-  toolingHint?: string,
-): FsBenchComponent {
+function dedupeTocSlugs(entries: TocEntryDraft[]): TocEntryDraft[] {
+  const seen = new Set<string>();
+  return entries.map((entry) => {
+    let slug = entry.slug;
+    if (!slug) slug = "entry";
+    if (seen.has(slug)) {
+      let i = 2;
+      while (seen.has(`${slug}-${i}`)) i++;
+      slug = `${slug}-${i}`;
+    }
+    seen.add(slug);
+    return { ...entry, slug };
+  });
+}
+
+function tocEntryToFs(entry: TocEntryDraft): TocEntry {
   return {
-    id: draft.id,
-    name: draft.name,
-    preprompt: draft.preprompt,
-    tooling:
-      toolingHint ??
-      "Read: own data, TOCs and summaries of all other components. Write: own data only.",
-    summary: draft.summary,
-    toc: [],
-    tasks: [],
+    slug: entry.slug,
+    title: entry.title,
+    descriptor: entry.descriptor,
+    status: entry.status,
   };
+}
+
+function buildComponent(
+  draft: ProtocolComponentDraft,
+  toolingHint?: string,
+): { component: FsBenchComponent; entries: TocEntryDraft[] } {
+  const entries = dedupeTocSlugs(draft.toc ?? []);
+  return {
+    entries,
+    component: {
+      id: draft.id,
+      name: draft.name,
+      preprompt: draft.preprompt,
+      tooling:
+        toolingHint ??
+        "Read: own data, TOCs and summaries of all other components. Write: own data only.",
+      summary: draft.summary,
+      toc: entries.map(tocEntryToFs),
+      tasks: [],
+    },
+  };
+}
+
+async function writeTocBodies(
+  dataDir: string,
+  componentName: string,
+  entries: TocEntryDraft[],
+): Promise<void> {
+  for (const entry of entries) {
+    const file = path.join(dataDir, `${entry.slug}.md`);
+    const body = entry.body && entry.body.trim().length > 0
+      ? entry.body.trim()
+      : `# ${entry.title}\n\n_(${componentName} — content to be filled in.)_\n`;
+    await writeFile(file, body.endsWith("\n") ? body : body + "\n", "utf-8");
+  }
 }
 
 export async function createHypothesisFromTemplate(args: {
@@ -57,36 +104,46 @@ export async function createHypothesisFromTemplate(args: {
   const dataDir = path.join(hypothesisDir, "data");
   await mkdir(dataDir, { recursive: true });
 
-  const hypothesisComponent: FsBenchComponent = {
+  const hypothesisDraft: ProtocolComponentDraft = {
     id: "hypothesis",
     name: template.hypothesis.name,
     preprompt: template.hypothesis.preprompt,
-    tooling:
-      "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. Write: own data only.",
     summary: template.hypothesis.summary,
-    toc: [],
-    tasks: [],
+    toc: template.hypothesis.toc,
   };
+  const hypothesisBuilt = buildComponent(
+    hypothesisDraft,
+    "Read: own data, TOCs and summaries of all other components, full details on request via orchestrator. Write: own data only.",
+  );
   await writeJson(path.join(hypothesisDir, "hypothesis.json"), {
-    ...hypothesisComponent,
+    ...hypothesisBuilt.component,
     slug,
   });
+  await writeTocBodies(dataDir, hypothesisDraft.name, hypothesisBuilt.entries);
 
   for (const draft of template.components) {
     const dir = path.join(hypothesisDir, draft.id);
-    await mkdir(path.join(dir, "data"), { recursive: true });
-    await writeJson(path.join(dir, "component.json"), emptyComponent(draft));
+    const componentData = path.join(dir, "data");
+    await mkdir(componentData, { recursive: true });
+    const built = buildComponent(draft);
+    await writeJson(path.join(dir, "component.json"), built.component);
+    await writeTocBodies(componentData, draft.name, built.entries);
   }
 
   const supporting = template.supporting ?? [];
   for (const draft of supporting) {
     const dir = path.join(hypothesisDir, draft.id);
-    await mkdir(path.join(dir, "data"), { recursive: true });
+    const componentData = path.join(dir, "data");
+    await mkdir(componentData, { recursive: true });
     const tooling =
       draft.id === "protocols"
         ? "Read: own data, TOCs and summaries of all other components. External: protocols.io REST API via /api/protocol-sources/search (live search). Write: own data only."
-        : undefined;
-    await writeJson(path.join(dir, "component.json"), emptyComponent(draft, tooling));
+        : draft.id === "literature"
+          ? "Read: own data, TOCs and summaries of all other components. External: Semantic Scholar Graph API via /api/literature-sources/search. Write: own data only."
+          : undefined;
+    const built = buildComponent(draft, tooling);
+    await writeJson(path.join(dir, "component.json"), built.component);
+    await writeTocBodies(componentData, draft.name, built.entries);
   }
 
   await writeJson(path.join(hypothesisDir, "index.json"), {

@@ -1,8 +1,20 @@
+export type TocStatus = "ok" | "pending" | "blocked" | "done" | "info";
+
+export type TocEntryDraft = {
+  slug: string;
+  title: string;
+  descriptor: string;
+  status: TocStatus;
+  /** Optional markdown body — written to <component>/data/<slug>.md if present. */
+  body?: string;
+};
+
 export type ProtocolComponentDraft = {
   id: string;
   name: string;
   preprompt: string;
   summary: string;
+  toc?: TocEntryDraft[];
 };
 
 export type ProtocolTemplateDraft = {
@@ -10,6 +22,7 @@ export type ProtocolTemplateDraft = {
     name: string;
     summary: string;
     preprompt: string;
+    toc?: TocEntryDraft[];
   };
   components: ProtocolComponentDraft[];
   supporting?: ProtocolComponentDraft[];
@@ -37,11 +50,15 @@ export function parseTemplateDraft(text: string): ProtocolTemplateDraft {
   if (!Array.isArray(parsed.components)) {
     throw new Error("Template is missing `components` array");
   }
+  const hypoToc = Array.isArray((parsed.hypothesis as { toc?: unknown }).toc)
+    ? ((parsed.hypothesis as { toc: unknown[] }).toc.map(normalizeTocEntry))
+    : undefined;
   return {
     hypothesis: {
       name: String(parsed.hypothesis.name ?? "").trim(),
       summary: String(parsed.hypothesis.summary ?? "").trim(),
       preprompt: String(parsed.hypothesis.preprompt ?? "").trim(),
+      toc: hypoToc && hypoToc.length > 0 ? hypoToc : undefined,
     },
     components: parsed.components.map(normalizeComponent),
     supporting: Array.isArray(parsed.supporting)
@@ -50,13 +67,35 @@ export function parseTemplateDraft(text: string): ProtocolTemplateDraft {
   };
 }
 
+const ALLOWED_STATUS: ReadonlyArray<TocStatus> = ["ok", "pending", "blocked", "done", "info"];
+
+function normalizeStatus(raw: unknown): TocStatus {
+  const v = String(raw ?? "info").toLowerCase().trim() as TocStatus;
+  return ALLOWED_STATUS.includes(v) ? v : "info";
+}
+
+function normalizeTocEntry(raw: unknown): TocEntryDraft {
+  const r = (raw ?? {}) as Partial<TocEntryDraft>;
+  const title = String(r.title ?? "Untitled").trim();
+  const slug = slugify(String(r.slug ?? title));
+  return {
+    slug,
+    title,
+    descriptor: String(r.descriptor ?? "").trim(),
+    status: normalizeStatus(r.status),
+    body: r.body ? String(r.body).trim() : undefined,
+  };
+}
+
 function normalizeComponent(raw: unknown): ProtocolComponentDraft {
-  const r = (raw ?? {}) as Partial<ProtocolComponentDraft>;
+  const r = (raw ?? {}) as Partial<ProtocolComponentDraft> & { toc?: unknown };
+  const toc = Array.isArray(r.toc) ? r.toc.map(normalizeTocEntry) : undefined;
   return {
     id: slugify(String(r.id ?? r.name ?? "component")),
     name: String(r.name ?? "Component").trim(),
     preprompt: String(r.preprompt ?? "").trim(),
     summary: String(r.summary ?? "").trim(),
+    toc: toc && toc.length > 0 ? toc : undefined,
   };
 }
 
@@ -97,7 +136,7 @@ export function buildDraftPrompt(input: {
     "## Research question / hypothesis",
     input.question.trim(),
     "",
-    "## Protocols the user kept",
+    "## Protocols and references the user kept",
     protocolBlock,
     "",
     "## Your task",
@@ -108,23 +147,63 @@ export function buildDraftPrompt(input: {
     '  "hypothesis": {',
     '    "name": "short title for the hypothesis",',
     '    "summary": "2-3 sentence summary of what we are trying to find out",',
-    '    "preprompt": "instructions for the hypothesis component agent"',
+    '    "preprompt": "instructions for the hypothesis component agent",',
+    '    "toc": [',
+    "      {",
+    '        "slug": "framing",',
+    '        "title": "Question, scope, criteria, constraints",',
+    '        "descriptor": "The project frame — what we are answering and how.",',
+    '        "status": "info",',
+    '        "body": "Markdown paragraph or two stating the framing in detail."',
+    "      }",
+    "    ]",
     "  },",
     '  "components": [',
     "    {",
     '      "id": "kebab-case-id",',
     '      "name": "Display Name",',
     '      "preprompt": "instructions for this component agent",',
-    '      "summary": "1-2 sentence purpose of this component"',
+    '      "summary": "1-2 sentence purpose of this component",',
+    '      "toc": [',
+    "        {",
+    '          "slug": "kebab-case-slug",',
+    '          "title": "Short title for the entry",',
+    '          "descriptor": "1-line descriptor that shows in the TOC list",',
+    '          "status": "ok | pending | blocked | done | info",',
+    '          "body": "Markdown body for this entry — 1-3 short paragraphs of substantive content (assay parameters, expected results, parameter ranges, decision criteria, …). Do NOT just restate the title."',
+    "        }",
+    "      ]",
     "    }",
     "  ],",
-    '  "supporting": [ /* optional: literature, protocols, etc. */ ]',
+    '  "supporting": [ /* optional: literature, protocols — same shape as components */ ]',
     "}",
     "```",
     "",
-    "Components should be the *protocol components* — the concrete experimental procedures, reagent prep,",
-    "measurement steps, etc., that this project needs to actually run. Order them in the sequence a",
-    "researcher would execute them. Use 5–8 components unless the question is unusually narrow.",
-    "Always include a `protocols` entry under `supporting` that references the kept protocols above.",
+    "## Critical: synthesize, do not enumerate",
+    "",
+    "There is exactly ONE experiment in this bench. **Merge all the kept protocols and references into",
+    "a single coherent experiment plan**, and break that single plan into its execution phases.",
+    "",
+    "- Components are the *phases of the one experiment* (e.g. reagent preparation, animal cohort &",
+    "  randomization, treatment & monitoring, endpoint assay, statistical analysis). Use 5–8 phases.",
+    "- Do NOT create one component per kept protocol. The kept protocols are raw input you draw from;",
+    "  they are not the components themselves.",
+    "- Every TOC body should fold in the relevant detail from the kept protocols (specific reagents,",
+    "  doses, timings, parameter ranges, decision rules) and reference them inline by URL when useful.",
+    "",
+    "## TOC requirements",
+    "",
+    "**Every component MUST have a non-empty `toc` array** with 2–5 entries — these are the visible",
+    "drill-down inside the component card and the bench is empty without them. Each TOC entry MUST",
+    "have a `body` (markdown) with real substance — concrete protocol steps, parameter values, decision",
+    "rules, expected readouts, validation criteria. Write the SOP a tech will follow on the bench, not",
+    "a placeholder.",
+    "",
+    "## Supporting components",
+    "",
+    "Add a `literature` entry under `supporting` whose TOC entries cite each kept reference (one entry",
+    "per reference: `title` is the paper title, `descriptor` is `authors (year) — N citations`, `body`",
+    "is the TL;DR/abstract plus the URL). If no references were kept, leave its TOC empty. Do NOT add",
+    "a `protocols` supporting component — kept protocols are folded into the main components above.",
   ].join("\n");
 }
