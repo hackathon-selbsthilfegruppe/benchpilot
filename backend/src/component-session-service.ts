@@ -3,6 +3,7 @@ import path from "node:path";
 import { BenchReadService } from "./bench-read-service.js";
 import { loadCurrentPresetRegistry } from "./component-preset-registry.js";
 import { buildComponentSessionPrompt, loadComponentSessionPromptContext } from "./component-session-prompt.js";
+import { type TaskMetadata } from "./task.js";
 import { type RoleDefinition, type SessionSummary } from "./types.js";
 import { WorkspaceStore } from "./workspace-store.js";
 
@@ -63,6 +64,58 @@ export class ComponentSessionService {
       return null;
     }
     return this.pool.list().find((session) => session.id === existingId) ?? null;
+  }
+
+  async createTaskRunSession(task: TaskMetadata): Promise<SessionSummary> {
+    const presetRegistry = await loadCurrentPresetRegistry(this.projectRoot);
+    const component = await this.benchReadService.getComponent(task.benchId, task.toComponentInstanceId);
+    if (!component.presetId) {
+      throw new Error(`Component ${task.toComponentInstanceId} has no presetId; ad-hoc task bootstrap is not implemented yet`);
+    }
+
+    const preset = presetRegistry[component.presetId];
+    if (!preset) {
+      throw new Error(`No preset metadata available for preset ${component.presetId}`);
+    }
+
+    const promptContext = await loadComponentSessionPromptContext(
+      this.benchReadService,
+      preset,
+      task.benchId,
+      task.toComponentInstanceId,
+    );
+    const systemPrompt = [
+      buildComponentSessionPrompt(promptContext),
+      "",
+      "## Delegated task",
+      `Task ID: ${task.id}`,
+      `From: ${task.fromComponentInstanceId}`,
+      `To: ${task.toComponentInstanceId}`,
+      `Title: ${task.title}`,
+      `Request: ${task.request}`,
+      "You are running in a fresh task-run session. Complete the delegated work in a durable, inspectable way.",
+    ].join("\n");
+
+    const role = {
+      id: `${component.id}-${task.id}`,
+      name: `${component.name} Task Run`,
+      description: preset.shortDescription,
+      instructions: systemPrompt,
+      cwd: path.join(
+        this.workspaceStore.workspaceRoot,
+        "benches",
+        task.benchId,
+        "components",
+        component.id,
+        "tasks",
+        "running",
+        task.id,
+        "session",
+      ),
+      toolMode: component.toolMode ?? preset.defaultToolMode ?? "full",
+    } satisfies RoleDefinition;
+
+    return this.pool.createStandbySession(role);
   }
 }
 

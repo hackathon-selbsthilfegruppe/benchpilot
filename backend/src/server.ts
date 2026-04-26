@@ -12,7 +12,7 @@ const workspaceStore = new WorkspaceStore(process.cwd());
 const benchReadService = new BenchReadService(workspaceStore);
 const benchWriteService = new BenchWriteService(workspaceStore);
 const componentSessionService = new ComponentSessionService(pool, benchReadService, workspaceStore);
-const taskService = new TaskService(workspaceStore);
+const taskService = new TaskService(workspaceStore, componentSessionService);
 const app = createApp(pool, benchReadService, benchWriteService, componentSessionService, taskService);
 
 const server = app.listen(port, () => {

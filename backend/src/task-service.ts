@@ -3,6 +3,7 @@ import { z } from "zod";
 import { benchIdSchema } from "./bench.js";
 import { componentInstanceIdSchema } from "./component.js";
 import { createTask, taskMetadataSchema, taskStatusSchema, type TaskMetadata, type TaskStatus } from "./task.js";
+import type { ComponentSessionService } from "./component-session-service.js";
 import { parseComponentWriteActor } from "./write-actor.js";
 import { WorkspaceNotFoundError, WorkspaceStore, WorkspaceValidationError } from "./workspace-store.js";
 
@@ -25,7 +26,10 @@ export interface ListTasksOptions {
 }
 
 export class TaskService {
-  constructor(private readonly store: WorkspaceStore) {}
+  constructor(
+    private readonly store: WorkspaceStore,
+    private readonly componentSessionService?: ComponentSessionService,
+  ) {}
 
   async createTask(input: unknown): Promise<TaskMetadata> {
     const request = createTaskRequestSchema.parse(input);
@@ -59,7 +63,20 @@ export class TaskService {
     );
 
     await this.store.writeTask(task);
-    return task;
+
+    if (!this.componentSessionService) {
+      return task;
+    }
+
+    const taskSession = await this.componentSessionService.createTaskRunSession(task);
+    const runningTask = taskMetadataSchema.parse({
+      ...task,
+      status: "running",
+      taskSessionId: taskSession.id,
+      updatedAt: new Date().toISOString(),
+    });
+    await this.store.writeTask(runningTask);
+    return runningTask;
   }
 
   async listTasks(options: ListTasksOptions): Promise<TaskMetadata[]> {
