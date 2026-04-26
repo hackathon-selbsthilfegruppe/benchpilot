@@ -108,7 +108,7 @@ test.describe("demo: scientist generates an experiment plan", () => {
 
     await sb.narrate(
       "natalie",
-      "Open a component to see its procedure. The scientist can freely adapt the experiment protocol — every section is editable, every section is chat-driven.",
+      "Open a component to see its procedure. The scientist can freely adapt the experiment — every section is editable, every section is chat-driven.",
       async () => {
         const firstCard = page.locator("[data-testid^='open-']").first();
         await firstCard.click();

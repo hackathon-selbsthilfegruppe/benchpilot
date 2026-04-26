@@ -1214,7 +1214,7 @@ function ComponentCard({
           </span>
         )}
         <span
-          className={`truncate text-xs ${supporting ? "text-subtle" : "text-muted"}`}
+          className={`min-w-0 flex-1 truncate text-xs ${supporting ? "text-subtle" : "text-muted"}`}
         >
           {component.summary}
         </span>
