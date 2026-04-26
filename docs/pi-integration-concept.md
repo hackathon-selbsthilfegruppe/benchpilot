@@ -12,7 +12,7 @@ Key properties:
 
 - the system starts from an intake brief
 - requirements are derived dynamically
-- component instances are created dynamically from templates/archetypes
+- component instances are created dynamically, often starting from a small set of presets in code
 - components collaborate through resources and tasks
 - the process is iterative, not a rigid pipeline
 
@@ -51,7 +51,8 @@ The key point is that pi sessions are **created from backend decisions**, not fr
 - pi CLI as the main integration surface
 - RPC mode as the primary path
 - `pi-web-ui` as the product shell
-- uncontrolled discovery of a contributor’s personal extensions/skills/themes
+- uncontrolled discovery of a contributor’s personal extensions/themes
+- a skill system as a primary modeling tool for components
 
 ## 5. Integration principle
 
@@ -60,7 +61,7 @@ The key point is that pi sessions are **created from backend decisions**, not fr
 BenchPilot owns:
 - intake/brief concepts
 - requirements
-- component templates and instances
+- component presets and instances
 - resources
 - tasks
 - backend API
@@ -99,25 +100,37 @@ Instead, it should:
 
 1. receive an intake brief
 2. derive requirements
-3. choose fitting component templates/archetypes
+3. choose fitting component presets or create ad-hoc component definitions
 4. instantiate concrete component instances
 5. spin up sessions for those instances as needed
 
-### Component template
+### Component presets
 
-A reusable archetype such as:
-- literature review
-- protocol design
-- reagent sourcing
-- budget planning
-- validation design
+For the hackathon, keep this simple: we will have a small preset set in code.
+
+The initial preset components are:
+- `orchestrator` — coordinates the bench and delegates tasks
+- `protocols` — fetches and curates protocol/source material from the protocol-source API layer
+- `budget` — estimates costs and keeps budget artifacts
+- `timeline` — estimates phases, dependencies, and execution timing
+- `literature` — investigates novelty, overlap, and supporting references
+
+Each preset should define at least:
+- short description
+- detailed description
+- pre-prompt
+- optional default tool policy
+
+### Prompt-engineering note
+
+Prompt engineers should create pre-prompts for those five presets now while backend work continues. That parallelization is intentional.
 
 ### Component instance
 
 A concrete runtime worker for one bench/problem.
 
 The backend should construct its prompt and workspace from:
-- the template
+- the preset or ad-hoc definition
 - the requirement(s) it addresses
 - current bench resources
 - current cheap cross-component context
@@ -157,7 +170,7 @@ This is where backend logic becomes more important than pi itself.
 Each session prompt should be assembled from:
 
 - global project instructions
-- component template instructions
+- component preset or component-specific instructions
 - current requirement(s)
 - component-local resources
 - summaries and TOCs of other relevant component instances
@@ -229,7 +242,7 @@ But in the current hackathon phase, `pi-coding-agent` remains the fastest and mo
 - add requirement-aware component instantiation logic
 - add read-only resource/component APIs
 - add CLI reads
-- add role skills that teach TOC-first / details-on-demand behavior
+- wire preset component prompts and metadata into backend-managed sessions
 
 ### After that
 

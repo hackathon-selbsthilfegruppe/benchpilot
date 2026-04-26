@@ -10,7 +10,7 @@ BenchPilot should be modeled around five main entities:
 
 - **Bench**
 - **Requirement**
-- **Component Template**
+- **Component Preset**
 - **Component Instance**
 - **Resource**
 
@@ -67,25 +67,29 @@ Examples:
 
 For hackathon speed, requirements can initially be implemented as a special resource kind, but the concept should treat them as first-class.
 
-## 4. Component templates
+## 4. Component presets
 
-A component template is a reusable archetype.
+A component preset is a reusable definition we keep in code for speed.
 
-Examples:
-- `literature-review`
-- `protocol-design`
-- `reagent-sourcing`
-- `budget-planning`
-- `validation-design`
+The initial preset set is:
+- `orchestrator` — coordinates the bench and delegates tasks
+- `protocols` — fetches and curates protocol/source material from the protocol-source API layer
+- `budget` — estimates costs and keeps budget artifacts
+- `timeline` — estimates phases, dependencies, and execution timing
+- `literature` — investigates novelty, overlap, and supporting references
 
-### Template should describe
+### Each preset should describe
 
-- template ID
+- preset ID
 - display name
-- prompt skeleton
-- tool policy
-- default workspace/resource conventions
-- maybe UI hints
+- short description
+- detailed description
+- pre-prompt
+- optional default tool policy
+
+### Prompt-engineering note
+
+Prompt engineers should create the pre-prompts for those five presets now, in parallel with backend work.
 
 ## 5. Component instances
 
@@ -104,7 +108,7 @@ A component instance exists because one or more requirements made it necessary.
 {
   "id": "literature-crp-biosensor",
   "benchId": "bench-crp-biosensor",
-  "templateId": "literature-review",
+  "presetId": "literature",
   "name": "Literature — CRP biosensor",
   "summary": "Tracks prior work, novelty signal, and references relevant to the CRP biosensor hypothesis.",
   "requirementIds": ["req-001"],
@@ -246,7 +250,7 @@ Responsibilities:
 Responsibilities:
 - discover component instances for one bench
 - read summaries and TOCs
-- expose template linkage
+- expose preset linkage
 
 ### 4. Resource Store
 

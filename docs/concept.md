@@ -86,24 +86,20 @@ For hackathon simplicity, requirements can initially be represented as a resourc
 
 BenchPilot still uses **components** as the main working units, but components are no longer best thought of as a fixed list or plugin inventory.
 
-### Component template
+The backend may have some **component presets in code**, but the visible bench is still dynamic. A given bench only gets the component instances that make sense for that problem.
 
-A component template is a reusable archetype such as:
+### Component preset
 
-- literature review
-- protocol design
-- reagent sourcing
-- budget planning
-- validation design
-- equipment / samples / compliance support
+A component preset is a reusable definition we keep in code for speed.
 
-A template defines:
+For now, each preset should define at least:
 
-- role prompt shape
-- expected input/output style
-- tool policy
-- workspace skeleton
-- maybe UI hints
+- `id`
+- `name`
+- `shortDescription`
+- `detailedDescription`
+- `preprompt`
+- optional default tool policy
 
 ### Component instance
 
@@ -112,15 +108,37 @@ A component instance is a runtime-created specialist for one bench.
 Examples:
 
 - `literature-crp-biosensor`
-- `protocol-paper-electrochemistry`
-- `reagents-whole-blood-crp`
-- `validation-elisa-comparison`
+- `protocols-crp-biosensor`
+- `budget-co2-fixation`
+- `timeline-whole-blood-assay`
 
-A component instance exists because one or more requirements made it necessary.
+A component instance exists because the current bench needs it.
+
+### Initial preset components
+
+These five presets are important right now and should be treated as the first prompt-engineering workstream:
+
+- `orchestrator` — coordinates the bench and delegates tasks
+- `protocols` — fetches and curates protocol/source material from the protocol-source API layer
+- `budget` — estimates costs and keeps budget artifacts
+- `timeline` — estimates phases, dependencies, and execution timing
+- `literature` — investigates novelty, overlap, and supporting references
+
+### Prompt-engineering note
+
+Prompt engineers should start writing **pre-prompts** for those five preset components now, in parallel with backend work.
+
+For each preset component we need:
+
+- a short description (cheap index / component discovery)
+- a detailed description (load on demand)
+- a pre-prompt that defines the role
+
+That is enough for the backend team to continue with dynamic instantiation and session/runtime work while prompt engineers move ahead independently.
 
 ### Important consequence
 
-The visible bench for one question may have a different set of components than the visible bench for another question.
+The visible bench for one question may have a different set of component instances than the visible bench for another question.
 
 That is expected and desirable.
 
@@ -178,7 +196,7 @@ A component does **not** automatically see:
 
 Instead, it requests the full body only when it actually needs it.
 
-This is the same spirit as lazy skill loading: cheap overview by default, detailed context on demand.
+This is the same spirit as lazy loading more context only when needed: cheap overview by default, detailed context on demand.
 
 ## Resources should carry more metadata now
 

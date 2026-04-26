@@ -121,7 +121,7 @@ Responsibilities:
 
 Responsibilities:
 - read the current component instances for a bench
-- know which template/archetype each instance came from
+- know which preset each instance came from, if any
 - surface summaries and TOCs
 
 ### 4. Resource Store
@@ -167,7 +167,7 @@ Responsibilities:
 
 1. define bench metadata shape
 2. define requirement shape
-3. define component instance shape
+3. define component preset + component instance shape
 4. implement `GET /api/benches`
 5. implement `GET /api/benches/:benchId/components`
 6. implement `GET /api/benches/:benchId/components/:componentInstanceId/resources`
@@ -180,11 +180,22 @@ Responsibilities:
 3. add `benchpilot components list`
 4. add `benchpilot resources list/get`
 
-### Track 4 — Agent behavior via skills
+### Track 4 — Prompt-definition workstream
 
-1. teach TOC-first behavior
-2. teach details-on-demand behavior
-3. teach requirement-aware reading
+Prompt engineers should create pre-prompts now for these preset components:
+
+- `orchestrator` — coordinates the bench and delegates tasks
+- `protocols` — fetches and curates protocol/source material from the protocol-source API layer
+- `budget` — estimates costs and keeps budget artifacts
+- `timeline` — estimates phases, dependencies, and execution timing
+- `literature` — investigates novelty, overlap, and supporting references
+
+For each preset, produce:
+- short description
+- detailed description
+- pre-prompt
+
+Backend should then wire those prompt definitions into session creation.
 
 ### Track 5 — Tasks
 
@@ -229,3 +240,7 @@ The next backend implementation target should be:
 ### dynamic bench state reads
 
 That is the highest-leverage next step after the current session/chat integration.
+
+### Prompt-engineering parallelization
+
+Do not wait on backend completion to start prompt work. The five preset components above are stable enough to hand to prompt engineers immediately.

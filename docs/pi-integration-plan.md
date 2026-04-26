@@ -42,7 +42,7 @@ Continue to use:
 Backend should own:
 - intake brief structure
 - requirement derivation
-- component template selection
+- component preset selection / dynamic component creation
 - component instance lifecycle
 - resource storage
 - task storage and polling
@@ -54,6 +54,23 @@ Agents should initially reach backend semantics through:
 - backend API
 - a thin CLI
 - pi `bash`
+
+### Rule 3.5: prompt engineering can run in parallel now
+
+The following preset components are confirmed and should get pre-prompts immediately:
+
+- `orchestrator` — coordinates the bench and delegates tasks
+- `protocols` — fetches and curates protocol/source material from the protocol-source API layer
+- `budget` — estimates costs and keeps budget artifacts
+- `timeline` — estimates phases, dependencies, and execution timing
+- `literature` — investigates novelty, overlap, and supporting references
+
+For each one we need:
+- a short description
+- a detailed description
+- a pre-prompt
+
+Prompt engineers can work on those now while backend implementation continues.
 
 ### Rule 4: keep resources cheap and tasks file-backed
 
@@ -89,7 +106,7 @@ frontend UI
    v
 backend runtime
    |
-   | intake / requirements / component templates / component instances
+   | intake / requirements / component presets / component instances
    v
 resources + summaries + TOCs
    |
@@ -115,6 +132,18 @@ That means:
 - expose them through backend reads
 
 This gives both UI and agents something stable to reason over.
+
+## Preset component note
+
+The backend should treat the current five presets as the initial default vocabulary, not the permanent full system:
+
+- `orchestrator`
+- `protocols`
+- `budget`
+- `timeline`
+- `literature`
+
+They are a simplification for the hackathon, not a denial of dynamic components.
 
 ## CLI direction
 

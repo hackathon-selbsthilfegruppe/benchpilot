@@ -22,7 +22,7 @@ The frontend/backend contract should be expressed in product nouns:
 - **Bench**
 - **Intake Brief**
 - **Requirement**
-- **Component Template**
+- **Component Preset**
 - **Component Instance**
 - **Resource**
 - **Task**
@@ -165,15 +165,32 @@ This is the big conceptual update.
 }
 ```
 
-### Component template metadata
+### Component preset metadata
 
 ```json
 {
-  "id": "literature-review",
-  "name": "Literature Review",
-  "description": "Investigates prior work and evidence"
+  "id": "literature",
+  "name": "Literature",
+  "shortDescription": "Investigates prior work and novelty.",
+  "detailedDescription": "Reads scientific references, compares overlap, and produces literature resources."
 }
 ```
+
+### Initial preset set
+
+The initial preset set is:
+- `orchestrator` — coordinates the bench and delegates tasks
+- `protocols` — fetches and curates protocol/source material from the protocol-source API layer
+- `budget` — estimates costs and keeps budget artifacts
+- `timeline` — estimates phases, dependencies, and execution timing
+- `literature` — investigates novelty, overlap, and supporting references
+
+Prompt engineers should prepare:
+- short description
+- detailed description
+- pre-prompt
+
+for each of those now.
 
 ### Component instance summary
 
@@ -181,7 +198,7 @@ This is the big conceptual update.
 {
   "id": "literature-crp-biosensor",
   "benchId": "bench-crp-biosensor",
-  "templateId": "literature-review",
+  "presetId": "literature",
   "name": "Literature — CRP biosensor",
   "summary": "Tracks prior work, novelty signal, and references relevant to the CRP biosensor hypothesis.",
   "requirementIds": ["req-001"],
@@ -311,7 +328,7 @@ Frontend should not depend on:
 - raw pi events
 - local filesystem layout
 - provider/model internals
-- how the backend chooses component templates internally
+- how the backend chooses or derives component instances internally beyond the stable preset layer
 
 ## 11. Recommended implementation order
 
