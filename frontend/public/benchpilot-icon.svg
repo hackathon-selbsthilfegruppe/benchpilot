@@ -1,25 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
   <defs>
     <linearGradient id="planeGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#0ea5e9"/>
-      <stop offset="100%" stop-color="#6366f1"/>
-    </linearGradient>
+      <stop offset="0%" stop-color="#0ea5e9"/> <stop offset="100%" stop-color="#6366f1"/> </linearGradient>
   </defs>
-  <g transform="translate(10, 4)">
-    <path d="M 15,75 L 110,32 L 85,115 L 50,78 Z"
-          fill="none"
-          stroke="url(#planeGradient)"
-          stroke-width="10"
+
+  <g>
+    <path d="M 13,62 L 108,19 L 83,102 L 48,65 Z" 
+          fill="none" 
+          stroke="url(#planeGradient)" 
+          stroke-width="8" 
           stroke-linejoin="round"/>
-    <path d="M 50,78 L 110,32"
-          fill="none"
-          stroke="url(#planeGradient)"
-          stroke-width="10"
-          stroke-linecap="round"
+          
+    <path d="M 48,65 L 108,19" 
+          fill="none" 
+          stroke="url(#planeGradient)" 
+          stroke-width="8" 
+          stroke-linecap="round" 
           stroke-linejoin="round"/>
-    <circle cx="15" cy="75" r="11" fill="#0ea5e9"/>
-    <circle cx="50" cy="78" r="11" fill="#3b82f6"/>
-    <circle cx="85" cy="115" r="11" fill="#8b5cf6"/>
-    <circle cx="110" cy="32" r="12" fill="#6366f1"/>
+    
+    <circle cx="13" cy="62" r="9.5" fill="#0ea5e9"/>
+    <circle cx="48" cy="65" r="9.5" fill="#3b82f6"/>
+    <circle cx="83" cy="102" r="9.5" fill="#8b5cf6"/>
+    <circle cx="108" cy="19" r="9.5" fill="#6366f1"/>
   </g>
 </svg>
