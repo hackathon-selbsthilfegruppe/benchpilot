@@ -27,6 +27,13 @@ afterEach(async () => {
 });
 
 describe("createApp", () => {
+  it("adds a request id header to responses", async () => {
+    const response = await request(createApp(createFakePool({})), "/api/health", { method: "GET" });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-request-id")).toBeTruthy();
+  });
+
   it("streams normalized prompt events from the session service", async () => {
     const fakePool = createFakePool({
       prompt: async (_sessionId, _message, onEvent) => {

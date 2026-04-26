@@ -10,6 +10,7 @@ import type { ComponentSessionService } from "./component-session-service.js";
 import type { BenchMaterializationService } from "./bench-materialization-service.js";
 import type { IntakeService } from "./intake-service.js";
 import type { TaskService } from "./task-service.js";
+import { logger } from "./logger.js";
 import { OwnershipRuleError } from "./ownership.js";
 import {
   fetchProtocolIo,
@@ -114,6 +115,33 @@ export function createApp(
 
   app.use(cors());
   app.use(express.json({ limit: "2mb" }));
+  app.use((req, res, next) => {
+    const requestId = typeof req.header("x-request-id") === "string" && req.header("x-request-id")?.trim()
+      ? req.header("x-request-id")!.trim()
+      : crypto.randomUUID();
+    res.locals.requestId = requestId;
+    res.setHeader("x-request-id", requestId);
+
+    const startedAt = Date.now();
+    logger.info("http.request.started", {
+      requestId,
+      method: req.method,
+      path: req.originalUrl,
+      query: req.query,
+    });
+
+    res.on("finish", () => {
+      logger.info("http.request.completed", {
+        requestId,
+        method: req.method,
+        path: req.originalUrl,
+        statusCode: res.statusCode,
+        durationMs: Date.now() - startedAt,
+      });
+    });
+
+    next();
+  });
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
@@ -382,7 +410,7 @@ export function createApp(
     res.status(204).end();
   }));
 
-  app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((error: unknown, req: Request, res: Response, _next: NextFunction) => {
     const status = error instanceof z.ZodError || error instanceof WorkspaceValidationError
       ? 400
       : error instanceof OwnershipRuleError
@@ -390,6 +418,13 @@ export function createApp(
         : error instanceof WorkspaceNotFoundError
           ? 404
           : 500;
+    logger.error("http.request.failed", {
+      requestId: getRequestId(res),
+      method: req.method,
+      path: req.originalUrl,
+      statusCode: status,
+      error,
+    });
     res.status(status).json({
       error: error instanceof Error ? error.message : "Unknown server error",
       details: error instanceof z.ZodError ? error.flatten() : undefined,
@@ -493,4 +528,8 @@ function requireSessionId(req: Request): string {
     throw new Error("Missing sessionId route parameter");
   }
   return value;
+}
+
+function getRequestId(res: Response): string | undefined {
+  return typeof res.locals.requestId === "string" ? res.locals.requestId : undefined;
 }
