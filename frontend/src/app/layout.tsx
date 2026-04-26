@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   title: "BenchPilot",
   description: "A bench for scientific engineers — clickdummy",
   icons: {
-    icon: "/benchpilot-logo.svg",
+    icon: "/benchpilot-icon.svg",
   },
 };
 

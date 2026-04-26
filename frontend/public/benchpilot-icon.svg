@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" width="100%" height="100%">
+  <defs>
+    <linearGradient id="planeGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(10, 4)">
+    <path d="M 15,75 L 110,32 L 85,115 L 50,78 Z"
+          fill="none"
+          stroke="url(#planeGradient)"
+          stroke-width="10"
+          stroke-linejoin="round"/>
+    <path d="M 50,78 L 110,32"
+          fill="none"
+          stroke="url(#planeGradient)"
+          stroke-width="10"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+    <circle cx="15" cy="75" r="11" fill="#0ea5e9"/>
+    <circle cx="50" cy="78" r="11" fill="#3b82f6"/>
+    <circle cx="85" cy="115" r="11" fill="#8b5cf6"/>
+    <circle cx="110" cy="32" r="12" fill="#6366f1"/>
+  </g>
+</svg>
