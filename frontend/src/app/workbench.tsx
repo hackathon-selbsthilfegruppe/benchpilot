@@ -725,45 +725,32 @@ function ComponentStrip({
       (t) => t.status === "open",
     ).length;
     return (
-      <div className="flex w-full items-center gap-3 rounded-lg border border-accent bg-accent-soft px-4 py-3">
-        <select
-          value={activeHypothesisSlug}
-          onChange={(e) => {
-            const next = e.target.value;
-            if (next !== activeHypothesisSlug) {
-              window.location.href = `/bench/${encodeURIComponent(next)}`;
-            }
-          }}
-          aria-label="Switch hypothesis"
-          className="shrink-0 rounded-md border border-border-strong bg-surface px-2 py-1 text-xs font-semibold text-foreground"
-        >
-          {hypotheses.map((h) => (
-            <option key={h.slug} value={h.slug}>
-              {h.name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => onOpen(hypothesis.id)}
-          className="group flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-1 text-left transition hover:bg-surface"
-        >
-          <span className="truncate text-xs text-accent-soft-fg">
-            {hypothesis.summary}
+      <button
+        type="button"
+        onClick={() => onOpen(hypothesis.id)}
+        className="group flex w-full items-center gap-3 rounded-lg border-2 border-accent bg-accent-soft px-4 py-3 text-left transition-colors duration-150 hover:bg-accent hover:text-white"
+      >
+        <span className="shrink-0 rounded-sm bg-accent-soft-fg/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent-soft-fg group-hover:bg-white/20 group-hover:text-white">
+          Hypothesis
+        </span>
+        <span className="shrink-0 text-sm font-semibold text-accent-soft-fg group-hover:text-white">
+          {hypothesis.name}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-xs text-accent-soft-fg/80 group-hover:text-white/85">
+          {hypothesis.summary}
+        </span>
+        {inboundOpen > 0 && (
+          <span
+            title={`${inboundOpen} open inbound task${inboundOpen === 1 ? "" : "s"}`}
+            className="shrink-0 font-mono text-xs text-accent-soft-fg group-hover:text-white"
+          >
+            → {inboundOpen}
           </span>
-          {inboundOpen > 0 && (
-            <span
-              title={`${inboundOpen} open inbound task${inboundOpen === 1 ? "" : "s"}`}
-              className="shrink-0 font-mono text-xs text-accent-soft-fg"
-            >
-              → {inboundOpen}
-            </span>
-          )}
-          <span className="ml-auto shrink-0 text-[11px] text-accent-soft-fg group-hover:text-accent">
-            open →
-          </span>
-        </button>
-      </div>
+        )}
+        <span className="ml-auto shrink-0 text-[11px] text-accent-soft-fg/80 group-hover:text-white">
+          open →
+        </span>
+      </button>
     );
   }
 
