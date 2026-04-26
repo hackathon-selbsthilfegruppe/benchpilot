@@ -3,7 +3,7 @@
 - ID: `02_000`
 - Type: `Epic`
 - Area: `Backend`
-- Status: `Open`
+- Status: `Closed`
 
 ## Goal
 
@@ -53,3 +53,13 @@ This also enables the TOC-first, details-on-demand access pattern described in t
 - cheap component/resource browsing works without loading all full bodies
 - the context endpoint supports TOC-first cross-component access
 - agents and frontend can inspect the same backend state consistently
+
+## Resolution
+
+Closed after implementing and testing:
+
+- `02_001` bench and requirement read endpoints
+- `02_002` component instance read endpoints
+- `02_003` resource TOC and detail read endpoints
+- `02_004` cross-component context endpoint
+- `02_005` loader-backed read services and app integration tests
