@@ -112,6 +112,92 @@ export async function runCli(
         ),
       );
     }
+
+    if (command === "tasks" && subcommand === "create") {
+      const options = parseOptions(args.slice(2));
+      const benchId = requireOption(options, "bench");
+      const from = requireOption(options, "from");
+      const to = requireOption(options, "to");
+      const title = requireOption(options, "title");
+      const body = optionalStringOption(options, "body") ?? "";
+      const request = options.stdin ? await readStdin() : body;
+      if (!request.trim()) {
+        throw new Error("Missing required task body: use --body <text> or --stdin");
+      }
+      return printJson(
+        io,
+        await fetchJson(deps.fetch, `${backendUrl}/api/tasks`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            actor: {
+              benchId,
+              componentInstanceId: from,
+              presetId: optionalStringOption(options, "actor-preset"),
+            },
+            fromComponentInstanceId: from,
+            toComponentInstanceId: to,
+            title,
+            request,
+          }),
+        }),
+      );
+    }
+
+    if (command === "tasks" && subcommand === "list") {
+      const options = parseOptions(args.slice(2));
+      const benchId = requireOption(options, "bench");
+      const search = new URLSearchParams({ benchId });
+      const component = optionalStringOption(options, "component");
+      const status = optionalStringOption(options, "status");
+      if (component) search.set("componentInstanceId", component);
+      if (status) search.set("status", status);
+      return printJson(io, await fetchJson(deps.fetch, `${backendUrl}/api/tasks?${search.toString()}`));
+    }
+
+    if (command === "tasks" && subcommand === "get") {
+      const taskId = requireArg(args[2], "taskId");
+      const options = parseOptions(args.slice(3));
+      const benchId = requireOption(options, "bench");
+      return printJson(io, await fetchJson(deps.fetch, `${backendUrl}/api/tasks/${encodeURIComponent(taskId)}?benchId=${encodeURIComponent(benchId)}`));
+    }
+
+    if (command === "tasks" && subcommand === "complete") {
+      const taskId = requireArg(args[2], "taskId");
+      const options = parseOptions(args.slice(3));
+      const benchId = requireOption(options, "bench");
+      const actor = requireOption(options, "actor");
+      const resultText = optionalStringOption(options, "result-text") ?? (options.stdin ? await readStdin() : "");
+      if (!resultText.trim()) {
+        throw new Error("Missing required task result text: use --result-text <text> or --stdin");
+      }
+      return printJson(
+        io,
+        await fetchJson(deps.fetch, `${backendUrl}/api/tasks/${encodeURIComponent(taskId)}/result`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            benchId,
+            actor: {
+              benchId,
+              componentInstanceId: actor,
+              presetId: optionalStringOption(options, "actor-preset"),
+            },
+            resultText,
+            resultResourceId: optionalStringOption(options, "result-resource-id"),
+            createdResourceIds: listOptionValues(options, "created-resource-id"),
+            modifiedResourceIds: listOptionValues(options, "modified-resource-id"),
+          }),
+        }),
+      );
+    }
+
+    if (command === "tasks" && subcommand === "result") {
+      const taskId = requireArg(args[2], "taskId");
+      const options = parseOptions(args.slice(3));
+      const benchId = requireOption(options, "bench");
+      return printJson(io, await fetchJson(deps.fetch, `${backendUrl}/api/tasks/${encodeURIComponent(taskId)}/result?benchId=${encodeURIComponent(benchId)}`));
+    }
   } catch (error) {
     io.stderr(error instanceof Error ? error.message : String(error));
     return 1;
@@ -130,8 +216,8 @@ function requireArg(value: string | undefined, label: string): string {
   return value;
 }
 
-async function fetchJson(fetchImpl: typeof fetch, url: string): Promise<unknown> {
-  const response = await fetchImpl(url);
+async function fetchJson(fetchImpl: typeof fetch, url: string, init?: RequestInit): Promise<unknown> {
+  const response = await fetchImpl(url, init);
   if (!response.ok) {
     throw new Error(`Backend request failed (${response.status}) for ${url}`);
   }
@@ -141,4 +227,63 @@ async function fetchJson(fetchImpl: typeof fetch, url: string): Promise<unknown>
 function printJson(io: CliIo, value: unknown): number {
   io.stdout(JSON.stringify(value, null, 2));
   return 0;
+}
+
+function parseOptions(args: string[]): Record<string, string | true | string[]> {
+  const options: Record<string, string | true | string[]> = {};
+
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index];
+    if (!token?.startsWith("--")) {
+      continue;
+    }
+
+    const key = token.slice(2);
+    const next = args[index + 1];
+    if (!next || next.startsWith("--")) {
+      options[key] = true;
+      continue;
+    }
+
+    const existing = options[key];
+    if (existing === undefined || existing === true) {
+      options[key] = next;
+    } else if (Array.isArray(existing)) {
+      existing.push(next);
+    } else {
+      options[key] = [existing, next];
+    }
+    index += 1;
+  }
+
+  return options;
+}
+
+function requireOption(options: Record<string, string | true | string[]>, key: string): string {
+  const value = options[key];
+  if (typeof value !== "string") {
+    throw new Error(`Missing required option: --${key}`);
+  }
+  return value;
+}
+
+function optionalStringOption(options: Record<string, string | true | string[]>, key: string): string | undefined {
+  const value = options[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function listOptionValues(options: Record<string, string | true | string[]>, key: string): string[] {
+  const value = options[key];
+  if (value === undefined || value === true) {
+    return [];
+  }
+  return Array.isArray(value) ? value : [value];
+}
+
+async function readStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks).toString("utf8").trim();
 }
