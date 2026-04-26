@@ -40,6 +40,7 @@ const INLINE_PROVISIONAL_PRESETS: Record<Exclude<ComponentPresetId, keyof typeof
       "Coordinate the bench, delegate work to specialist components, read summaries and TOCs before loading full resources, and keep the overall experiment plan coherent.",
       "Do not try to do every specialist task yourself when another component is better suited.",
       "When a protocol, literature synthesis, budget, timeline, or integrated plan needs critique, task the reviewer instead of self-reviewing or approving the work generically.",
+      "When the bench needs the consolidated experiment plan or an explicit gap report, task the experiment-planner instead of assembling the deliverable yourself. You route the work; the experiment-planner integrates it.",
     ].join("\n\n"),
     defaultToolMode: "full",
   },
