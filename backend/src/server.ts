@@ -7,7 +7,9 @@ import { BenchReadService } from "./bench-read-service.js";
 import { BenchWriteService } from "./bench-write-service.js";
 import { ComponentSessionService } from "./component-session-service.js";
 import { IntakeService } from "./intake-service.js";
+import { logger } from "./logger.js";
 import { SessionPool } from "./session-pool.js";
+import { TaskDispatcher } from "./task-dispatcher.js";
 import { TaskService } from "./task-service.js";
 import { WorkspaceStore } from "./workspace-store.js";
 
@@ -22,6 +24,9 @@ const benchMaterializationService = new BenchMaterializationService(workspaceSto
 const componentSessionService = new ComponentSessionService(pool, benchReadService, workspaceStore, projectRoot);
 const intakeService = new IntakeService(workspaceStore, benchMaterializationService, benchReadService, componentSessionService);
 const taskService = new TaskService(workspaceStore, componentSessionService);
+const taskDispatcher = new TaskDispatcher(workspaceStore, taskService, pool);
+const taskDispatchEnabled = process.env.BENCHPILOT_TASK_DISPATCH_ENABLED?.trim().toLowerCase() !== "false";
+const taskDispatchIntervalMs = Number(process.env.BENCHPILOT_TASK_DISPATCH_INTERVAL_MS ?? 2000);
 const app = createApp(
   pool,
   benchReadService,
@@ -36,7 +41,23 @@ const server = app.listen(port, () => {
   console.log(`BenchPilot backend listening on http://localhost:${port}`);
 });
 
+let taskDispatchTimer: NodeJS.Timeout | null = null;
+
+if (taskDispatchEnabled) {
+  logger.info("task.dispatch.loop.started", { intervalMs: taskDispatchIntervalMs });
+  void taskDispatcher.dispatchRunnableTasksOnce();
+  taskDispatchTimer = setInterval(() => {
+    void taskDispatcher.dispatchRunnableTasksOnce();
+  }, taskDispatchIntervalMs);
+} else {
+  logger.warn("task.dispatch.loop.disabled", {});
+}
+
 async function shutdown() {
+  if (taskDispatchTimer) {
+    clearInterval(taskDispatchTimer);
+    taskDispatchTimer = null;
+  }
   await pool.disposeAll();
   server.close(() => process.exit(0));
 }

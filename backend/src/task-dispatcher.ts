@@ -13,6 +13,7 @@ export interface TaskPromptService {
 export class TaskDispatcher {
   private readonly logger = rootLogger.child({ scope: "task_dispatcher" });
   private readonly inFlightTaskIds = new Set<string>();
+  private scanInProgress = false;
 
   constructor(
     private readonly store: WorkspaceStore,
@@ -21,33 +22,45 @@ export class TaskDispatcher {
   ) {}
 
   async dispatchRunnableTasksOnce(): Promise<string[]> {
-    const benches = await this.store.listBenches();
+    if (this.scanInProgress) {
+      this.logger.debug("task.dispatch.scan.skipped", {
+        reason: "scan_already_in_progress",
+      });
+      return [];
+    }
+
+    this.scanInProgress = true;
+    try {
+      const benches = await this.store.listBenches();
     const runningTasks = await Promise.all(benches.map((bench) => this.taskService.listTasks({ benchId: bench.id, status: "running" })));
     const runnable = runningTasks
       .flat()
       .map((task) => ({ task, candidate: getRunnableTaskCandidate(task) }))
       .filter((entry): entry is { task: Awaited<ReturnType<TaskService["listTasks"]>>[number]; candidate: NonNullable<ReturnType<typeof getRunnableTaskCandidate>> } => Boolean(entry.candidate));
 
-    this.logger.info("task.dispatch.scan.completed", {
-      benchCount: benches.length,
-      runningTaskCount: runningTasks.flat().length,
-      runnableTaskCount: runnable.length,
-      inFlightTaskCount: this.inFlightTaskIds.size,
-    });
-
-    const dispatchedTaskIds: string[] = [];
-    for (const entry of runnable) {
-      if (this.inFlightTaskIds.has(entry.task.id)) {
-        continue;
-      }
-      this.inFlightTaskIds.add(entry.task.id);
-      dispatchedTaskIds.push(entry.task.id);
-      void this.dispatchTask(entry.task.benchId, entry.task.id).finally(() => {
-        this.inFlightTaskIds.delete(entry.task.id);
+      this.logger.info("task.dispatch.scan.completed", {
+        benchCount: benches.length,
+        runningTaskCount: runningTasks.flat().length,
+        runnableTaskCount: runnable.length,
+        inFlightTaskCount: this.inFlightTaskIds.size,
       });
-    }
 
-    return dispatchedTaskIds;
+      const dispatchedTaskIds: string[] = [];
+      for (const entry of runnable) {
+        if (this.inFlightTaskIds.has(entry.task.id)) {
+          continue;
+        }
+        this.inFlightTaskIds.add(entry.task.id);
+        dispatchedTaskIds.push(entry.task.id);
+        void this.dispatchTask(entry.task.benchId, entry.task.id).finally(() => {
+          this.inFlightTaskIds.delete(entry.task.id);
+        });
+      }
+
+      return dispatchedTaskIds;
+    } finally {
+      this.scanInProgress = false;
+    }
   }
 
   private async dispatchTask(benchId: string, taskId: string): Promise<void> {
