@@ -1,6 +1,7 @@
-import { proxyBenchpilotJson, runtime } from "../shared";
+import { proxyBenchpilotJson } from "../shared";
 
-export { runtime };
+export const runtime = "nodejs";
+
 
 export async function POST(req: Request) {
   const body = await req.text();

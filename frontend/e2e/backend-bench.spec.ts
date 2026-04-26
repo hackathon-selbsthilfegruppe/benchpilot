@@ -123,9 +123,69 @@ test.describe("backend-backed bench page", () => {
     expect(result.ndjson).toContain('"type":"message_completed"');
     expect(result.ndjson).toContain("I found similar prior work.");
   });
+
+  test("shows backend task state and exposes backend task result reads", async ({ page, request }) => {
+    await seedBackendBenchFixture({
+      tasks: [
+        {
+          id: "task-review-prior-work-overlap",
+          status: "pending",
+          resultText: undefined,
+          resultResourceId: undefined,
+          createdResourceIds: [],
+          modifiedResourceIds: [],
+          updatedAt: "2026-04-25T19:20:00.000Z",
+          completedAt: undefined,
+        },
+        {
+          id: "task-literature-result",
+          status: "completed",
+          resultText: "Similar work exists.",
+          resultResourceId: "lit-0007",
+          createdResourceIds: ["lit-0007"],
+          modifiedResourceIds: [],
+          updatedAt: "2026-04-25T19:24:00.000Z",
+          completedAt: "2026-04-25T19:24:00.000Z",
+        },
+      ],
+    });
+
+    await page.goto(`/bench/${BENCH_ID}`);
+    await expect(page.getByTestId("open-literature-backend-e2e-bench")).toBeVisible();
+
+    const tasksResponse = await request.get(`/api/benchpilot/tasks?benchId=${encodeURIComponent(BENCH_ID)}`);
+    expect(tasksResponse.ok()).toBe(true);
+    const tasksJson = await tasksResponse.json();
+    expect(tasksJson.tasks.find((task: { id: string }) => task.id === "task-literature-result")?.status).toBe("completed");
+
+    const resultResponse = await request.get(`/api/benchpilot/tasks/task-literature-result/result?benchId=${encodeURIComponent(BENCH_ID)}`);
+    expect(resultResponse.ok()).toBe(true);
+    expect(await resultResponse.json()).toEqual({
+      result: {
+        taskId: "task-literature-result",
+        status: "completed",
+        resultText: "Similar work exists.",
+        resultResourceId: "lit-0007",
+        createdResourceIds: ["lit-0007"],
+        modifiedResourceIds: [],
+        completedAt: "2026-04-25T19:24:00.000Z",
+      },
+    });
+  });
 });
 
-async function seedBackendBenchFixture() {
+async function seedBackendBenchFixture(options: {
+  tasks?: Array<{
+    id: string;
+    status: "pending" | "running" | "completed" | "error";
+    resultText?: string;
+    resultResourceId?: string;
+    createdResourceIds: string[];
+    modifiedResourceIds: string[];
+    updatedAt: string;
+    completedAt?: string;
+  }>;
+} = {}) {
   await rm(BENCH_DIR, { recursive: true, force: true });
 
   const requirementsDir = path.join(BENCH_DIR, "requirements");
@@ -135,12 +195,14 @@ async function seedBackendBenchFixture() {
   const tasksPendingDir = path.join(componentDir, "tasks", "pending");
   const tasksRunningDir = path.join(componentDir, "tasks", "running");
   const tasksCompletedDir = path.join(componentDir, "tasks", "completed");
+  const tasksErrorDir = path.join(componentDir, "tasks", "error");
 
   await mkdir(requirementsDir, { recursive: true });
   await mkdir(resourceFilesDir, { recursive: true });
   await mkdir(tasksPendingDir, { recursive: true });
   await mkdir(tasksRunningDir, { recursive: true });
   await mkdir(tasksCompletedDir, { recursive: true });
+  await mkdir(tasksErrorDir, { recursive: true });
 
   await writeJson(path.join(BENCH_DIR, "bench.json"), {
     id: BENCH_ID,
@@ -224,6 +286,26 @@ async function seedBackendBenchFixture() {
     "# Prior art note\n\nFull markdown body from the backend bench.\n",
     "utf8",
   );
+
+  for (const task of options.tasks ?? []) {
+    const stateDir = path.join(componentDir, "tasks", task.status);
+    await writeJson(path.join(stateDir, `${task.id}.json`), {
+      id: task.id,
+      benchId: BENCH_ID,
+      fromComponentInstanceId: "orchestrator-backend-e2e-bench",
+      toComponentInstanceId: "literature-backend-e2e-bench",
+      title: task.id === "task-review-prior-work-overlap" ? "Review prior work overlap" : "Literature result",
+      request: "Check whether closely related work already exists.",
+      status: task.status,
+      resultText: task.resultText,
+      resultResourceId: task.resultResourceId,
+      createdResourceIds: task.createdResourceIds,
+      modifiedResourceIds: task.modifiedResourceIds,
+      createdAt: "2026-04-25T19:20:00.000Z",
+      updatedAt: task.updatedAt,
+      completedAt: task.completedAt,
+    });
+  }
 }
 
 async function writeJson(filePath: string, value: unknown) {

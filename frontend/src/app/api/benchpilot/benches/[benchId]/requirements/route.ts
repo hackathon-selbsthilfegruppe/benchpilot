@@ -1,6 +1,7 @@
-import { proxyBenchpilotJson, runtime } from "../../../shared";
+import { proxyBenchpilotJson } from "../../../shared";
 
-export { runtime };
+export const runtime = "nodejs";
+
 
 export async function GET(
   _req: Request,
