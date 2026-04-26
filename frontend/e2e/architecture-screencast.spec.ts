@@ -32,14 +32,14 @@ test.describe("architecture: tech stack & quality gate", () => {
 
     await sb.showTitleCard(
       "Architecture & Quality",
-      "Three slides, one gate.",
+      "Front to back. Then the gate that keeps it honest.",
       "douglas",
-      "BenchPilot's stack — front to back, in three slides.",
+      "BenchPilot's stack — front to back — and the gate that keeps it honest.",
     );
 
     await sb.narrate(
       "douglas",
-      "Slide one — a bench, not a rigid workflow. Intake is a conversation between scientist and orchestrator, with no fixed steps. The bench it produces is a grid of editable component cards — open knowledge in, open formats out.",
+      "A bench, not a rigid workflow. Intake is a conversation between scientist and orchestrator, with no fixed steps. The bench it produces is a grid of editable component cards — open knowledge in, open formats out.",
       async () => {
         await page.goto(slide(1));
         await page.waitForLoadState("networkidle");
@@ -48,7 +48,7 @@ test.describe("architecture: tech stack & quality gate", () => {
 
     await sb.narrate(
       "douglas",
-      "Slide two — request flow. A scientist talks to a Next.js front end. The front end calls a Node back end over JSON. The back end runs the pi agent harness for long-lived per-component sessions, talking to whichever LLM is configured.",
+      "A scientist talks to a Next.js front end. The front end calls a Node back end over JSON. The back end runs the pi agent harness for long-lived per-component sessions, talking to whichever LLM is configured.",
       async () => {
         await page.goto(slide(2));
         await page.waitForLoadState("networkidle");
@@ -57,7 +57,7 @@ test.describe("architecture: tech stack & quality gate", () => {
 
     await sb.narrate(
       "douglas",
-      "Slide three — data and exports. Two pipelines pull from protocols dot io, Crossref, OpenWetWare, and Semantic Scholar. The workspace folder holds each hypothesis on disk. And exports — PDF for the deliverable, JSON for round-tripping.",
+      "Two pipelines feed real-world content into those agents. The protocol pipeline pulls from protocols dot io, Crossref, and OpenWetWare. The literature pipeline pulls from Semantic Scholar. Hypotheses live on disk under workspace, and ship out as PDF reports or JSON snapshots.",
       async () => {
         await page.goto(slide(3));
         await page.waitForLoadState("networkidle");
@@ -66,7 +66,7 @@ test.describe("architecture: tech stack & quality gate", () => {
 
     await sb.narrate(
       "douglas",
-      "Slide four — the quality gate. One shell script, four modes, eight checks. Typecheck, lint, vitest, coverage, audit, build, jscpd, knip. Default is all checks plus the dashboard.",
+      "Every change runs through one shell script. Typecheck, lint, vitest with coverage, build, copy-paste detection, dead-code analysis, and a dependency audit — wired to fail the gate on anything that matters.",
       async () => {
         await page.goto(slide(4));
         await page.waitForLoadState("networkidle");
@@ -83,10 +83,10 @@ test.describe("architecture: tech stack & quality gate", () => {
     );
 
     await sb.showTitleCard(
-      "Always green.",
-      "Next.js · Node · pi · LLM — guarded.",
+      "Open by design. Always green.",
+      "Swap the LLM. Add a data source. Plug in a new component. The gate has your back.",
       "douglas",
-      "Always green. That is BenchPilot.",
+      "Open by design — every layer is replaceable. Swap the LLM. Add a data source. Plug in a new component. The gate has your back.",
     );
 
     await sb.done();

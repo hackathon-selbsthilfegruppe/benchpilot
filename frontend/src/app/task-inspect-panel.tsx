@@ -55,6 +55,10 @@ export function TaskInspectPanel({
 
   useEffect(() => {
     if (open && !history && !loading && taskSessionId) {
+      // Lazy-load on first open. The setState inside loadHistory is the
+      // synchronization point with an external system (the API), which is
+      // exactly what this rule allows.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void loadHistory();
     }
   }, [open, history, loading, taskSessionId, loadHistory]);

@@ -1,5 +1,9 @@
+import {
+  adaptResourceToDetailDoc,
+  adaptResourceToTocEntry,
+} from "./backend-resource-adapter";
 import { getResource, listResources, type ResourceDetail } from "./benchpilot-workbench-client";
-import type { BenchComponent, DetailDoc, Status, TocEntry } from "./components-shared";
+import type { BenchComponent } from "./components-shared";
 
 export type ResourcesByComponentId = Record<string, ResourceDetail[]>;
 
@@ -51,44 +55,3 @@ export function applyResourcesToComponents(
   });
 }
 
-function adaptResourceToTocEntry(resource: ResourceDetail): TocEntry {
-  return {
-    slug: resource.id,
-    title: resource.title,
-    descriptor: resource.description || resource.kind,
-    status: mapResourceStatus(resource.status),
-  };
-}
-
-function adaptResourceToDetailDoc(resource: ResourceDetail): DetailDoc {
-  return {
-    slug: resource.id,
-    title: resource.title,
-    body: resource.content?.trim() || formatResourceFallback(resource),
-  };
-}
-
-function formatResourceFallback(resource: ResourceDetail): string {
-  return [
-    `# ${resource.title}`,
-    "",
-    `Kind: ${resource.kind}`,
-    `Status: ${resource.status}`,
-    resource.description ? `Description: ${resource.description}` : undefined,
-    "",
-    resource.summary,
-  ].filter(Boolean).join("\n");
-}
-
-function mapResourceStatus(status: string): Status {
-  switch (status) {
-    case "ready":
-      return "ok";
-    case "draft":
-      return "pending";
-    case "error":
-      return "blocked";
-    default:
-      return "info";
-  }
-}

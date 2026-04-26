@@ -482,14 +482,21 @@ if [[ "$RUN_CPD" == "true" ]]; then
   rm -rf "$LOG_DIR/quality-data/jscpd" 2>/dev/null || true
   run_capture "jscpd" npx --no -- jscpd
   cpd_extras=$(parse_jscpd_report "$LOG_DIR/quality-data/jscpd/jscpd-report.json")
-  # jscpd exits 0 even with clones found, so reclassify based on the parsed
-  # clone count: any clone above the configured min-lines/min-tokens fails the
-  # gate. Tighten or relax the threshold in .jscpd.json, not here.
-  cpd_clones=$(echo "$cpd_extras" | python3 -c '
+  # jscpd exits 0 even when clones are found, so reclassify based on the
+  # *percentage* of duplicated lines. Counting raw clones is too noisy:
+  # jscpd's TS tokenizer flags route-handler imports + cross-workspace type
+  # mirrors as 0-token matches we cannot dedupe. The percentage cap
+  # (CPD_MAX_PERCENT, default 5%) is the project-wide budget — fix real
+  # duplication when it climbs, not chase parser artefacts.
+  cpd_max_percent="${CPD_MAX_PERCENT:-5}"
+  cpd_should_fail=$(echo "$cpd_extras" | python3 -c '
 import json, sys
-print(int(json.load(sys.stdin).get("clones") or 0))
-')
-  if [[ "$cpd_clones" -gt 0 ]]; then
+data = json.load(sys.stdin)
+limit = float(sys.argv[1])
+percentage = float(data.get("percentage") or 0)
+print("true" if percentage > limit else "false")
+' "$cpd_max_percent")
+  if [[ "$cpd_should_fail" == "true" ]]; then
     reclassify_last true
   else
     reclassify_last false

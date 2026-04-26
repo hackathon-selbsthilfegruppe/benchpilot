@@ -13,13 +13,48 @@ import {
   DEFAULT_TASK_TIMEOUT_POLICY,
   type TaskTimeoutPolicy,
 } from "../src/task-timeout-policy.js";
-import { WorkspaceStore } from "../src/workspace-store.js";
+import { WorkspaceNotFoundError, WorkspaceStore } from "../src/workspace-store.js";
 
 const tempDirs: string[] = [];
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
+
+// dispatchRunnableTasksOnce returns once tasks are *dispatched* (fire-and-forget
+// via `void`), so the test has to wait for each task to reach its terminal
+// state. Fixed sleeps were timing-flaky under full-suite parallelism.
+//
+// readTask scans status-keyed subdirectories (pending/running/completed/error);
+// when the dispatcher moves a task between states it briefly lives in neither,
+// so a concurrent read can throw WorkspaceNotFoundError. Treat that as a
+// transient state — same as "not yet completed".
+async function waitForTaskStatus(
+  store: WorkspaceStore,
+  benchId: string,
+  componentInstanceId: string,
+  taskId: string,
+  expected: TaskMetadata["status"],
+  timeoutMs = 5_000,
+): Promise<TaskMetadata> {
+  const deadline = Date.now() + timeoutMs;
+  let last: TaskMetadata | undefined;
+  while (Date.now() < deadline) {
+    try {
+      last = await store.readTask(benchId, componentInstanceId, taskId);
+      if (last.status === expected) {
+        return last;
+      }
+    } catch (error) {
+      if (!(error instanceof WorkspaceNotFoundError)) throw error;
+      // mid-transition; keep polling
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(
+    `Task ${taskId} did not reach status ${expected} within ${timeoutMs}ms (last: ${last?.status ?? "not-yet-readable"})`,
+  );
+}
 
 describe("task dispatcher", () => {
   it("prompts runnable task-run sessions and auto-completes them with a durable result resource", async () => {
@@ -94,15 +129,13 @@ describe("task dispatcher", () => {
     const dispatched = await dispatcher.dispatchRunnableTasksOnce();
     expect(dispatched).toEqual([task.id]);
 
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    const stored = await waitForTaskStatus(store, bench.id, target.id, task.id, "completed");
 
     expect(prompts).toHaveLength(1);
     expect(prompts[0]?.sessionId).toBe(task.taskSessionId);
     expect(prompts[0]?.message).toContain(task.request);
 
-    const stored = await store.readTask(bench.id, target.id, task.id);
     expect(stored.executionStartedAt).toBeTruthy();
-    expect(stored.status).toBe("completed");
     expect(stored.resultResourceId).toBeTruthy();
 
     const resource = await store.readResource(bench.id, target.id, stored.resultResourceId!);
@@ -179,9 +212,8 @@ describe("task dispatcher", () => {
     });
 
     await dispatcher.dispatchRunnableTasksOnce();
-    await new Promise((resolve) => setTimeout(resolve, 25));
 
-    const stored = await store.readTask(bench.id, reviewer.id, task.id);
+    const stored = await waitForTaskStatus(store, bench.id, reviewer.id, task.id, "completed");
     const resource = await store.readResource(bench.id, reviewer.id, stored.resultResourceId!);
     expect(resource.kind).toBe("review-report");
     expect(resource.title).toContain("Review");
@@ -269,10 +301,9 @@ describe("task dispatcher", () => {
     });
 
     await dispatcher.dispatchRunnableTasksOnce();
-    await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const storedDeliver = await store.readTask(bench.id, planner.id, deliverTask.id);
-    const storedGap = await store.readTask(bench.id, planner.id, gapTask.id);
+    const storedDeliver = await waitForTaskStatus(store, bench.id, planner.id, deliverTask.id, "completed");
+    const storedGap = await waitForTaskStatus(store, bench.id, planner.id, gapTask.id, "completed");
     const deliverResource = await store.readResource(bench.id, planner.id, storedDeliver.resultResourceId!);
     const gapResource = await store.readResource(bench.id, planner.id, storedGap.resultResourceId!);
 
@@ -344,10 +375,8 @@ describe("task dispatcher", () => {
     });
 
     await dispatcher.dispatchRunnableTasksOnce();
-    await new Promise((resolve) => setTimeout(resolve, 25));
 
-    const stored = await store.readTask(bench.id, target.id, task.id);
-    expect(stored.status).toBe("error");
+    const stored = await waitForTaskStatus(store, bench.id, target.id, task.id, "error");
     expect(stored.failureKind).toBe("prompt_error");
     expect(stored.failureMessage).toBe("budget session failed");
     expect(stored.resultText).toBeUndefined();

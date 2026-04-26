@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { loadHypothesesIndex } from "@/lib/components-fs";
 import { getBenchpilotBackendEndpoint } from "@/lib/benchpilot-backend";
 import Start from "./start";
@@ -8,7 +9,13 @@ export default async function Page() {
   // Merge backend benches with legacy local benches so older local data stays
   // reachable, while backend-created benches remain the primary path.
   const existingHypotheses = dedupeHypotheses([...idx.hypotheses, ...backendHypotheses]);
-  return <Start existingHypotheses={existingHypotheses} />;
+  // Suspense boundary required because Start uses useSearchParams() — without
+  // it, Next.js 16 bails out of static prerender for "/" with a build error.
+  return (
+    <Suspense fallback={null}>
+      <Start existingHypotheses={existingHypotheses} />
+    </Suspense>
+  );
 }
 
 async function loadBackendBenchOptions(): Promise<Array<{ slug: string; name: string; domain?: string }>> {
