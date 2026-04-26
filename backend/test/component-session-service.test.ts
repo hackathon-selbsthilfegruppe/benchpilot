@@ -70,6 +70,8 @@ describe("component session service", () => {
     expect(session.role.toolMode).toBe("read-only");
     expect(session.role.instructions).toContain("## Component pre-prompt");
     expect(session.role.instructions).toContain("Tracks protocol candidates");
+    expect(session.role.instructions).toContain("## BenchPilot backend operations");
+    expect(session.role.instructions).toContain(`tasks create --bench ${bench.id} --from ${component.id}`);
     expect(session.cwd).toBe(path.join(store.workspaceRoot, "benches", bench.id, "components", component.id));
 
     const reused = await service.ensureComponentSession(bench.id, component.id);

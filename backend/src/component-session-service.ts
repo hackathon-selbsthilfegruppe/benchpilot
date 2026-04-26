@@ -50,7 +50,11 @@ export class ComponentSessionService {
       benchId,
       componentInstanceId,
     );
-    const systemPrompt = buildComponentSessionPrompt(promptContext);
+    const systemPrompt = [
+      buildComponentSessionPrompt(promptContext),
+      "",
+      buildBenchpilotCliGuidance(this.projectRoot, component.benchId, component.id),
+    ].join("\n");
     const role = await buildComponentRoleDefinition(this.workspaceStore, component, preset, systemPrompt);
     const session = await this.pool.createStandbySession(role);
     this.componentSessionIds.set(key, session.id);
@@ -87,6 +91,8 @@ export class ComponentSessionService {
     const systemPrompt = [
       buildComponentSessionPrompt(promptContext),
       "",
+      buildBenchpilotCliGuidance(this.projectRoot, task.benchId, component.id),
+      "",
       "## Delegated task",
       `Task ID: ${task.id}`,
       `From: ${task.fromComponentInstanceId}`,
@@ -94,6 +100,7 @@ export class ComponentSessionService {
       `Title: ${task.title}`,
       `Request: ${task.request}`,
       "You are running in a fresh task-run session. Complete the delegated work in a durable, inspectable way.",
+      buildTaskRunCompletionGuidance(this.projectRoot, task),
     ].join("\n");
 
     const role = {
@@ -117,6 +124,30 @@ export class ComponentSessionService {
 
     return this.pool.createStandbySession(role);
   }
+}
+
+function buildBenchpilotCliGuidance(projectRoot: string, benchId: string, actorComponentInstanceId: string): string {
+  const cliPrefix = `cd ${projectRoot} && npm run cli --workspace backend --`;
+
+  return [
+    "## BenchPilot backend operations",
+    "Use bash to call the BenchPilot CLI when you need to create, inspect, or complete tasks.",
+    `CLI prefix: ${cliPrefix}`,
+    `Create a task: ${cliPrefix} tasks create --bench ${benchId} --from ${actorComponentInstanceId} --to <target-component-id> --title \"<title>\" --body \"<request>\"`,
+    `List tasks for this bench: ${cliPrefix} tasks list --bench ${benchId}`,
+    `Read one task: ${cliPrefix} tasks get <task-id> --bench ${benchId}`,
+    `Read a task result: ${cliPrefix} tasks result <task-id> --bench ${benchId}`,
+  ].join("\n");
+}
+
+function buildTaskRunCompletionGuidance(projectRoot: string, task: TaskMetadata): string {
+  const cliPrefix = `cd ${projectRoot} && npm run cli --workspace backend --`;
+
+  return [
+    "When you have completed the delegated work, you may explicitly complete the task with the BenchPilot CLI.",
+    `Completion command: ${cliPrefix} tasks complete ${task.id} --bench ${task.benchId} --actor ${task.toComponentInstanceId} --result-text \"<short result summary>\"`,
+    "If you do not complete the task explicitly, the backend may fall back to your final assistant output as the first recorded task result.",
+  ].join("\n");
 }
 
 async function buildComponentRoleDefinition(

@@ -36,6 +36,8 @@ describe("component session integration", () => {
     expect(createBody.session.role.id).toBe("protocols-crp-biosensor");
     expect(createBody.session.role.instructions).toContain("## Component pre-prompt");
     expect(createBody.session.role.instructions).toContain("published lab protocols");
+    expect(createBody.session.role.instructions).toContain("## BenchPilot backend operations");
+    expect(createBody.session.role.instructions).toContain("tasks create --bench bench-crp-biosensor --from protocols-crp-biosensor");
 
     const prewarmResponse = await request(
       app,
