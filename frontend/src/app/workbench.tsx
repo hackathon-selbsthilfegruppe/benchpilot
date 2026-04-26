@@ -25,6 +25,10 @@ import {
 import { listBackendTasks } from "@/lib/benchpilot-task-client";
 import { buildBackendTaskActivityMessages, type BackendTaskActivitySnapshot } from "@/lib/backend-task-activity";
 import { applyBackendTasksToWorkbench } from "@/lib/backend-task-workbench";
+import {
+  applyResourcesToComponents,
+  fetchResourcesForComponents,
+} from "@/lib/backend-resources-workbench";
 import { formatTaskLifecycleText, summarizeTaskLifecycle } from "@/lib/task-visibility";
 import { reorderGroups } from "@/lib/reorder";
 import { Markdown } from "./markdown";
@@ -255,8 +259,9 @@ export default function Workbench({
           backendTasks,
         );
         const componentNames = buildComponentNameLookup(projected.components, projected.supporting, projected.hypothesis, backendOrchestratorComponentId);
+        const previousSnapshots = backendTaskSnapshotsRef.current;
         const activity = buildBackendTaskActivityMessages(
-          backendTaskSnapshotsRef.current,
+          previousSnapshots,
           backendTasks,
           componentNames,
         );
@@ -272,6 +277,34 @@ export default function Workbench({
               ...activity.messages.map((text) => ({ role: "agent" as const, text })),
             ],
           }));
+          // A task transitioned (started, completed, errored, retried). The
+          // backend writes auto-result resources on completion, so refresh
+          // the resource list/details for the affected components so the
+          // chat panel renders the new artifact without a hard reload.
+          const affectedComponentIds = new Set<string>();
+          for (const task of backendTasks) {
+            const before = previousSnapshots[task.id];
+            const after = activity.next[task.id];
+            if (!before || !after) {
+              affectedComponentIds.add(task.toComponentInstanceId);
+              continue;
+            }
+            if (
+              before.status !== after.status
+              || before.executionStartedAt !== after.executionStartedAt
+              || before.completedAt !== after.completedAt
+              || before.resultResourceId !== after.resultResourceId
+              || before.updatedAt !== after.updatedAt
+            ) {
+              affectedComponentIds.add(task.toComponentInstanceId);
+            }
+          }
+          if (affectedComponentIds.size > 0) {
+            const refreshed = await fetchResourcesForComponents(benchId, Array.from(affectedComponentIds));
+            if (cancelled) return;
+            setComponents((prev) => applyResourcesToComponents(prev, refreshed));
+            setSupporting((prev) => applyResourcesToComponents(prev, refreshed));
+          }
         }
       } catch {
         // Keep the UI stable; retry on the next poll tick.
