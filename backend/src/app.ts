@@ -7,6 +7,7 @@ import { WorkspaceNotFoundError, WorkspaceValidationError } from "./workspace-st
 import type { BenchReadService } from "./bench-read-service.js";
 import type { BenchWriteService } from "./bench-write-service.js";
 import type { ComponentSessionService } from "./component-session-service.js";
+import type { TaskService } from "./task-service.js";
 import { OwnershipRuleError } from "./ownership.js";
 import {
   fetchProtocolIo,
@@ -49,11 +50,18 @@ const componentSessionPrewarmSchema = z.object({
   })).min(1),
 });
 
+const listTasksQuerySchema = z.object({
+  benchId: z.string().min(1),
+  componentInstanceId: z.string().min(1).optional(),
+  status: z.enum(["pending", "running", "completed", "error"]).optional(),
+});
+
 export function createApp(
   pool: SessionService,
   benchReadService?: BenchReadService,
   benchWriteService?: BenchWriteService,
   componentSessionService?: ComponentSessionService,
+  taskService?: TaskService,
 ) {
   const app = express();
 
@@ -163,6 +171,26 @@ export function createApp(
       body.components.map((entry) => componentSessionService.ensureComponentSession(entry.benchId, entry.componentInstanceId)),
     );
     res.status(201).json({ sessions });
+  }));
+
+  app.post("/api/tasks", asyncHandler(async (req, res) => {
+    ensureTaskService(taskService);
+    const task = await taskService.createTask(req.body);
+    res.status(201).json({ task });
+  }));
+
+  app.get("/api/tasks", asyncHandler(async (req, res) => {
+    ensureTaskService(taskService);
+    const query = listTasksQuerySchema.parse(req.query);
+    const tasks = await taskService.listTasks(query);
+    res.json({ tasks });
+  }));
+
+  app.get("/api/tasks/:taskId", asyncHandler(async (req, res) => {
+    ensureTaskService(taskService);
+    const query = listTasksQuerySchema.pick({ benchId: true }).parse(req.query);
+    const task = await taskService.getTask(requireTaskId(req), query.benchId);
+    res.json({ task });
   }));
 
   app.get("/api/agent-sessions", (_req, res) => {
@@ -292,6 +320,12 @@ function ensureComponentSessionService(service: ComponentSessionService | undefi
   }
 }
 
+function ensureTaskService(service: TaskService | undefined): asserts service is TaskService {
+  if (!service) {
+    throw new Error("Task service is not configured");
+  }
+}
+
 function requireBenchId(req: Request): string {
   const value = req.params.benchId;
   if (typeof value !== "string" || value.length === 0) {
@@ -312,6 +346,14 @@ function requireResourceId(req: Request): string {
   const value = req.params.resourceId;
   if (typeof value !== "string" || value.length === 0) {
     throw new Error("Missing resourceId route parameter");
+  }
+  return value;
+}
+
+function requireTaskId(req: Request): string {
+  const value = req.params.taskId;
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error("Missing taskId route parameter");
   }
   return value;
 }

@@ -7,6 +7,7 @@ import { createApp, type SessionService } from "../src/app.js";
 import type { BenchReadService } from "../src/bench-read-service.js";
 import type { BenchWriteService } from "../src/bench-write-service.js";
 import type { ComponentSessionService } from "../src/component-session-service.js";
+import type { TaskService } from "../src/task-service.js";
 import type { RoleDefinition, SessionSummary, StreamEnvelope } from "../src/types.js";
 
 const createdServers: Server[] = [];
@@ -530,8 +531,51 @@ describe("createApp", () => {
     const componentSessionService = createFakeComponentSessionService({
       ensureComponentSession: async () => createSessionSummary({ id: "literature-crp-biosensor", name: "Literature" }),
     });
+    const taskService = createFakeTaskService({
+      createTask: async () => ({
+        id: "task-review-prior-work-overlap",
+        benchId: "bench-crp-biosensor",
+        fromComponentInstanceId: "orchestrator-crp-biosensor",
+        toComponentInstanceId: "literature-crp-biosensor",
+        title: "Review prior work overlap",
+        request: "Check whether closely related CRP protocols already exist.",
+        status: "pending",
+        createdResourceIds: [],
+        modifiedResourceIds: [],
+        createdAt: "2026-04-25T19:20:00.000Z",
+        updatedAt: "2026-04-25T19:20:00.000Z",
+      }),
+      listTasks: async () => [
+        {
+          id: "task-review-prior-work-overlap",
+          benchId: "bench-crp-biosensor",
+          fromComponentInstanceId: "orchestrator-crp-biosensor",
+          toComponentInstanceId: "literature-crp-biosensor",
+          title: "Review prior work overlap",
+          request: "Check whether closely related CRP protocols already exist.",
+          status: "pending",
+          createdResourceIds: [],
+          modifiedResourceIds: [],
+          createdAt: "2026-04-25T19:20:00.000Z",
+          updatedAt: "2026-04-25T19:20:00.000Z",
+        },
+      ],
+      getTask: async () => ({
+        id: "task-review-prior-work-overlap",
+        benchId: "bench-crp-biosensor",
+        fromComponentInstanceId: "orchestrator-crp-biosensor",
+        toComponentInstanceId: "literature-crp-biosensor",
+        title: "Review prior work overlap",
+        request: "Check whether closely related CRP protocols already exist.",
+        status: "pending",
+        createdResourceIds: [],
+        modifiedResourceIds: [],
+        createdAt: "2026-04-25T19:20:00.000Z",
+        updatedAt: "2026-04-25T19:20:00.000Z",
+      }),
+    });
 
-    const app = createApp(createFakePool({}), undefined, benchWriteService, componentSessionService);
+    const app = createApp(createFakePool({}), undefined, benchWriteService, componentSessionService, taskService);
 
     const response = await request(
       app,
@@ -719,6 +763,65 @@ describe("createApp", () => {
     expect(await prewarmResponse.json()).toEqual({
       sessions: [createSessionSummary({ id: "literature-crp-biosensor", name: "Literature" })],
     });
+
+    const taskCreateResponse = await request(
+      app,
+      "/api/tasks",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          actor: {
+            benchId: "bench-crp-biosensor",
+            componentInstanceId: "orchestrator-crp-biosensor",
+            presetId: "orchestrator",
+          },
+          fromComponentInstanceId: "orchestrator-crp-biosensor",
+          toComponentInstanceId: "literature-crp-biosensor",
+          title: "Review prior work overlap",
+          request: "Check whether closely related CRP protocols already exist.",
+        }),
+      },
+    );
+    expect(taskCreateResponse.status).toBe(201);
+
+    const tasksResponse = await request(app, "/api/tasks?benchId=bench-crp-biosensor", { method: "GET" });
+    expect(tasksResponse.status).toBe(200);
+    expect(await tasksResponse.json()).toEqual({
+      tasks: [
+        {
+          id: "task-review-prior-work-overlap",
+          benchId: "bench-crp-biosensor",
+          fromComponentInstanceId: "orchestrator-crp-biosensor",
+          toComponentInstanceId: "literature-crp-biosensor",
+          title: "Review prior work overlap",
+          request: "Check whether closely related CRP protocols already exist.",
+          status: "pending",
+          createdResourceIds: [],
+          modifiedResourceIds: [],
+          createdAt: "2026-04-25T19:20:00.000Z",
+          updatedAt: "2026-04-25T19:20:00.000Z",
+        },
+      ],
+    });
+
+    const taskResponse = await request(app, "/api/tasks/task-review-prior-work-overlap?benchId=bench-crp-biosensor", { method: "GET" });
+    expect(taskResponse.status).toBe(200);
+    expect(await taskResponse.json()).toEqual({
+      task: {
+        id: "task-review-prior-work-overlap",
+        benchId: "bench-crp-biosensor",
+        fromComponentInstanceId: "orchestrator-crp-biosensor",
+        toComponentInstanceId: "literature-crp-biosensor",
+        title: "Review prior work overlap",
+        request: "Check whether closely related CRP protocols already exist.",
+        status: "pending",
+        createdResourceIds: [],
+        modifiedResourceIds: [],
+        createdAt: "2026-04-25T19:20:00.000Z",
+        updatedAt: "2026-04-25T19:20:00.000Z",
+      },
+    });
   });
 });
 
@@ -777,6 +880,19 @@ function createFakeComponentSessionService(overrides: Partial<ComponentSessionSe
     lookupComponentSession: () => null,
     ...overrides,
   } as ComponentSessionService;
+}
+
+function createFakeTaskService(overrides: Partial<TaskService>): TaskService {
+  return {
+    createTask: async () => {
+      throw new Error("missing createTask");
+    },
+    listTasks: async () => [],
+    getTask: async () => {
+      throw new Error("missing getTask");
+    },
+    ...overrides,
+  } as TaskService;
 }
 
 function createSessionSummary(role: RoleDefinition): SessionSummary {
