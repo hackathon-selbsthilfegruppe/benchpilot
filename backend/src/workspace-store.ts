@@ -1,5 +1,5 @@
 import path from "node:path";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { Buffer } from "node:buffer";
 
 import { z } from "zod";
@@ -26,6 +26,7 @@ import {
   getComponentSummaryPath,
   getComponentTocPath,
   getRequirementMetadataPath,
+  getResourceDir,
   getResourceFilePath,
   getResourceFilesDir,
   getResourceMetadataPath,
@@ -196,6 +197,14 @@ export class WorkspaceStore {
       }
       throw error;
     }
+  }
+
+  async deleteResource(benchId: string, componentInstanceId: string, resourceId: string): Promise<void> {
+    await rm(getResourceDir(this.workspaceRoot, benchId, componentInstanceId, resourceId), {
+      recursive: true,
+      force: true,
+    });
+    await this.refreshComponentToc(benchId, componentInstanceId);
   }
 
   async readResource(
