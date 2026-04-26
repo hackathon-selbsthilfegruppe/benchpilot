@@ -329,11 +329,16 @@ function StepButton({
 }
 
 const EXAMPLE_QUESTIONS = [
-  "In E. coli alkaline phosphatase (PhoA), the H148A point mutant retains at least 70% of wild-type activity at pH 5 — measured by p-nitrophenyl phosphate hydrolysis at 37 °C with 1 mM substrate — whereas wild-type retains <30%, indicating that His148 is the primary protonation-driven driver of the pH 4–8 activity loss.",
-  "Supplementing 10-week-old C57BL/6J mice with Lactobacillus rhamnosus GG (1×10^9 CFU/day, oral gavage, n=12 per group) for 4 weeks reduces intestinal permeability by ≥30% vs vehicle control, measured by FITC-dextran (4 kDa, 600 mg/kg) plasma concentration at 4 h post-gavage, with concurrent upregulation of claudin-1 and occludin in ileal tissue (qPCR + western).",
-  "A paper-based electrochemical biosensor functionalized with anti-CRP monoclonal antibodies (clone C7) detects C-reactive protein in unprocessed whole blood at ≥0.5 mg/L within 10 min at 25 °C, matching commercial high-sensitivity ELISA (Abcam ab260058) sensitivity (Pearson r ≥ 0.95 across n=30 patient samples) without sample preprocessing.",
-  "Sporomusa ovata DSM 2662 in a single-chamber bioelectrochemical reactor at a cathode potential of −400 mV vs SHE (graphite felt electrode, 30 °C, CO2-saturated medium) fixes CO2 into acetate at ≥150 mmol L⁻¹ day⁻¹ over 7 days — at least 20% above the Nevin et al. 2010 benchmark of 124 mmol L⁻¹ day⁻¹ under matched conditions.",
-  "Replacing sucrose with trehalose (10% w/v) as the primary cryoprotectant in HeLa cell freezing medium (with 10% FBS, 5% DMSO) increases post-thaw viability by ≥15 percentage points vs the standard 10% DMSO protocol — measured by trypan blue exclusion at 24 h post-thaw across n=6 cryovials per condition — driven by trehalose's superior membrane stabilization at low temperatures.",
+  // Short — fits comfortably in the protocols-step header.
+  "Does 100 nM rapamycin extend median lifespan in C57BL/6J male mice when started at 12 months of age?",
+  // Medium.
+  "Does the H148A mutant of E. coli alkaline phosphatase (PhoA) retain ≥70% of wild-type activity at pH 5, measured by p-nitrophenyl phosphate hydrolysis at 37 °C with 1 mM substrate?",
+  // Medium-long.
+  "Does Lactobacillus rhamnosus GG (1×10^9 CFU/day oral gavage, 4 weeks) reduce intestinal permeability in 10-week-old C57BL/6J mice by ≥30% vs vehicle, measured by FITC-dextran (4 kDa, 600 mg/kg) plasma concentration at 4 h post-gavage?",
+  // Long.
+  "Can a paper-based electrochemical biosensor functionalized with anti-CRP monoclonal antibodies (clone C7) detect C-reactive protein in unprocessed whole blood at ≥0.5 mg/L within 10 min at 25 °C, with Pearson r ≥ 0.95 vs commercial high-sensitivity ELISA across n=30 patient samples?",
+  // Very long — stress case for layout.
+  "Does Sporomusa ovata DSM 2662 in a single-chamber bioelectrochemical reactor at a cathode potential of −400 mV vs SHE (graphite felt electrode, 30 °C, CO2-saturated medium) fix CO2 into acetate at ≥150 mmol L⁻¹ day⁻¹ over 7 days, at least 20% above the Nevin et al. 2010 benchmark of 124 mmol L⁻¹ day⁻¹ under matched conditions?",
 ];
 
 function useAutoResize(value: string, minRows = 1, maxRows = 8) {
