@@ -3,7 +3,7 @@
 - ID: `01_000`
 - Type: `Epic`
 - Area: `Backend`
-- Status: `Open`
+- Status: `Closed`
 
 ## Goal
 
@@ -46,3 +46,13 @@ We already know we need support for `.md`, `.txt`, and `.pdf`, with extracted `.
 - backend can ingest supported resource files into the agreed folder structure
 - every PDF resource produces an extracted `.txt`
 - resource metadata captures file inventory and short descriptions consistently
+
+## Resolution
+
+Closed after implementing and testing:
+
+- `01_001` supported file contract and ingestion validation
+- `01_002` resource file materialization and storage writes
+- `01_003` PDF extracted-text generation
+- `01_004` file inventory metadata and description persistence
+- `01_005` ingestion service orchestration and error handling
