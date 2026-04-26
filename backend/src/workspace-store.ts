@@ -1,5 +1,6 @@
 import path from "node:path";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { Buffer } from "node:buffer";
 
 import { z } from "zod";
 
@@ -25,6 +26,7 @@ import {
   getComponentSummaryPath,
   getComponentTocPath,
   getRequirementMetadataPath,
+  getResourceFilePath,
   getResourceFilesDir,
   getResourceMetadataPath,
   resolveWorkspaceRoot,
@@ -145,6 +147,57 @@ export class WorkspaceStore {
     await this.refreshComponentToc(parsed.benchId, parsed.componentInstanceId);
   }
 
+  async writeResourceFile(
+    benchId: string,
+    componentInstanceId: string,
+    resourceId: string,
+    filename: string,
+    content: Uint8Array,
+  ): Promise<void> {
+    await this.ensureResourceExists(benchId, componentInstanceId, resourceId);
+    const filePath = getResourceFilePath(this.workspaceRoot, benchId, componentInstanceId, resourceId, filename);
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await writeFile(filePath, content);
+  }
+
+  async readResourceFile(
+    benchId: string,
+    componentInstanceId: string,
+    resourceId: string,
+    filename: string,
+  ): Promise<Buffer> {
+    await this.ensureResourceExists(benchId, componentInstanceId, resourceId);
+    const filePath = getResourceFilePath(this.workspaceRoot, benchId, componentInstanceId, resourceId, filename);
+    try {
+      return await readFile(filePath);
+    } catch (error) {
+      if (isMissingFileError(error)) {
+        throw new WorkspaceNotFoundError(`resource file not found: ${filePath}`);
+      }
+      throw error;
+    }
+  }
+
+  async listResourceFiles(
+    benchId: string,
+    componentInstanceId: string,
+    resourceId: string,
+  ): Promise<string[]> {
+    await this.ensureResourceExists(benchId, componentInstanceId, resourceId);
+    try {
+      const entries = await readdir(
+        getResourceFilesDir(this.workspaceRoot, benchId, componentInstanceId, resourceId),
+        { withFileTypes: true },
+      );
+      return entries.filter((entry) => entry.isFile()).map((entry) => entry.name).sort();
+    } catch (error) {
+      if (isMissingFileError(error)) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
   async readResource(
     benchId: string,
     componentInstanceId: string,
@@ -203,6 +256,19 @@ export class WorkspaceStore {
       if (error instanceof WorkspaceNotFoundError) {
         throw new WorkspaceValidationError(
           `Cannot write resource for missing component ${componentInstanceId} in bench ${benchId}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async ensureResourceExists(benchId: string, componentInstanceId: string, resourceId: string): Promise<void> {
+    try {
+      await this.readResource(benchId, componentInstanceId, resourceId);
+    } catch (error) {
+      if (error instanceof WorkspaceNotFoundError) {
+        throw new WorkspaceValidationError(
+          `Cannot write resource files for missing resource ${resourceId} in component ${componentInstanceId}`,
         );
       }
       throw error;

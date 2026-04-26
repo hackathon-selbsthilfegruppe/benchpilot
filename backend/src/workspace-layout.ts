@@ -107,6 +107,19 @@ export function getResourceFilesDir(
   return path.join(getResourceDir(workspaceRoot, benchId, componentInstanceId, resourceId), RESOURCE_FILES_DIRNAME);
 }
 
+export function getResourceFilePath(
+  workspaceRoot: string,
+  benchId: string,
+  componentInstanceId: string,
+  resourceId: string,
+  filename: string,
+): string {
+  if (path.basename(filename) !== filename) {
+    throw new Error("Resource file paths must use a resource-local basename without path separators");
+  }
+  return path.join(getResourceFilesDir(workspaceRoot, benchId, componentInstanceId, resourceId), filename);
+}
+
 export function getComponentTasksDir(workspaceRoot: string, benchId: string, componentInstanceId: string): string {
   return path.join(getComponentDir(workspaceRoot, benchId, componentInstanceId), TASKS_DIRNAME);
 }

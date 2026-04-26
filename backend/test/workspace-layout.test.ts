@@ -25,6 +25,7 @@ import {
   getComponentTocPath,
   getRequirementMetadataPath,
   getResourceDir,
+  getResourceFilePath,
   getResourceFilesDir,
   getResourceMetadataPath,
   resolveWorkspaceRoot,
@@ -151,5 +152,21 @@ describe("workspace layout", () => {
         RESOURCE_FILES_DIRNAME,
       ),
     );
+    expect(getResourceFilePath(workspaceRoot, "bench-crp-biosensor", "literature-crp-biosensor", "lit-0007", "prior-art.pdf")).toBe(
+      path.join(
+        workspaceRoot,
+        "benches",
+        "bench-crp-biosensor",
+        "components",
+        "literature-crp-biosensor",
+        "resources",
+        "lit-0007",
+        RESOURCE_FILES_DIRNAME,
+        "prior-art.pdf",
+      ),
+    );
+    expect(() =>
+      getResourceFilePath(workspaceRoot, "bench-crp-biosensor", "literature-crp-biosensor", "lit-0007", "nested/prior-art.pdf"),
+    ).toThrow(/basename/);
   });
 });

@@ -85,8 +85,12 @@ describe("workspace store", () => {
     await expect(store.listRequirements(bench.id)).resolves.toEqual([requirement]);
     await expect(store.readComponent(bench.id, component.id)).resolves.toEqual(component);
     await expect(store.listComponents(bench.id)).resolves.toEqual([component]);
+    await store.writeResourceFile(bench.id, component.id, resource.id, "prior-art.md", Buffer.from("# Prior art\n"));
+
     await expect(store.readResource(bench.id, component.id, resource.id)).resolves.toEqual(resource);
     await expect(store.listResources(bench.id, component.id)).resolves.toEqual([resource]);
+    await expect(store.listResourceFiles(bench.id, component.id, resource.id)).resolves.toEqual(["prior-art.md"]);
+    await expect(store.readResourceFile(bench.id, component.id, resource.id, "prior-art.md")).resolves.toEqual(Buffer.from("# Prior art\n"));
     await expect(store.readComponentSummary(bench.id, component.id)).resolves.toBe("Tracks prior work and novelty.\n");
     await expect(store.readComponentToc(bench.id, component.id)).resolves.toEqual([
       {
@@ -126,6 +130,9 @@ describe("workspace store", () => {
     });
 
     await expect(store.writeResource(resource)).rejects.toBeInstanceOf(WorkspaceValidationError);
+    await expect(
+      store.writeResourceFile("bench-crp-biosensor", "literature-crp-biosensor", "lit-0007", "prior-art.md", Buffer.from("x")),
+    ).rejects.toBeInstanceOf(WorkspaceValidationError);
   });
 
   it("surfaces invalid JSON and missing files as explicit workspace errors", async () => {
@@ -146,5 +153,38 @@ describe("workspace store", () => {
     await writeFile(benchFile, "{not-json}\n", "utf8");
 
     await expect(store.readBench(bench.id)).rejects.toBeInstanceOf(WorkspaceValidationError);
+  });
+
+  it("rejects resource file paths that try to escape the resource-local files directory", async () => {
+    const baseDir = await mkdtemp(path.join(os.tmpdir(), "benchpilot-workspace-store-"));
+    tempDirs.push(baseDir);
+
+    const store = new WorkspaceStore(baseDir);
+    const bench = createBench({
+      title: "CRP biosensor",
+      question: "Can we build a paper-based electrochemical biosensor for CRP?",
+    });
+    const component = createComponentInstance({
+      benchId: bench.id,
+      presetId: "literature",
+      name: "Literature — CRP biosensor",
+      summary: "Tracks prior work and novelty.",
+    });
+    const resource = createResource({
+      benchId: bench.id,
+      componentInstanceId: component.id,
+      title: "CRP paper sensor prior art",
+      kind: "paper-note",
+      description: "Prior-art note",
+      summary: "Summary of prior work on CRP paper sensors.",
+    });
+
+    await store.writeBench(bench);
+    await store.writeComponent(component);
+    await store.writeResource(resource);
+
+    await expect(
+      store.writeResourceFile(bench.id, component.id, resource.id, "nested/prior-art.md", Buffer.from("x")),
+    ).rejects.toThrow(/basename/);
   });
 });
