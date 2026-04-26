@@ -8,7 +8,7 @@ export const benchIdSchema = z.string().regex(/^bench-[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export type BenchId = z.infer<typeof benchIdSchema>;
 
-export const benchStatusSchema = z.enum(["active", "archived", "error"]);
+export const benchStatusSchema = z.enum(["draft", "active", "archived", "error"]);
 export type BenchStatus = z.infer<typeof benchStatusSchema>;
 
 const isoDateTimeSchema = z.string().datetime({ offset: true });
