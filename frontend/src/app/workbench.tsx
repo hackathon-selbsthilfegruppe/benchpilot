@@ -163,11 +163,12 @@ export default function Workbench({
       return;
     }
 
+    const benchId = backendBenchId;
     let cancelled = false;
 
     async function syncTasks() {
       try {
-        const backendTasks = await listBackendTasks({ benchId: backendBenchId });
+        const backendTasks = await listBackendTasks({ benchId });
         if (cancelled) return;
         const projected = applyBackendTasksToWorkbench(components, supporting, hypothesisState, backendTasks);
         setComponents(projected.components);
@@ -459,7 +460,7 @@ async function ensureSession(
     return existing;
   }
 
-  const created = shouldUseBackendComponentSession(chatId, hypothesis.id, backendBenchId)
+  const created = backendBenchId && shouldUseBackendComponentSession(chatId, hypothesis.id, backendBenchId)
     ? await createComponentSession(backendBenchId, chatId)
     : await createSession(resolveRoleInput(chatId, components, supporting, hypothesis));
   setSessionsByRoleId((prev) => ({ ...prev, [created.role.id]: created }));

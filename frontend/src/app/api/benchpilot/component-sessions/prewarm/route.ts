@@ -1,4 +1,4 @@
-import { proxyBenchpilotJson } from "../shared";
+import { proxyBenchpilotJson } from "../../shared";
 
 export const runtime = "nodejs";
 
