@@ -33,12 +33,25 @@ export interface UpdateIntakeBriefRequest {
   normalizedQuestion?: string;
 }
 
+export interface EnrichmentResource {
+  title: string;
+  summary: string;
+  body: string;
+}
+
 export interface FinalizeIntakeBriefRequest {
   title?: string;
   question?: string;
   normalizedQuestion?: string;
   literatureSelections?: IntakeSelection[];
   protocolSelections?: IntakeSelection[];
+  /**
+   * Per-preset starter resources (one entry per preset id, value is an
+   * array of resources to write under that preset's component
+   * instance). Used to seed the five non-literature/non-protocols
+   * presets so the bench is not empty on day one.
+   */
+  componentResources?: Partial<Record<string, EnrichmentResource[]>>;
 }
 
 export interface IntakeBootstrapResult {
@@ -228,33 +241,69 @@ export class IntakeService {
     const literatureRequirement = requirements.find((entry) => entry.componentInstanceIds.includes(literatureComponent.id));
     const protocolsRequirement = requirements.find((entry) => entry.componentInstanceIds.includes(protocolsComponent.id));
 
-    const literatureResources = await Promise.all((input.literatureSelections ?? []).map((selection) =>
-      this.createSelectionResource(update.bench.id, literatureComponent.id, selection, "paper-note", literatureRequirement?.id),
-    ));
-    const protocolResources = await Promise.all((input.protocolSelections ?? []).map((selection) =>
-      this.createSelectionResource(update.bench.id, protocolsComponent.id, selection, "protocol-note", protocolsRequirement?.id),
-    ));
+    // Map the requested preset → component instance so enrichment
+    // resources land on the right component.
+    const enrichmentByPreset = input.componentResources ?? {};
+    const enrichmentTargets: Array<{ presetId: string; component: ComponentInstance }> = [
+      { presetId: "orchestrator", component: orchestratorComponent },
+      { presetId: "budget", component: budgetComponent },
+      { presetId: "timeline", component: timelineComponent },
+      { presetId: "reviewer", component: reviewerComponent },
+      { presetId: "experiment-planner", component: experimentPlannerComponent },
+    ];
 
+    // All three resource-write batches are independent — fan them out
+    // concurrently. Each createSelectionResource / createEnrichmentResource
+    // does its own listResources / writeResource pair internally.
+    const [literatureResources, protocolResources, enrichmentResultsByPreset] = await Promise.all([
+      Promise.all((input.literatureSelections ?? []).map((selection) =>
+        this.createSelectionResource(update.bench.id, literatureComponent.id, selection, "paper-note", literatureRequirement?.id),
+      )),
+      Promise.all((input.protocolSelections ?? []).map((selection) =>
+        this.createSelectionResource(update.bench.id, protocolsComponent.id, selection, "protocol-note", protocolsRequirement?.id),
+      )),
+      Promise.all(enrichmentTargets.map(async ({ presetId, component }) => {
+        const requirement = requirements.find((entry) => entry.componentInstanceIds.includes(component.id));
+        const resources = await Promise.all((enrichmentByPreset[presetId] ?? []).map((resource) =>
+          this.createEnrichmentResource(update.bench.id, component.id, resource, requirement?.id),
+        ));
+        return { presetId, component, requirement, resources };
+      })),
+    ]);
+
+    const requirementWrites: Array<Promise<unknown>> = [];
     if (literatureRequirement) {
-      await this.store.writeRequirement({
+      requirementWrites.push(this.store.writeRequirement({
         ...literatureRequirement,
         resourceIds: literatureResources.map((resource) => resource.id),
         updatedAt: new Date().toISOString(),
-      });
+      }));
     }
     if (protocolsRequirement) {
-      await this.store.writeRequirement({
+      requirementWrites.push(this.store.writeRequirement({
         ...protocolsRequirement,
         resourceIds: protocolResources.map((resource) => resource.id),
         updatedAt: new Date().toISOString(),
-      });
+      }));
     }
+    for (const { requirement, resources } of enrichmentResultsByPreset) {
+      if (!requirement || resources.length === 0) continue;
+      requirementWrites.push(this.store.writeRequirement({
+        ...requirement,
+        resourceIds: resources.map((resource) => resource.id),
+        updatedAt: new Date().toISOString(),
+      }));
+    }
+    await Promise.all(requirementWrites);
 
     this.logger.info("intake.resources.persisted", {
       briefId,
       benchId: update.bench.id,
       literatureResourceIds: literatureResources.map((resource) => resource.id),
       protocolResourceIds: protocolResources.map((resource) => resource.id),
+      enrichmentResourceCounts: Object.fromEntries(
+        enrichmentResultsByPreset.map((entry) => [entry.presetId, entry.resources.length] as const),
+      ),
     });
 
     const finalizedBench = await this.store.updateBench(update.bench.id, { status: "active" });
@@ -279,6 +328,50 @@ export class IntakeService {
       components: await this.benchReadService.listComponents(finalizedBench.id),
       requirements: await this.store.listRequirements(finalizedBench.id),
     };
+  }
+
+  private async createEnrichmentResource(
+    benchId: string,
+    componentInstanceId: string,
+    entry: EnrichmentResource,
+    supportsRequirementId?: string,
+  ): Promise<ResourceMetadata> {
+    const existingResourceIds = (await this.store.listResources(benchId, componentInstanceId)).map((entry) => entry.id);
+    const title = entry.title.trim();
+    const summarySource = entry.summary.trim() || title;
+    const summary = summarySource.length <= 240 ? summarySource : `${summarySource.slice(0, 237)}...`;
+    const resource = createResource({
+      benchId,
+      componentInstanceId,
+      title,
+      kind: "enrichment-note",
+      description: "intake enrichment seed",
+      summary,
+      tags: ["intake-enrichment"],
+      primaryFile: "enrichment.md",
+      contentType: "text/markdown",
+      supportsRequirementIds: supportsRequirementId ? [supportsRequirementId] : [],
+      files: [
+        {
+          filename: "enrichment.md",
+          mediaType: "text/markdown",
+          description: `${title} enrichment markdown`,
+          role: "primary",
+        },
+      ],
+      status: "draft",
+    }, { existingResourceIds });
+
+    await this.store.writeResource(resource);
+    await this.store.writeResourceFile(benchId, componentInstanceId, resource.id, "enrichment.md", Buffer.from(entry.body, "utf8"));
+    this.logger.info("intake.enrichment_resource.created", {
+      benchId,
+      componentInstanceId,
+      resourceId: resource.id,
+      title: resource.title,
+      supportsRequirementId: supportsRequirementId ?? null,
+    });
+    return resource;
   }
 
   private async createSelectionResource(

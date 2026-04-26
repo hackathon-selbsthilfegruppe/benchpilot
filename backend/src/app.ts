@@ -100,6 +100,14 @@ const intakeFinalizeSchema = z.object({
     url: z.string().url().optional(),
     description: z.string().optional(),
   })).optional(),
+  componentResources: z.record(
+    z.string().min(1),
+    z.array(z.object({
+      title: z.string().min(1),
+      summary: z.string().min(1),
+      body: z.string().min(1),
+    })),
+  ).optional(),
 });
 
 export function createApp(
@@ -191,6 +199,16 @@ export function createApp(
     ensureBenchReadService(benchReadService);
     const bench = await benchReadService.getBench(requireBenchId(req));
     res.json({ bench });
+  }));
+
+  app.get("/api/benches/:benchId/export.json", asyncHandler(async (req, res) => {
+    ensureBenchReadService(benchReadService);
+    const bundle = await benchReadService.exportBench(requireBenchId(req));
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${encodeURIComponent(bundle.bench.id)}.json"`,
+    );
+    res.json(bundle);
   }));
 
   app.get("/api/benches/:benchId/requirements", asyncHandler(async (req, res) => {

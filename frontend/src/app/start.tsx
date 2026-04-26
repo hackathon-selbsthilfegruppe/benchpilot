@@ -11,6 +11,10 @@ import {
   finalizeIntakeBrief,
   updateIntakeBrief,
 } from "@/lib/benchpilot-intake-client";
+import {
+  buildEnrichmentPrompt,
+  parseEnrichmentResponse,
+} from "@/lib/component-enrichment";
 import { Markdown } from "./markdown";
 import { BenchpilotLogo } from "./benchpilot-logo";
 
@@ -332,6 +336,23 @@ export default function Start({
 
       const briefId = intake.briefId;
 
+      // Ask the orchestrator for per-component starter resources so the
+      // five non-literature/non-protocols presets land non-empty too.
+      // Failure here must not block finalize — fall back to no enrichment.
+      let componentResources: Awaited<ReturnType<typeof parseEnrichmentResponse>> | undefined;
+      try {
+        const reply = await runOrchestrator(
+          buildEnrichmentPrompt({ question: q, literature, protocols }),
+          q,
+        );
+        componentResources = parseEnrichmentResponse(reply);
+      } catch (err) {
+        // Surface the warning but keep finalizing — the bench still works
+        // with empty seed components, just less rich on day one.
+        // eslint-disable-next-line no-console
+        console.warn("[finalize] enrichment skipped:", err);
+      }
+
       setFinalizeStage("creating");
       const result = await finalizeIntakeBrief(briefId, {
         title: q,
@@ -339,6 +360,7 @@ export default function Start({
         normalizedQuestion: q,
         literatureSelections: literature,
         protocolSelections: protocols,
+        componentResources,
       });
       router.push(`/bench/${result.bench.id}`);
     } catch (err) {

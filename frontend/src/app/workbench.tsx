@@ -481,6 +481,8 @@ export default function Workbench({
       <AppHeader
         theme={theme}
         onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
+        benchId={backendBenchId}
+        benchSlug={activeHypothesisSlug}
       />
       <div className="flex min-h-0 flex-1 overflow-hidden">
       <OrchestratorPanel
@@ -699,14 +701,40 @@ function OrchestratorPanel({
 function AppHeader({
   theme,
   onToggleTheme,
+  benchId,
+  benchSlug,
 }: {
   theme: Theme;
   onToggleTheme: () => void;
+  benchId?: string;
+  benchSlug?: string;
 }) {
   return (
     <header className="flex items-center gap-3 border-b border-border bg-surface px-6 py-3 text-foreground">
       <BenchpilotLogo className="h-10 w-auto" />
       <div className="ml-auto flex items-center gap-3">
+        {benchId && (
+          <>
+            <a
+              href={`/api/benchpilot/benches/${encodeURIComponent(benchId)}/export.json`}
+              data-testid="export-bench-json"
+              className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-elev"
+              title="Download the bench as one JSON file (hypothesis, components, resources, bodies)."
+            >
+              Export JSON
+            </a>
+            <a
+              href={`/bench/${encodeURIComponent(benchSlug ?? benchId)}/print`}
+              target="_blank"
+              rel="noopener"
+              data-testid="print-bench"
+              className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-elev"
+              title="Open a print-friendly view; use the browser's print dialog to save as PDF."
+            >
+              Print / PDF
+            </a>
+          </>
+        )}
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
         <ProfileBadge />
       </div>
@@ -1260,7 +1288,7 @@ function ComponentCard({
                     : [
                         {
                           role: "agent",
-                          text: `Hi — I'm the ${component.name} component. What do you need?`,
+                          text: `Hi — I'm the ${component.name} component. What can I help you with?`,
                         },
                       ]
                 }

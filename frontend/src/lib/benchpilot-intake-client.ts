@@ -82,15 +82,23 @@ export async function updateIntakeBrief(
   });
 }
 
+export interface FinalizeIntakeBriefInput {
+  title?: string;
+  question?: string;
+  normalizedQuestion?: string;
+  literatureSelections?: IntakeSelection[];
+  protocolSelections?: IntakeSelection[];
+  /**
+   * Per-preset starter resources written alongside the literature/
+   * protocol selections at finalize time. Each preset gets its
+   * resources written under the matching component instance.
+   */
+  componentResources?: Partial<Record<string, Array<{ title: string; summary: string; body: string }>>>;
+}
+
 export async function finalizeIntakeBrief(
   briefId: string,
-  input: {
-    title?: string;
-    question?: string;
-    normalizedQuestion?: string;
-    literatureSelections?: IntakeSelection[];
-    protocolSelections?: IntakeSelection[];
-  },
+  input: FinalizeIntakeBriefInput,
 ): Promise<{ brief: IntakeBrief; bench: IntakeBench; components: IntakeComponent[]; requirements: Array<{ id: string }> }> {
   return fetchJson(`${API_PREFIX}/intake/${encodeURIComponent(briefId)}/finalize`, {
     method: "POST",

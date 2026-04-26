@@ -18,6 +18,17 @@ export interface ComponentContextView {
   }>;
 }
 
+export interface BenchExportBundle {
+  exportedAt: string;
+  bench: BenchMetadata;
+  requirements: RequirementMetadata[];
+  components: Array<{
+    component: ComponentInstance;
+    summary: string;
+    resources: ResourceDetail[];
+  }>;
+}
+
 export class BenchReadService {
   constructor(private readonly store: WorkspaceStore) {}
 
@@ -88,6 +99,34 @@ export class BenchReadService {
         toc: selfToc,
       },
       others,
+    };
+  }
+
+  async exportBench(benchId: string): Promise<BenchExportBundle> {
+    const [bench, components, requirements] = await Promise.all([
+      this.getBench(benchId),
+      this.listComponents(benchId),
+      this.listRequirements(benchId),
+    ]);
+
+    const exportedComponents = await Promise.all(components.map(async (component) => {
+      const [summary, toc] = await Promise.all([
+        this.store.readComponentSummary(benchId, component.id).catch(() => ""),
+        this.store.readComponentToc(benchId, component.id).catch(() => [] as ResourceTocEntry[]),
+      ]);
+      const resources = await Promise.all(toc.map(async (entry) => {
+        const resource = await this.store.readResource(benchId, component.id, entry.id);
+        const content = await readResourceContent(this.store, resource);
+        return { ...resource, content } satisfies ResourceDetail;
+      }));
+      return { component, summary, resources };
+    }));
+
+    return {
+      exportedAt: new Date().toISOString(),
+      bench,
+      requirements,
+      components: exportedComponents,
     };
   }
 
