@@ -11,6 +11,7 @@ export interface BackendWorkbenchData {
   hypothesis: BenchComponent;
   components: BenchComponent[];
   supporting: BenchComponent[];
+  orchestratorComponentId?: string;
 }
 
 export interface BackendWorkbenchAdapterInput {
@@ -32,14 +33,16 @@ export function adaptBackendWorkbench(input: BackendWorkbenchAdapterInput): Back
     tasks: [],
   };
 
-  const components = input.components.map((component) =>
-    adaptComponent(component, input.resourcesByComponentId[component.id] ?? []),
-  );
+  const orchestratorComponent = input.components.find((component) => component.presetId === "orchestrator");
+  const components = input.components
+    .filter((component) => component.presetId !== "orchestrator")
+    .map((component) => adaptComponent(component, input.resourcesByComponentId[component.id] ?? []));
 
   return {
     hypothesis,
     components,
     supporting: [],
+    orchestratorComponentId: orchestratorComponent?.id,
   };
 }
 

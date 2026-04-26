@@ -4,7 +4,7 @@
  * prompt context) only has to deal with one shape.
  */
 
-export type LiteratureSource = "semantic-scholar" | "crossref" | "pubmed" | "openalex" | "manual";
+export type LiteratureSource = "semantic-scholar" | "brave-search" | "crossref" | "pubmed" | "openalex" | "manual";
 
 export interface CanonicalLiteratureHit {
   /** Stable cross-source identifier — typically `<source>:<source-id>`. */

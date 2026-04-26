@@ -3,7 +3,7 @@
 - ID: `07_004`
 - Type: `Issue`
 - Area: `Backend`
-- Status: `Open`
+- Status: `Closed`
 
 ## Goal
 

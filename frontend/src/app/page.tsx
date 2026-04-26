@@ -1,7 +1,42 @@
 import { loadHypothesesIndex } from "@/lib/components-fs";
+import { getBenchpilotBackendEndpoint } from "@/lib/benchpilot-backend";
 import Start from "./start";
 
 export default async function Page() {
   const idx = await loadHypothesesIndex();
-  return <Start existingHypotheses={idx.hypotheses} />;
+  const backendHypotheses = await loadBackendBenchOptions();
+  const existingHypotheses = dedupeHypotheses([...idx.hypotheses, ...backendHypotheses]);
+  return <Start existingHypotheses={existingHypotheses} />;
+}
+
+async function loadBackendBenchOptions(): Promise<Array<{ slug: string; name: string; domain?: string }>> {
+  try {
+    const response = await fetch(getBenchpilotBackendEndpoint("/api/benches"), {
+      method: "GET",
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return [];
+    }
+    const body = (await response.json()) as {
+      benches?: Array<{ id: string; title: string }>;
+    };
+    return (body.benches ?? []).map((bench) => ({
+      slug: bench.id,
+      name: bench.title,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function dedupeHypotheses(entries: Array<{ slug: string; name: string; domain?: string }>) {
+  const seen = new Set<string>();
+  return entries.filter((entry) => {
+    if (seen.has(entry.slug)) {
+      return false;
+    }
+    seen.add(entry.slug);
+    return true;
+  });
 }

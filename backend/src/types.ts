@@ -62,3 +62,38 @@ export type StreamEnvelope =
       type: "session_error";
       error: string;
     });
+
+export type SessionHistoryItem =
+  | {
+      type: "user_message";
+      text: string;
+      createdAt: string;
+    }
+  | {
+      type: "assistant_message";
+      text: string | null;
+      createdAt: string;
+    }
+  | {
+      type: "tool_started";
+      toolName: string;
+      summary: string;
+      createdAt: string;
+    }
+  | {
+      type: "tool_finished";
+      toolName: string;
+      ok: boolean;
+      createdAt: string;
+    }
+  | {
+      type: "session_error";
+      error: string;
+      createdAt: string;
+    };
+
+export interface SessionHistory {
+  sessionId: string;
+  roleId: string;
+  items: SessionHistoryItem[];
+}

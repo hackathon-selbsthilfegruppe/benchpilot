@@ -15,7 +15,7 @@ import {
   fetchProtocolIo,
   searchProtocolsIo,
 } from "./protocols/index.js";
-import { searchSemanticScholar } from "./literature/index.js";
+import { searchBraveLiterature, searchSemanticScholar } from "./literature/index.js";
 
 export interface SessionService {
   list(): SessionSummary[];
@@ -332,6 +332,12 @@ export function createApp(
     }
   }));
 
+  app.get("/api/agent-sessions/:sessionId/history", asyncHandler(async (req, res) => {
+    ensureSessionHistoryService(pool);
+    const history = await pool.getHistory(requireSessionId(req));
+    res.json({ history });
+  }));
+
   const protocolsSearchSchema = z.object({
     query: z.string().min(1),
     pageSize: z.number().int().positive().max(50).optional(),
@@ -356,11 +362,14 @@ export function createApp(
   const literatureSearchSchema = z.object({
     query: z.string().min(1),
     pageSize: z.number().int().positive().max(50).optional(),
+    provider: z.enum(["semantic-scholar", "brave-search"]).optional(),
   });
 
   app.post("/api/literature/search", asyncHandler(async (req, res) => {
-    const { query, pageSize } = literatureSearchSchema.parse(req.body);
-    const hits = await searchSemanticScholar(query, pageSize ?? 20);
+    const { query, pageSize, provider } = literatureSearchSchema.parse(req.body);
+    const hits = provider === "brave-search"
+      ? await searchBraveLiterature(query, pageSize ?? 10)
+      : await searchSemanticScholar(query, pageSize ?? 20);
     res.json({ hits });
   }));
 
@@ -417,6 +426,12 @@ function ensureComponentSessionService(service: ComponentSessionService | undefi
 function ensureTaskService(service: TaskService | undefined): asserts service is TaskService {
   if (!service) {
     throw new Error("Task service is not configured");
+  }
+}
+
+function ensureSessionHistoryService(service: SessionService): asserts service is SessionService & { getHistory: NonNullable<SessionService["getHistory"]> } {
+  if (typeof service.getHistory !== "function") {
+    throw new Error("Session history is not configured");
   }
 }
 

@@ -14,7 +14,7 @@ import { extractLatestAssistantOutcome } from "./assistant-message.js";
 import { resolvePreferredModel } from "./model-selection.js";
 import { buildRoleSystemPrompt, ensureRoleWorkspace, normalizeRoleDefinition } from "./roles.js";
 import { normalizeSessionEvent } from "./stream-events.js";
-import type { RoleDefinition, SessionSummary, StreamEnvelope, ToolMode } from "./types.js";
+import type { RoleDefinition, SessionHistory, SessionHistoryItem, SessionSummary, StreamEnvelope, ToolMode } from "./types.js";
 
 type PiSession = Awaited<ReturnType<typeof createAgentSession>>["session"];
 
@@ -23,6 +23,7 @@ type ManagedSession = {
   roleDir: string;
   loader: DefaultResourceLoader;
   session: PiSession;
+  history: SessionHistory;
   unsubscribe: () => void;
 };
 
@@ -117,10 +118,28 @@ export class SessionPool {
       roleDir,
       loader,
       session,
+      history: {
+        sessionId: id,
+        roleId: role.id,
+        items: [],
+      },
       unsubscribe,
     });
 
     return { ...summary };
+  }
+
+  async getHistory(sessionId: string): Promise<SessionHistory> {
+    const managed = this.sessions.get(sessionId);
+    if (!managed) {
+      throw new Error(`Unknown session: ${sessionId}`);
+    }
+
+    return {
+      sessionId: managed.history.sessionId,
+      roleId: managed.history.roleId,
+      items: managed.history.items.map((item) => ({ ...item })),
+    };
   }
 
   async prompt(sessionId: string, message: string, onEvent: (chunk: StreamEnvelope) => void): Promise<void> {
@@ -136,10 +155,16 @@ export class SessionPool {
     managed.summary.status = "running";
     managed.summary.lastError = undefined;
     managed.summary.lastUsedAt = new Date().toISOString();
+    managed.history.items.push({
+      type: "user_message",
+      text: message,
+      createdAt: new Date().toISOString(),
+    });
 
     const unsubscribe = managed.session.subscribe((event: any) => {
       const chunks = normalizeSessionEvent(event, sessionId, managed.summary.role.id);
       for (const chunk of chunks) {
+        recordHistoryChunk(managed.history.items, chunk);
         onEvent(chunk);
       }
     });
@@ -153,13 +178,20 @@ export class SessionPool {
       const outcome = extractLatestAssistantOutcome(managed.session.messages);
       if (outcome.error) {
         managed.summary.lastError = outcome.error;
-        onEvent({
+        const errorChunk = {
           type: "session_error",
           sessionId,
           roleId: managed.summary.role.id,
           error: outcome.error,
-        });
+        } satisfies StreamEnvelope;
+        recordHistoryChunk(managed.history.items, errorChunk);
+        onEvent(errorChunk);
       } else {
+        managed.history.items.push({
+          type: "assistant_message",
+          text: outcome.text,
+          createdAt: new Date().toISOString(),
+        });
         onEvent({
           type: "message_completed",
           sessionId,
@@ -172,12 +204,14 @@ export class SessionPool {
       managed.summary.status = "error";
       managed.summary.lastError = errorMessage;
       managed.summary.lastUsedAt = new Date().toISOString();
-      onEvent({
+      const errorChunk = {
         type: "session_error",
         sessionId,
         roleId: managed.summary.role.id,
         error: errorMessage,
-      });
+      } satisfies StreamEnvelope;
+      recordHistoryChunk(managed.history.items, errorChunk);
+      onEvent(errorChunk);
       throw error;
     } finally {
       unsubscribe();
@@ -213,6 +247,38 @@ export class SessionPool {
 
   private resolveConfiguredModel() {
     return resolvePreferredModel(this.modelRegistry, process.env.BENCHPILOT_MODEL);
+  }
+}
+
+function recordHistoryChunk(history: SessionHistoryItem[], chunk: StreamEnvelope): void {
+  const createdAt = new Date().toISOString();
+
+  if (chunk.type === "tool_started") {
+    history.push({
+      type: "tool_started",
+      toolName: chunk.toolName,
+      summary: chunk.summary,
+      createdAt,
+    });
+    return;
+  }
+
+  if (chunk.type === "tool_finished") {
+    history.push({
+      type: "tool_finished",
+      toolName: chunk.toolName,
+      ok: chunk.ok,
+      createdAt,
+    });
+    return;
+  }
+
+  if (chunk.type === "session_error") {
+    history.push({
+      type: "session_error",
+      error: chunk.error,
+      createdAt,
+    });
   }
 }
 

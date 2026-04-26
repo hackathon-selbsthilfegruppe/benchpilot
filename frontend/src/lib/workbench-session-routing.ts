@@ -12,13 +12,17 @@ export function buildBackendComponentPrewarmTargets(
   backendBenchId: string | undefined,
   components: BenchComponent[],
   supporting: BenchComponent[],
+  orchestratorComponentId?: string,
 ): Array<{ benchId: string; componentInstanceId: string }> {
   if (!backendBenchId) {
     return [];
   }
 
-  return [...components, ...supporting].map((component) => ({
-    benchId: backendBenchId,
-    componentInstanceId: component.id,
-  }));
+  return [
+    ...(orchestratorComponentId ? [{ benchId: backendBenchId, componentInstanceId: orchestratorComponentId }] : []),
+    ...[...components, ...supporting].map((component) => ({
+      benchId: backendBenchId,
+      componentInstanceId: component.id,
+    })),
+  ];
 }

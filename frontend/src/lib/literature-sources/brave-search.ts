@@ -19,10 +19,10 @@ type CanonicalLiteratureEnvelope = {
 
 function toHit(env: CanonicalLiteratureEnvelope): LiteratureHit {
   return {
-    sourceId: "semantic-scholar",
-    externalId: env.id.replace(/^semantic-scholar:/, ""),
+    sourceId: "brave-search",
+    externalId: env.id.replace(/^brave-search:/, ""),
     title: env.title || "(untitled)",
-    authors: env.authors.length > 0 ? env.authors.slice(0, 3).join(", ") + (env.authors.length > 3 ? " et al." : "") : undefined,
+    authors: env.authors.length > 0 ? env.authors.join(", ") : undefined,
     year: env.year,
     url: env.sourceUrl,
     doi: env.doi,
@@ -36,42 +36,26 @@ async function callBackend(query: string, pageSize: number): Promise<LiteratureH
   const res = await fetch(getBenchpilotBackendEndpoint("/api/literature/search"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, pageSize }),
+    body: JSON.stringify({ query, pageSize, provider: "brave-search" }),
     cache: "no-store",
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    if (detail.includes("SEMANTIC_SCHOLAR_API_KEY")) {
-      throw new Error(
-        "not configured — set SEMANTIC_SCHOLAR_API_KEY in backend/.env (see backend/.env.example) and restart the backend",
-      );
-    }
-
-    const fallbackGuidance = " If Semantic Scholar is rate-limiting, try a narrower query or use the local `bx` search tool as a fallback for intake grounding.";
-    if (res.status === 429 || /rate.?limit/i.test(detail)) {
-      throw new Error(
-        `semantic-scholar search failed (HTTP ${res.status}): ${detail.slice(0, 300) || "no body"}.${fallbackGuidance}`,
-      );
-    }
-
     throw new Error(
-      `semantic-scholar search failed (HTTP ${res.status}): ${detail.slice(0, 300) || "no body"}`,
+      `brave-search fallback failed (HTTP ${res.status}): ${detail.slice(0, 300) || "no body"}`,
     );
   }
   const body = (await res.json()) as { hits?: CanonicalLiteratureEnvelope[] };
   return (body.hits ?? []).map(toHit);
 }
 
-export const semanticScholarSource: LiteratureSource = {
-  id: "semantic-scholar",
-  label: "Semantic Scholar",
+export const braveSearchLiteratureSource: LiteratureSource = {
+  id: "brave-search",
+  label: "Brave Search (bx)",
   isConfigured(): boolean {
     return true;
   },
   async search(query: string, pageSize: number): Promise<LiteratureHit[]> {
-    // Semantic Scholar's /paper/search is a real ranked search across the
-    // full corpus, so the verbatim question (often a long sentence) is fine
-    // — no keyword fanout needed like protocols.io requires.
     return callBackend(query, pageSize);
   },
 };

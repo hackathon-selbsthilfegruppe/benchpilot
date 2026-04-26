@@ -59,6 +59,41 @@ export type SessionRoleInput = {
   description?: string;
 };
 
+export type SessionHistoryItem =
+  | {
+      type: "user_message";
+      text: string;
+      createdAt: string;
+    }
+  | {
+      type: "assistant_message";
+      text: string | null;
+      createdAt: string;
+    }
+  | {
+      type: "tool_started";
+      toolName: string;
+      summary: string;
+      createdAt: string;
+    }
+  | {
+      type: "tool_finished";
+      toolName: string;
+      ok: boolean;
+      createdAt: string;
+    }
+  | {
+      type: "session_error";
+      error: string;
+      createdAt: string;
+    };
+
+export type SessionHistory = {
+  sessionId: string;
+  roleId: string;
+  items: SessionHistoryItem[];
+};
+
 export type ComponentSessionInput = {
   benchId: string;
   componentInstanceId: string;
@@ -132,6 +167,19 @@ export async function createComponentSession(
 
   const body = (await response.json()) as { session: BenchpilotSessionSummary };
   return body.session;
+}
+
+export async function getSessionHistory(sessionId: string): Promise<SessionHistory> {
+  const response = await fetch(`${API_PREFIX}/agent-sessions/${encodeURIComponent(sessionId)}/history`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  const body = (await response.json()) as { history: SessionHistory };
+  return body.history;
 }
 
 export async function streamSessionPrompt(

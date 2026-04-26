@@ -23,6 +23,18 @@ describe("backend workbench adapter", () => {
       ],
       components: [
         {
+          id: "orchestrator-crp-biosensor",
+          benchId: "bench-crp-biosensor",
+          presetId: "orchestrator",
+          name: "Orchestrator — CRP biosensor",
+          summary: "Coordinates the bench.",
+          requirementIds: [],
+          resourceCount: 0,
+          updatedAt: "2026-04-25T19:12:00.000Z",
+          status: "active",
+          toolMode: "full",
+        },
+        {
           id: "literature-crp-biosensor",
           benchId: "bench-crp-biosensor",
           presetId: "literature",
@@ -88,5 +100,6 @@ describe("backend workbench adapter", () => {
     ]);
     expect(result.components[0]?.details[0]?.body).toBe("# Notes\n\nFull markdown body here...");
     expect(result.supporting).toEqual([]);
+    expect(result.orchestratorComponentId).toBe("orchestrator-crp-biosensor");
   });
 });

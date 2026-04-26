@@ -45,7 +45,7 @@ describe("intake api integration", () => {
       "timeline",
     ]);
     expect(createBody.orchestratorComponent.presetId).toBe("orchestrator");
-    expect(createBody.orchestratorSessionId).toBe("component-session-1");
+    expect(createBody.orchestratorSession.id).toBe("component-session-1");
 
     const finalizeResponse = await request(app, `/api/intake/${createBody.brief.id}/finalize`, {
       method: "POST",

@@ -90,6 +90,12 @@ export async function searchSemanticScholar(
   const res = await fetch(url, { headers });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
+    const fallbackGuidance = "If Semantic Scholar is rate-limiting, try a narrower query or use the local `bx` search tool as a fallback for intake grounding.";
+    if (res.status === 429 || /rate.?limit/i.test(detail)) {
+      throw new Error(
+        `semantic-scholar search failed (HTTP ${res.status}): ${detail.slice(0, 300) || "no body"}. ${fallbackGuidance}`,
+      );
+    }
     throw new Error(
       `semantic-scholar search failed (HTTP ${res.status}): ${detail.slice(0, 300) || "no body"}`,
     );

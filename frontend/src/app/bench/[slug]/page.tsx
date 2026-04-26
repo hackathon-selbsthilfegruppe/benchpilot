@@ -69,6 +69,7 @@ export default async function BenchPage({
       hypotheses={idx.hypotheses}
       activeHypothesisSlug={slug}
       backendBenchId={slug}
+      backendOrchestratorComponentId={backendWorkbench.orchestratorComponentId}
     />
   );
 }

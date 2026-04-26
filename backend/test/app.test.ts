@@ -100,6 +100,35 @@ describe("createApp", () => {
     });
   });
 
+  it("serves session history through the injected session service", async () => {
+    const fakePool = createFakePool({
+      getHistory: async () => ({
+        sessionId: "session-1",
+        roleId: "orchestrator-bench-1",
+        items: [
+          { type: "user_message", text: "hello", createdAt: "2026-04-25T19:00:00.000Z" },
+          { type: "tool_started", toolName: "bash", summary: "echo hello", createdAt: "2026-04-25T19:00:01.000Z" },
+        ],
+      }),
+    });
+
+    const response = await request(createApp(fakePool), "/api/agent-sessions/session-1/history", {
+      method: "GET",
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      history: {
+        sessionId: "session-1",
+        roleId: "orchestrator-bench-1",
+        items: [
+          { type: "user_message", text: "hello", createdAt: "2026-04-25T19:00:00.000Z" },
+          { type: "tool_started", toolName: "bash", summary: "echo hello", createdAt: "2026-04-25T19:00:01.000Z" },
+        ],
+      },
+    });
+  });
+
   it("serves bench, requirement, and component reads through the bench read service", async () => {
     const benchReadService = createFakeBenchReadService({
       listBenches: async () => [

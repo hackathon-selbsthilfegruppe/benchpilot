@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  createSession,
   streamSessionPrompt,
   type BenchpilotSessionSummary,
 } from "@/lib/benchpilot-client";
 import {
-  buildDraftPrompt,
-  parseTemplateDraft,
-} from "@/lib/hypothesis-template";
+  createIntakeBrief,
+  finalizeIntakeBrief,
+  updateIntakeBrief,
+} from "@/lib/benchpilot-intake-client";
 import { Markdown } from "./markdown";
 import { BenchpilotLogo } from "./benchpilot-logo";
 
@@ -56,12 +56,6 @@ type FinalizeStage = null | "drafting" | "creating";
 
 type HypothesisOption = { slug: string; name: string; domain?: string };
 
-const ORCHESTRATOR_ROLE = {
-  id: "orchestrator",
-  name: "Orchestrator",
-  description: "Refines the research question and drafts the protocol template.",
-};
-
 export default function Start({
   existingHypotheses,
 }: {
@@ -80,6 +74,11 @@ export default function Start({
   const [streaming, setStreaming] = useState("");
   const [pending, setPending] = useState(false);
   const [session, setSession] = useState<BenchpilotSessionSummary | null>(null);
+  const [intakeState, setIntakeState] = useState<{
+    briefId: string;
+    benchId: string;
+    orchestratorComponentId: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [searching, setSearching] = useState(false);
@@ -121,15 +120,36 @@ export default function Start({
     };
   }, []);
 
-  async function ensureSession(): Promise<BenchpilotSessionSummary> {
-    if (session) return session;
-    const created = await createSession(ORCHESTRATOR_ROLE);
-    setSession(created);
-    return created;
+  async function ensureSession(seedQuestion?: string): Promise<{
+    session: BenchpilotSessionSummary;
+    intake: NonNullable<typeof intakeState>;
+  }> {
+    if (session && intakeState) {
+      return { session, intake: intakeState };
+    }
+
+    const initialQuestion = (seedQuestion ?? question).trim();
+    if (!initialQuestion) {
+      throw new Error("Add a research question before starting the intake orchestrator.");
+    }
+
+    const bootstrap = await createIntakeBrief({
+      title: initialQuestion,
+      question: initialQuestion,
+    });
+
+    const nextIntakeState = {
+      briefId: bootstrap.brief.id,
+      benchId: bootstrap.bench.id,
+      orchestratorComponentId: bootstrap.orchestratorComponent.id,
+    };
+    setIntakeState(nextIntakeState);
+    setSession(bootstrap.orchestratorSession);
+    return { session: bootstrap.orchestratorSession, intake: nextIntakeState };
   }
 
-  async function runOrchestrator(message: string): Promise<string> {
-    const s = await ensureSession();
+  async function runOrchestrator(message: string, seedQuestion?: string): Promise<string> {
+    const { session: s } = await ensureSession(seedQuestion);
     setStreaming("");
     setPending(true);
     let acc = "";
@@ -159,12 +179,26 @@ export default function Start({
     setChat((prev) => [...prev, { role: "user", text }]);
     setChatInput("");
     try {
+      const initialQuestion = question.trim() || text;
+      if (!question.trim()) {
+        setQuestion(initialQuestion);
+      }
       const reply = await runOrchestrator(
-        `The user is iterating on their research question. Current draft: "${question.trim() || "(empty)"}".\n\nUser says: ${text}\n\nReply briefly. If you suggest concrete edits to the question, also restate the full revised question on its own line prefixed with "Revised question:".`,
+        `The user is iterating on their research question. Current draft: "${(question.trim() || initialQuestion) || "(empty)"}".\n\nUser says: ${text}\n\nReply briefly. If you suggest concrete edits to the question, also restate the full revised question on its own line prefixed with "Revised question:".`,
+        initialQuestion,
       );
       setChat((prev) => [...prev, { role: "agent", text: reply }]);
       const revised = extractRevisedQuestion(reply);
-      if (revised) setQuestion(revised);
+      if (revised) {
+        setQuestion(revised);
+        if (intakeState) {
+          await updateIntakeBrief(intakeState.briefId, {
+            title: revised,
+            question: revised,
+            normalizedQuestion: revised,
+          });
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -252,6 +286,7 @@ export default function Start({
     setError(null);
     try {
       setFinalizeStage("drafting");
+      const { intake } = await ensureSession(q);
       const protocols = sources
         .flatMap((s) => s.hits)
         .filter((h) => kept[hitKey(h)])
@@ -268,27 +303,26 @@ export default function Start({
           sourceId: h.sourceId,
           title: h.title,
           url: h.url,
+          authors: h.authors,
+          year: h.year,
+          citationCount: h.citationCount,
+          openAccessPdfUrl: h.openAccessPdfUrl,
           description:
             (h.authors ? `${h.authors}${h.year ? ` (${h.year})` : ""}. ` : "") +
             (h.summary ?? ""),
         }));
-      const reply = await runOrchestrator(
-        buildDraftPrompt({ question: q, protocols: [...protocols, ...literature] }),
-      );
-      const template = parseTemplateDraft(reply);
+
+      const briefId = intake.briefId;
 
       setFinalizeStage("creating");
-      const res = await fetch("/api/hypotheses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template }),
+      const result = await finalizeIntakeBrief(briefId, {
+        title: q,
+        question: q,
+        normalizedQuestion: q,
+        literatureSelections: literature,
+        protocolSelections: protocols,
       });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? `HTTP ${res.status}`);
-      }
-      const body = (await res.json()) as { slug: string };
-      router.push(`/bench/${body.slug}`);
+      router.push(`/bench/${result.bench.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setFinalizeStage(null);
@@ -776,7 +810,7 @@ function ProtocolsView({
 
       <div className="flex items-center justify-between">
         <span data-testid="finalize-status" className="text-xs text-subtle">
-          {finalizeStage === "drafting" && "Drafting protocol template…"}
+          {finalizeStage === "drafting" && "Preparing backend intake handoff…"}
           {finalizeStage === "creating" && "Creating bench…"}
         </span>
         <button

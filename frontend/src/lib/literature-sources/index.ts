@@ -1,11 +1,12 @@
 import "server-only";
 
+import { braveSearchLiteratureSource } from "./brave-search";
 import { semanticScholarSource } from "./semantic-scholar";
 import type { LiteratureSource, LiteratureSourceResult } from "./types";
 
 export type { LiteratureHit, LiteratureSource, LiteratureSourceResult } from "./types";
 
-const ALL_SOURCES: LiteratureSource[] = [semanticScholarSource];
+const ALL_SOURCES: LiteratureSource[] = [semanticScholarSource, braveSearchLiteratureSource];
 
 export function listSources(): LiteratureSource[] {
   return ALL_SOURCES;

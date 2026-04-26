@@ -8,4 +8,5 @@
 
 export type { CanonicalLiteratureHit, LiteratureSource } from "./types.js";
 
+export { searchBraveLiterature } from "./sources/brave-search.js";
 export { searchSemanticScholar } from "./sources/semantic-scholar.js";

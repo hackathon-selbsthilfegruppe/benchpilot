@@ -4,6 +4,7 @@ import { BenchMaterializationService } from "./bench-materialization-service.js"
 import { type ComponentInstance } from "./component.js";
 import { ComponentSessionService } from "./component-session-service.js";
 import { createIntakeBrief, intakeBriefSchema, type IntakeBrief } from "./intake.js";
+import { type SessionSummary } from "./types.js";
 import { createRequirement, type RequirementMetadata } from "./requirement.js";
 import { createResource, type ResourceMetadata } from "./resource.js";
 import { WorkspaceStore } from "./workspace-store.js";
@@ -44,7 +45,7 @@ export interface IntakeBootstrapResult {
   bench: BenchMetadata;
   components: ComponentInstance[];
   orchestratorComponent: ComponentInstance;
-  orchestratorSessionId: string;
+  orchestratorSession: SessionSummary;
 }
 
 export interface FinalizedIntakeResult {
@@ -95,7 +96,7 @@ export class IntakeService {
       bench: materialized.bench,
       components: materialized.components,
       orchestratorComponent,
-      orchestratorSessionId: orchestratorSession.id,
+      orchestratorSession,
     };
   }
 
@@ -141,7 +142,7 @@ export class IntakeService {
       bench,
       components,
       orchestratorComponent,
-      orchestratorSessionId: orchestratorSession.id,
+      orchestratorSession,
     };
   }
 

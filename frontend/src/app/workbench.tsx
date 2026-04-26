@@ -4,10 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createComponentSession,
   createSession,
+  getSessionHistory,
   prewarmComponentSessions,
   prewarmSessions,
   streamSessionPrompt,
   type BenchpilotSessionSummary,
+  type SessionHistory,
   type SessionRoleInput,
 } from "@/lib/benchpilot-client";
 import type {
@@ -59,6 +61,7 @@ export default function Workbench({
   hypotheses,
   activeHypothesisSlug,
   backendBenchId,
+  backendOrchestratorComponentId,
 }: {
   components: BenchComponent[];
   supporting: BenchComponent[];
@@ -66,6 +69,7 @@ export default function Workbench({
   hypotheses: HypothesisOption[];
   activeHypothesisSlug: string;
   backendBenchId?: string;
+  backendOrchestratorComponentId?: string;
 }) {
   const [components, setComponents] = useState<BenchComponent[]>(initialComponents);
   const [supporting, setSupporting] = useState<BenchComponent[]>(initialSupporting);
@@ -125,16 +129,28 @@ export default function Workbench({
 
     async function bootstrapSessions() {
       try {
-        const sessions = await prewarmSessions(DEFAULT_SESSION_ROLES);
+        const defaultRoles = backendBenchId && backendOrchestratorComponentId
+          ? DEFAULT_SESSION_ROLES.filter((role) => role.id !== "orchestrator")
+          : DEFAULT_SESSION_ROLES;
+        const sessions = await prewarmSessions(defaultRoles);
         if (cancelled) return;
         setSessionsByRoleId((prev) => mergeSessions(prev, sessions));
 
         if (backendBenchId) {
           const componentSessions = await prewarmComponentSessions(
-            buildBackendComponentPrewarmTargets(backendBenchId, components, supporting),
+            buildBackendComponentPrewarmTargets(backendBenchId, components, supporting, backendOrchestratorComponentId),
           );
           if (cancelled) return;
-          setSessionsByRoleId((prev) => mergeSessions(prev, componentSessions));
+          setSessionsByRoleId((prev) => {
+            const next = mergeSessions(prev, componentSessions);
+            const orchestratorSession = backendOrchestratorComponentId
+              ? componentSessions.find((session) => session.role.id === backendOrchestratorComponentId)
+              : undefined;
+            if (orchestratorSession) {
+              next.orchestrator = orchestratorSession;
+            }
+            return next;
+          });
         }
       } catch (err) {
         if (cancelled) return;
@@ -156,7 +172,46 @@ export default function Workbench({
     return () => {
       cancelled = true;
     };
-  }, [backendBenchId, components, supporting]);
+  }, [backendBenchId, backendOrchestratorComponentId, components, supporting]);
+
+  useEffect(() => {
+    if (!backendBenchId || !backendOrchestratorComponentId) {
+      return;
+    }
+
+    const benchId = backendBenchId;
+    const orchestratorComponentId = backendOrchestratorComponentId;
+    let cancelled = false;
+
+    async function hydrateOrchestratorHistory() {
+      try {
+        const session = sessionsByRoleId.orchestrator
+          ?? await createComponentSession(benchId, orchestratorComponentId);
+        if (cancelled) return;
+        const history = await getSessionHistory(session.id);
+        if (cancelled) return;
+
+        setSessionsByRoleId((prev) => ({
+          ...prev,
+          [session.role.id]: session,
+          orchestrator: session,
+        }));
+        setChats((prev) => ({
+          ...prev,
+          orchestrator: history.items.length > 0
+            ? convertSessionHistoryToMessages(history)
+            : prev.orchestrator,
+        }));
+      } catch {
+        // Keep the welcome message if session history is unavailable.
+      }
+    }
+
+    void hydrateOrchestratorHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [backendBenchId, backendOrchestratorComponentId, sessionsByRoleId.orchestrator]);
 
   useEffect(() => {
     if (!backendBenchId) {
@@ -216,6 +271,7 @@ export default function Workbench({
         hypothesisState,
         setSessionsByRoleId,
         backendBenchId,
+        backendOrchestratorComponentId,
       );
 
       await streamSessionPrompt(session.id, trimmed, (event) => {
@@ -444,6 +500,37 @@ function mergeSessions(
   return next;
 }
 
+function convertSessionHistoryToMessages(history: SessionHistory): Message[] {
+  const messages = history.items.flatMap<Message>((item) => {
+    if (item.type === "user_message") {
+      return [{ role: "user", text: item.text } satisfies Message];
+    }
+    if (item.type === "assistant_message") {
+      return item.text ? [{ role: "agent", text: item.text } satisfies Message] : [];
+    }
+    if (item.type === "tool_started") {
+      return [{
+        role: "agent",
+        text: `[tool] ${item.toolName}${item.summary ? ` — ${item.summary}` : ""}`,
+      } satisfies Message];
+    }
+    if (item.type === "tool_finished") {
+      return [{
+        role: "agent",
+        text: `[tool finished] ${item.toolName} ${item.ok ? "✓" : "✗"}`,
+      } satisfies Message];
+    }
+    return [{ role: "agent", text: `[error] ${item.error}` } satisfies Message];
+  });
+
+  return messages.length > 0
+    ? messages
+    : [{
+      role: "agent",
+      text: "Welcome to BenchPilot. I'm the orchestrator — I can see all components' summaries and tables of contents. Ask me anything, or open a component on the right to talk to it directly.",
+    }];
+}
+
 async function ensureSession(
   chatId: ChatId,
   sessionsByRoleId: Record<string, BenchpilotSessionSummary>,
@@ -454,16 +541,27 @@ async function ensureSession(
     updater: (prev: Record<string, BenchpilotSessionSummary>) => Record<string, BenchpilotSessionSummary>,
   ) => void,
   backendBenchId?: string,
+  backendOrchestratorComponentId?: string,
 ): Promise<BenchpilotSessionSummary> {
-  const existing = sessionsByRoleId[chatId];
+  const sessionLookupKey = chatId === "orchestrator" && backendOrchestratorComponentId
+    ? "orchestrator"
+    : chatId;
+  const existing = sessionsByRoleId[sessionLookupKey]
+    ?? (chatId === "orchestrator" && backendOrchestratorComponentId ? sessionsByRoleId[backendOrchestratorComponentId] : undefined);
   if (existing) {
     return existing;
   }
 
-  const created = backendBenchId && shouldUseBackendComponentSession(chatId, hypothesis.id, backendBenchId)
-    ? await createComponentSession(backendBenchId, chatId)
-    : await createSession(resolveRoleInput(chatId, components, supporting, hypothesis));
-  setSessionsByRoleId((prev) => ({ ...prev, [created.role.id]: created }));
+  const created = backendBenchId && chatId === "orchestrator" && backendOrchestratorComponentId
+    ? await createComponentSession(backendBenchId, backendOrchestratorComponentId)
+    : backendBenchId && shouldUseBackendComponentSession(chatId, hypothesis.id, backendBenchId)
+      ? await createComponentSession(backendBenchId, chatId)
+      : await createSession(resolveRoleInput(chatId, components, supporting, hypothesis));
+  setSessionsByRoleId((prev) => ({
+    ...prev,
+    [created.role.id]: created,
+    ...(chatId === "orchestrator" ? { orchestrator: created } : {}),
+  }));
   return created;
 }
 

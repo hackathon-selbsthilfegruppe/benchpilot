@@ -15,8 +15,9 @@ describe("workbench session routing", () => {
 
   it("builds backend prewarm targets only for real backend component instances", () => {
     expect(
-      buildBackendComponentPrewarmTargets("bench-1", [{ id: "comp-1" } as any], [{ id: "comp-2" } as any]),
+      buildBackendComponentPrewarmTargets("bench-1", [{ id: "comp-1" } as any], [{ id: "comp-2" } as any], "orchestrator-comp"),
     ).toEqual([
+      { benchId: "bench-1", componentInstanceId: "orchestrator-comp" },
       { benchId: "bench-1", componentInstanceId: "comp-1" },
       { benchId: "bench-1", componentInstanceId: "comp-2" },
     ]);
