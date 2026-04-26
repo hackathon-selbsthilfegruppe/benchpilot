@@ -3,7 +3,7 @@
 - ID: `05_000`
 - Type: `Epic`
 - Area: `Backend`
-- Status: `Open`
+- Status: `Closed`
 
 ## Goal
 
@@ -49,3 +49,13 @@ Tasks are the bridge between one component deciding work should happen and anoth
 - target component runs in a fresh task session
 - task completion records result text and affected resource IDs
 - task results become durable backend state
+
+## Resolution
+
+Closed after implementing and testing:
+
+- `05_001` task schema and workspace-backed storage
+- `05_002` task create/list/get api endpoints
+- `05_003` task-run session bootstrap and tracking
+- `05_004` task completion submission and result linkage
+- `05_005` task lifecycle integration tests and polling verification
