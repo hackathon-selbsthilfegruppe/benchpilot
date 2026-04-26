@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { benchMetadataSchema, type BenchMetadata } from "./bench.js";
 import { componentInstanceSchema, type ComponentInstance } from "./component.js";
+import { intakeBriefSchema, type IntakeBrief } from "./intake.js";
 import { requirementMetadataSchema, type RequirementMetadata } from "./requirement.js";
 import { taskMetadataSchema, taskStatusSchema, type TaskMetadata, type TaskStatus } from "./task.js";
 import {
@@ -20,6 +21,8 @@ import {
   getBenchMetadataPath,
   getBenchRequirementsDir,
   getBenchesDir,
+  getIntakeBriefPath,
+  getIntakeBriefsDir,
   getBenchComponentsDir,
   getComponentDir,
   getComponentMetadataPath,
@@ -68,10 +71,38 @@ export class WorkspaceStore {
     return readJsonFile(getBenchMetadataPath(this.workspaceRoot, benchId), benchMetadataSchema, "bench");
   }
 
+  async updateBench(benchId: string, input: Partial<Pick<BenchMetadata, "title" | "question" | "normalizedQuestion" | "status">>): Promise<BenchMetadata> {
+    const existing = await this.readBench(benchId);
+    const updated = benchMetadataSchema.parse({
+      ...existing,
+      ...input,
+      updatedAt: new Date().toISOString(),
+    });
+    await writeJsonFile(getBenchMetadataPath(this.workspaceRoot, benchId), updated);
+    return updated;
+  }
+
   async listBenches(): Promise<BenchMetadata[]> {
     return listJsonChildren(
       getBenchesDirSafe(this.workspaceRoot),
       async (benchId) => this.readBench(benchId),
+    );
+  }
+
+  async writeIntakeBrief(brief: IntakeBrief): Promise<void> {
+    const parsed = intakeBriefSchema.parse(brief);
+    await this.ensureBenchExists(parsed.benchId);
+    await writeJsonFile(getIntakeBriefPath(this.workspaceRoot, parsed.id), parsed);
+  }
+
+  async readIntakeBrief(intakeBriefId: string): Promise<IntakeBrief> {
+    return readJsonFile(getIntakeBriefPath(this.workspaceRoot, intakeBriefId), intakeBriefSchema, "intake brief");
+  }
+
+  async listIntakeBriefs(): Promise<IntakeBrief[]> {
+    return listJsonFiles(
+      getIntakeBriefsDir(this.workspaceRoot),
+      async (filename) => this.readIntakeBrief(filename.replace(/\.json$/, "")),
     );
   }
 

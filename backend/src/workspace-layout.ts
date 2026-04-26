@@ -8,6 +8,7 @@ import { resourceIdSchema } from "./resource.js";
 
 export const WORKSPACE_DIRNAME = "workspace";
 export const BENCHES_DIRNAME = "benches";
+export const INTAKE_BRIEFS_DIRNAME = "intake-briefs";
 export const REQUIREMENTS_DIRNAME = "requirements";
 export const COMPONENTS_DIRNAME = "components";
 export const RESOURCES_DIRNAME = "resources";
@@ -15,6 +16,7 @@ export const RESOURCE_FILES_DIRNAME = "files";
 export const TASKS_DIRNAME = "tasks";
 
 export const BENCH_METADATA_FILENAME = "bench.json";
+export const INTAKE_BRIEF_METADATA_FILENAME = "intake-brief.json";
 export const COMPONENT_METADATA_FILENAME = "component.json";
 export const COMPONENT_SUMMARY_FILENAME = "summary.md";
 export const COMPONENT_TOC_FILENAME = "toc.json";
@@ -29,6 +31,14 @@ export function resolveWorkspaceRoot(baseDir: string): string {
 
 export function getBenchesDir(workspaceRoot: string): string {
   return path.join(workspaceRoot, BENCHES_DIRNAME);
+}
+
+export function getIntakeBriefsDir(workspaceRoot: string): string {
+  return path.join(workspaceRoot, INTAKE_BRIEFS_DIRNAME);
+}
+
+export function getIntakeBriefPath(workspaceRoot: string, intakeBriefId: string): string {
+  return path.join(getIntakeBriefsDir(workspaceRoot), `${intakeBriefId}.json`);
 }
 
 export function getBenchDir(workspaceRoot: string, benchId: string): string {

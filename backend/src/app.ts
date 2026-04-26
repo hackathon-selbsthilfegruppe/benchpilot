@@ -7,6 +7,8 @@ import { WorkspaceNotFoundError, WorkspaceValidationError } from "./workspace-st
 import type { BenchReadService } from "./bench-read-service.js";
 import type { BenchWriteService } from "./bench-write-service.js";
 import type { ComponentSessionService } from "./component-session-service.js";
+import type { BenchMaterializationService } from "./bench-materialization-service.js";
+import type { IntakeService } from "./intake-service.js";
 import type { TaskService } from "./task-service.js";
 import { OwnershipRuleError } from "./ownership.js";
 import {
@@ -19,6 +21,7 @@ export interface SessionService {
   list(): SessionSummary[];
   createStandbySession(role: RoleDefinition): Promise<SessionSummary>;
   prompt(sessionId: string, message: string, onEvent: (chunk: StreamEnvelope) => void): Promise<void>;
+  getHistory?(sessionId: string): Promise<unknown> | unknown;
   dispose(sessionId: string): Promise<boolean>;
 }
 
@@ -56,12 +59,56 @@ const listTasksQuerySchema = z.object({
   status: z.enum(["pending", "running", "completed", "error"]).optional(),
 });
 
+const benchCreateSchema = z.object({
+  title: z.string().min(1).optional(),
+  question: z.string().min(1),
+  normalizedQuestion: z.string().min(1).optional(),
+  intakeBriefId: z.string().min(1).optional(),
+  status: z.enum(["draft", "active", "archived", "error"]).optional(),
+});
+
+const intakeCreateSchema = z.object({
+  title: z.string().min(1).optional(),
+  question: z.string().min(1),
+  normalizedQuestion: z.string().min(1).optional(),
+});
+
+const intakeUpdateSchema = z.object({
+  title: z.string().min(1).optional(),
+  question: z.string().min(1).optional(),
+  normalizedQuestion: z.string().min(1).optional(),
+});
+
+const intakeFinalizeSchema = z.object({
+  title: z.string().min(1).optional(),
+  question: z.string().min(1).optional(),
+  normalizedQuestion: z.string().min(1).optional(),
+  literatureSelections: z.array(z.object({
+    sourceId: z.string().min(1),
+    title: z.string().min(1),
+    url: z.string().url().optional(),
+    description: z.string().optional(),
+    authors: z.string().optional(),
+    year: z.number().int().optional(),
+    citationCount: z.number().int().optional(),
+    openAccessPdfUrl: z.string().url().optional(),
+  })).optional(),
+  protocolSelections: z.array(z.object({
+    sourceId: z.string().min(1),
+    title: z.string().min(1),
+    url: z.string().url().optional(),
+    description: z.string().optional(),
+  })).optional(),
+});
+
 export function createApp(
   pool: SessionService,
   benchReadService?: BenchReadService,
   benchWriteService?: BenchWriteService,
   componentSessionService?: ComponentSessionService,
   taskService?: TaskService,
+  benchMaterializationService?: BenchMaterializationService,
+  intakeService?: IntakeService,
 ) {
   const app = express();
 
@@ -76,6 +123,40 @@ export function createApp(
     ensureBenchReadService(benchReadService);
     const benches = await benchReadService.listBenches();
     res.json({ benches });
+  }));
+
+  app.post("/api/benches", asyncHandler(async (req, res) => {
+    ensureBenchMaterializationService(benchMaterializationService);
+    const payload = benchCreateSchema.parse(req.body);
+    const result = await benchMaterializationService.createBenchFromIntake(payload);
+    res.status(201).json(result);
+  }));
+
+  app.post("/api/intake", asyncHandler(async (req, res) => {
+    ensureIntakeService(intakeService);
+    const payload = intakeCreateSchema.parse(req.body);
+    const result = await intakeService.createBrief(payload);
+    res.status(201).json(result);
+  }));
+
+  app.patch("/api/intake/:briefId", asyncHandler(async (req, res) => {
+    ensureIntakeService(intakeService);
+    const payload = intakeUpdateSchema.parse(req.body);
+    const result = await intakeService.updateBrief(requireIntakeBriefId(req), payload);
+    res.json(result);
+  }));
+
+  app.post("/api/intake/:briefId/orchestrator-session", asyncHandler(async (req, res) => {
+    ensureIntakeService(intakeService);
+    const result = await intakeService.ensureOrchestratorSession(requireIntakeBriefId(req));
+    res.status(201).json(result);
+  }));
+
+  app.post("/api/intake/:briefId/finalize", asyncHandler(async (req, res) => {
+    ensureIntakeService(intakeService);
+    const payload = intakeFinalizeSchema.parse(req.body);
+    const result = await intakeService.finalizeBrief(requireIntakeBriefId(req), payload);
+    res.status(201).json(result);
   }));
 
   app.get("/api/benches/:benchId", asyncHandler(async (req, res) => {
@@ -339,10 +420,30 @@ function ensureTaskService(service: TaskService | undefined): asserts service is
   }
 }
 
+function ensureBenchMaterializationService(service: BenchMaterializationService | undefined): asserts service is BenchMaterializationService {
+  if (!service) {
+    throw new Error("Bench materialization service is not configured");
+  }
+}
+
+function ensureIntakeService(service: IntakeService | undefined): asserts service is IntakeService {
+  if (!service) {
+    throw new Error("Intake service is not configured");
+  }
+}
+
 function requireBenchId(req: Request): string {
   const value = req.params.benchId;
   if (typeof value !== "string" || value.length === 0) {
     throw new Error("Missing benchId route parameter");
+  }
+  return value;
+}
+
+function requireIntakeBriefId(req: Request): string {
+  const value = req.params.briefId;
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error("Missing briefId route parameter");
   }
   return value;
 }
