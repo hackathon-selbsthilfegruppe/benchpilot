@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BenchPilot — Quality gate</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: #0d1117;
+    color: #e6edf3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 1.5rem 2.5rem; box-sizing: border-box;
+    overflow: hidden;
+  }
+  h2 { color: #bc8cff; font-size: 1.3rem; margin: 0 0 1rem; letter-spacing: 0.3px; }
+  .mermaid {
+    width: 100%; max-width: 1500px;
+    flex: 1 1 auto; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mermaid svg { max-width: 100% !important; max-height: 70vh !important; width: auto !important; height: auto !important; }
+</style>
+</head>
+<body>
+<h2>Quality gate</h2>
+<pre class="mermaid">
+%%{init: { "theme": "base", "themeVariables": { "fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "primaryColor": "#161b22", "primaryTextColor": "#e6edf3", "primaryBorderColor": "#30363d", "lineColor": "#bc8cff", "clusterBkg": "#0d1117", "clusterBorder": "#30363d" }, "flowchart": { "curve": "basis", "htmlLabels": true, "padding": 14 } }}%%
+flowchart LR
+    Dev(["👩‍💻 Developer"]):::actor
+
+    subgraph QG["🛠️ scripts/quality/quality-check.sh"]
+        direction TB
+        Modes["Modes<br/><sub>--quick · --full · --report · --all</sub>"]:::mode
+        Runner["Runner"]:::core
+        Modes --> Runner
+    end
+
+    subgraph CHK["✔️ Checks"]
+        direction TB
+        TC["Typecheck"]:::check
+        Lint["ESLint 9"]:::check
+        Test["Vitest + RTL + axe"]:::check
+        Cov["Coverage v8"]:::check
+        Audit["npm audit"]:::check
+        Build["Build"]:::check
+        CPD["jscpd · fails on clones"]:::checkFail
+        Knip["knip · informational"]:::check
+    end
+
+    subgraph OUT["📊 Outputs"]
+        direction TB
+        Data[".local/quality-data/data.js"]:::out
+        Dash["dashboard.html"]:::out
+    end
+
+    Dev --> Modes
+    Runner --> TC
+    Runner --> Lint
+    Runner --> Test
+    Test --> Cov
+    Runner --> Audit
+    Runner --> Build
+    Runner --> CPD
+    Runner --> Knip
+    Runner --> Data
+    Data --> Dash
+
+    classDef actor   fill:#1f2937,stroke:#9ca3af,stroke-width:2px,color:#f3f4f6
+    classDef mode    fill:#352a4a,stroke:#bc8cff,stroke-width:2px,color:#e3d3ff
+    classDef core    fill:#2a214a,stroke:#a371f7,stroke-width:2px,color:#e9d5ff
+    classDef check   fill:#1e2a3d,stroke:#79c0ff,stroke-width:1.5px,color:#cfe7ff
+    classDef checkFail fill:#3d1f25,stroke:#f85149,stroke-width:2px,color:#fbcad0
+    classDef out     fill:#0e3320,stroke:#56d364,stroke-width:1.5px,color:#d0f0d6
+
+    style QG fill:#1d1c2c,stroke:#bc8cff,stroke-width:2px,color:#e3d3ff,rx:12,ry:12
+    style CHK fill:#0d1f33,stroke:#58a6ff,stroke-width:2px,color:#cfe7ff,rx:12,ry:12
+    style OUT fill:#0d2418,stroke:#56d364,stroke-width:2px,color:#d0f0d6,rx:12,ry:12
+</pre>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "base" });
+</script>
+</body>
+</html>

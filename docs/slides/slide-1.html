@@ -2,70 +2,253 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>BenchPilot — Request flow</title>
+<title>BenchPilot — A bench, not a rigid workflow</title>
 <style>
-  html, body { margin: 0; padding: 0; height: 100%; }
-  body {
-    background: #0d1117;
-    color: #e6edf3;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  :root {
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --muted: #8b949e;
+    --indigo: #818cf8;
+    --indigo-soft: rgba(99, 102, 241, 0.12);
+    --indigo-border: rgba(129, 140, 248, 0.45);
+    --green: #56d364;
+    --green-soft: rgba(86, 211, 100, 0.10);
+    --green-border: rgba(86, 211, 100, 0.45);
+    --bridge: #c084fc;
+    --card: #161b22;
+    --card-border: #30363d;
+  }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  body { display: flex; flex-direction: column; padding: 1.5rem 2.25rem; box-sizing: border-box; overflow: hidden; }
+  h2 { color: var(--indigo); font-size: 1.35rem; margin: 0 0 0.15rem; letter-spacing: 0.3px; }
+  .sub { color: var(--muted); font-size: 0.85rem; margin: 0 0 1.4rem; }
+
+  .stage {
+    flex: 1 1 auto; display: grid;
+    grid-template-columns: 1fr 90px 1.4fr;
+    gap: 1.5rem; min-height: 0;
+  }
+
+  .zone {
+    border-radius: 16px; padding: 1.25rem 1.25rem 1rem; min-height: 0;
+    display: flex; flex-direction: column; gap: 0.85rem;
+    position: relative;
+  }
+  .zone-title {
+    font-size: 0.78rem; letter-spacing: 1.4px; text-transform: uppercase; font-weight: 700;
+  }
+  .zone-tag { font-size: 0.78rem; color: var(--muted); }
+
+  /* LEFT: flexible intake — dashed border, indigo */
+  .intake {
+    background: var(--indigo-soft);
+    border: 2px dashed var(--indigo-border);
+  }
+  .intake .zone-title { color: var(--indigo); }
+
+  .actors {
+    display: flex; align-items: center; justify-content: center; gap: 0.9rem;
+    padding: 0.5rem 0;
+  }
+  .actor {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 10px;
+    padding: 0.5rem 0.85rem; display: flex; flex-direction: column; align-items: center;
+    min-width: 110px;
+  }
+  .actor .icon { font-size: 1.6rem; line-height: 1; }
+  .actor .label { font-size: 0.78rem; color: var(--fg); margin-top: 0.2rem; }
+  .actor .role { font-size: 0.65rem; color: var(--muted); }
+  .swap {
+    color: var(--indigo); font-size: 1.4rem; font-weight: 700; line-height: 1;
+  }
+
+  .memory {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 10px;
+    padding: 0.7rem 0.85rem;
+  }
+  .memory-label {
+    font-size: 0.65rem; letter-spacing: 1.2px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 0.4rem;
+  }
+  .memory-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .chip {
+    background: rgba(129, 140, 248, 0.18); color: #c7d2fe;
+    border-radius: 999px; padding: 0.18rem 0.55rem; font-size: 0.7rem;
+  }
+
+  .notes { display: flex; flex-direction: column; gap: 0.35rem; margin-top: auto; }
+  .note { font-size: 0.78rem; color: var(--fg); display: flex; gap: 0.5rem; line-height: 1.4; }
+  .note .bullet { color: var(--indigo); flex-shrink: 0; }
+
+  /* BRIDGE */
+  .bridge {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 1.5rem 2.5rem; box-sizing: border-box;
-    overflow: hidden;
+    color: var(--bridge);
   }
-  h2 { color: #58a6ff; font-size: 1.3rem; margin: 0 0 1rem; letter-spacing: 0.3px; }
-  .mermaid {
-    width: 100%; max-width: 1500px;
+  .bridge .arrow {
+    font-size: 2.4rem; line-height: 1;
+  }
+  .bridge .word {
+    font-size: 0.78rem; letter-spacing: 1.4px; text-transform: uppercase;
+    margin-top: 0.4rem; font-weight: 700;
+  }
+  .bridge .hint {
+    font-size: 0.65rem; color: var(--muted); text-align: center;
+    margin-top: 0.4rem; max-width: 90px; line-height: 1.3;
+  }
+
+  /* RIGHT: open bench — solid border, green */
+  .bench {
+    background: var(--green-soft);
+    border: 2px solid var(--green-border);
+  }
+  .bench .zone-title { color: var(--green); }
+
+  .io-row {
+    display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center;
+    font-size: 0.7rem; color: var(--muted);
+  }
+  .io-chip {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 999px; padding: 0.18rem 0.6rem; font-size: 0.7rem; color: var(--fg);
+  }
+  .io-arrow { color: var(--green); font-weight: 700; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.6rem;
     flex: 1 1 auto; min-height: 0;
-    display: flex; align-items: center; justify-content: center;
   }
-  .mermaid svg { max-width: 100% !important; max-height: 70vh !important; width: auto !important; height: auto !important; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: 10px;
+    padding: 0.55rem 0.7rem; display: flex; flex-direction: column; gap: 0.3rem;
+    min-width: 0; min-height: 0; overflow: hidden;
+  }
+  .card .name { font-size: 0.78rem; font-weight: 600; color: var(--fg); }
+  .card .affordances { font-size: 0.7rem; color: var(--muted); display: flex; gap: 0.45rem; }
+  .card .affordances span { white-space: nowrap; }
+
+  .out-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.7rem; color: var(--muted);
+  }
+  .out-chip {
+    background: rgba(86, 211, 100, 0.18); color: #b6f1be;
+    border-radius: 6px; padding: 0.18rem 0.55rem; font-size: 0.7rem; font-family: ui-monospace, SFMono-Regular, monospace;
+  }
 </style>
 </head>
 <body>
-<h2>Request flow — front end, back end, two paths to Claude</h2>
-<pre class="mermaid">
-%%{init: { "theme": "base", "themeVariables": { "fontFamily": "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif", "primaryColor": "#161b22", "primaryTextColor": "#e6edf3", "primaryBorderColor": "#30363d", "lineColor": "#58a6ff", "clusterBkg": "#0d1117", "clusterBorder": "#30363d" }, "flowchart": { "curve": "basis", "htmlLabels": true, "padding": 14 } }}%%
-flowchart LR
-    User(["🧑‍🔬 Scientist<br/><sub>browser</sub>"]):::actor
+<h2>A bench, not a rigid workflow.</h2>
+<p class="sub">Flexible intake. Open bench. The shape of the work is the scientist's, not ours.</p>
 
-    subgraph FE["🖥️ Frontend &nbsp;·&nbsp; Next.js 16 App Router"]
-        direction TB
-        FEUI["React 19 + Tailwind v4"]:::feCore
-        FEAPI["app/api/*/route.ts"]:::feApi
-        FEUI --> FEAPI
-    end
+<div class="stage">
 
-    subgraph BE["⚙️ Backend &nbsp;·&nbsp; Node 20 + Express 5"]
-        direction TB
-        BECore["TypeScript services<br/><sub>bench · component · workspace-store</sub>"]:::beCore
-        BEPi["session-pool<br/><sub>@mariozechner/pi-coding-agent</sub>"]:::bePi
-        BECore --> BEPi
-    end
+  <!-- LEFT: flexible intake -->
+  <div class="zone intake">
+    <div>
+      <div class="zone-title">Flexible intake</div>
+      <div class="zone-tag">scientist ⇄ orchestrator, no fixed steps</div>
+    </div>
 
-    PiAgent(["✨ pi agent loop<br/><sub>streaming · tools · compaction</sub>"]):::ai
-    LLM[("LLM<br/><sub>provider-agnostic — configured per session</sub>")]:::ext
+    <div class="actors">
+      <div class="actor">
+        <span class="icon">🧑‍🔬</span>
+        <span class="label">Scientist</span>
+        <span class="role">decides</span>
+      </div>
+      <div class="swap">⇄</div>
+      <div class="actor">
+        <span class="icon">🤖</span>
+        <span class="label">Orchestrator</span>
+        <span class="role">suggests</span>
+      </div>
+    </div>
 
-    User -- "HTTPS" --> FEUI
-    FEAPI -- "fetch JSON / SSE" --> BECore
-    BECore -- "stream events" --> FEAPI
-    BEPi -- "createAgentSession" --> PiAgent
-    PiAgent -. "chat completions" .-> LLM
+    <div class="memory">
+      <div class="memory-label">Working memory · grows as they talk</div>
+      <div class="memory-chips">
+        <span class="chip">research question</span>
+        <span class="chip">verdict</span>
+        <span class="chip">kept literature</span>
+        <span class="chip">kept protocols</span>
+      </div>
+    </div>
 
-    classDef actor   fill:#1f2937,stroke:#9ca3af,stroke-width:2px,color:#f3f4f6
-    classDef ai      fill:#3b1f5e,stroke:#a371f7,stroke-width:2px,color:#e9d5ff
-    classDef feCore  fill:#0c2a4a,stroke:#58a6ff,stroke-width:2px,color:#cfe7ff
-    classDef feApi   fill:#0c3a52,stroke:#39d0d8,stroke-width:2px,color:#cdf2f5
-    classDef beCore  fill:#0e3320,stroke:#56d364,stroke-width:2px,color:#d0f0d6
-    classDef bePi    fill:#1a3d2a,stroke:#7ee787,stroke-width:2px,color:#d6f5d6
-    classDef ext     fill:#3a2c0d,stroke:#d29922,stroke-width:2px,color:#f5deb0
+    <div class="notes">
+      <div class="note"><span class="bullet">↻</span><span>Refine the question at any point — the bench follows the conversation.</span></div>
+      <div class="note"><span class="bullet">⇆</span><span>The orchestrator suggests buttons; the scientist can take any of them, or just keep typing.</span></div>
+      <div class="note"><span class="bullet">∅</span><span>No wizard, no locked steps, no predefined experiment shape.</span></div>
+    </div>
+  </div>
 
-    style FE fill:#0d1f33,stroke:#58a6ff,stroke-width:2px,color:#cfe7ff,rx:12,ry:12
-    style BE fill:#0d2418,stroke:#56d364,stroke-width:2px,color:#d0f0d6,rx:12,ry:12
-</pre>
-<script type="module">
-  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
-  mermaid.initialize({ startOnLoad: true, theme: "base" });
-</script>
+  <!-- BRIDGE -->
+  <div class="bridge">
+    <div class="arrow">→</div>
+    <div class="word">Finalize</div>
+    <div class="hint">one click — but the conversation continues on every card</div>
+  </div>
+
+  <!-- RIGHT: open bench -->
+  <div class="zone bench">
+    <div>
+      <div class="zone-title">Open bench</div>
+      <div class="zone-tag">every component is its own agent — and editable</div>
+    </div>
+
+    <div class="io-row">
+      <span>open knowledge in</span>
+      <span class="io-arrow">→</span>
+      <span class="io-chip">Semantic Scholar</span>
+      <span class="io-chip">protocols.io</span>
+      <span class="io-chip">your sources</span>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="name">Orchestrator</div>
+        <div class="affordances"><span>💬 chat</span><span>✏️ edit</span></div>
+      </div>
+      <div class="card">
+        <div class="name">Literature</div>
+        <div class="affordances"><span>💬 chat</span><span>➕ add</span><span>✕ drop</span></div>
+      </div>
+      <div class="card">
+        <div class="name">Protocols</div>
+        <div class="affordances"><span>💬 chat</span><span>➕ add</span><span>✕ drop</span></div>
+      </div>
+      <div class="card">
+        <div class="name">Budget</div>
+        <div class="affordances"><span>💬 chat</span><span>✏️ edit</span></div>
+      </div>
+      <div class="card">
+        <div class="name">Timeline</div>
+        <div class="affordances"><span>💬 chat</span><span>✏️ edit</span></div>
+      </div>
+      <div class="card">
+        <div class="name">Reviewer</div>
+        <div class="affordances"><span>💬 chat</span><span>✏️ edit</span></div>
+      </div>
+      <div class="card">
+        <div class="name">Experiment planner</div>
+        <div class="affordances"><span>💬 chat</span><span>✏️ edit</span></div>
+      </div>
+      <div class="card" style="border-style: dashed; opacity: 0.75;">
+        <div class="name">+ your own</div>
+        <div class="affordances"><span>add a component</span></div>
+      </div>
+    </div>
+
+    <div class="out-row">
+      <span>open formats out</span>
+      <span class="io-arrow">→</span>
+      <span class="out-chip">JSON</span>
+      <span class="out-chip">Markdown</span>
+      <span class="out-chip">PDF</span>
+      <span style="color: var(--muted);">— your data, on disk, readable without us</span>
+    </div>
+  </div>
+
+</div>
 </body>
 </html>
