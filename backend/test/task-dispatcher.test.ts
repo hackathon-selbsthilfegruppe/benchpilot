@@ -183,6 +183,100 @@ describe("task dispatcher", () => {
     expect(resource.title).toContain("Review");
   });
 
+  it("writes experiment-planner auto-results as experiment-plan or gap-report resources", async () => {
+    const baseDir = await mkdtemp(path.join(os.tmpdir(), "benchpilot-planner-task-dispatcher-"));
+    tempDirs.push(baseDir);
+
+    const store = new WorkspaceStore(baseDir);
+    const bench = createBench({
+      title: "CRP biosensor",
+      question: "Can we build a paper-based electrochemical biosensor for CRP?",
+    });
+    const sender = createComponentInstance({
+      benchId: bench.id,
+      presetId: "orchestrator",
+      name: "Orchestrator — CRP biosensor",
+      summary: "Coordinates the bench.",
+    });
+    const planner = createComponentInstance({
+      benchId: bench.id,
+      presetId: "experiment-planner",
+      name: "Experiment Planner — CRP biosensor",
+      summary: "Integrates specialist output into the final plan.",
+    });
+
+    await store.writeBench(bench);
+    await store.writeComponent(sender);
+    await store.writeComponent(planner);
+
+    const taskService = new TaskService(store, {
+      createTaskRunSession: async (task: TaskMetadata) => ({
+        id: `task-session-${task.id}`,
+        role: {
+          id: `${task.toComponentInstanceId}-${task.id}`,
+          name: `${task.toComponentInstanceId} Task Run`,
+          description: "Task-run session",
+          instructions: "task prompt",
+          cwd: "/tmp/task-run",
+          toolMode: "full",
+        },
+        cwd: "/tmp/task-run",
+        status: "idle",
+        createdAt: "2026-04-25T19:20:00.000Z",
+      }),
+    } as any);
+
+    const deliverTask = await taskService.createTask({
+      actor: {
+        benchId: bench.id,
+        componentInstanceId: sender.id,
+        presetId: "orchestrator",
+      },
+      fromComponentInstanceId: sender.id,
+      toComponentInstanceId: planner.id,
+      title: "Assemble experiment plan",
+      request: "Integrate the current specialist outputs into the final plan.",
+    });
+
+    const gapTask = await taskService.createTask({
+      actor: {
+        benchId: bench.id,
+        componentInstanceId: sender.id,
+        presetId: "orchestrator",
+      },
+      fromComponentInstanceId: sender.id,
+      toComponentInstanceId: planner.id,
+      title: "Report missing inputs",
+      request: "If the plan cannot ship yet, report the missing inputs.",
+    });
+
+    const dispatcher = new TaskDispatcher(store, taskService, {
+      prompt: async (sessionId, message, onEvent) => {
+        const isGap = message.includes(gapTask.request);
+        onEvent({
+          type: "message_completed",
+          sessionId,
+          roleId: `${planner.id}-${isGap ? gapTask.id : deliverTask.id}`,
+          assistantText: isGap
+            ? "Missing inputs: no resolved reagent SKUs and no validation approach evidence."
+            : "Integrated protocol, literature, budget, and timeline into a coherent experiment plan.",
+        });
+      },
+    });
+
+    await dispatcher.dispatchRunnableTasksOnce();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const storedDeliver = await store.readTask(bench.id, planner.id, deliverTask.id);
+    const storedGap = await store.readTask(bench.id, planner.id, gapTask.id);
+    const deliverResource = await store.readResource(bench.id, planner.id, storedDeliver.resultResourceId!);
+    const gapResource = await store.readResource(bench.id, planner.id, storedGap.resultResourceId!);
+
+    expect(deliverResource.kind).toBe("experiment-plan");
+    expect(gapResource.kind).toBe("gap-report");
+    expect(gapResource.title).toContain("Gap Report");
+  });
+
   it("marks task execution as error when the task-run prompt fails", async () => {
     const baseDir = await mkdtemp(path.join(os.tmpdir(), "benchpilot-task-dispatcher-error-"));
     tempDirs.push(baseDir);
