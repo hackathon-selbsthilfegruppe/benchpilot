@@ -17,6 +17,7 @@ import type {
 import { reorderGroups } from "@/lib/reorder";
 import { Markdown } from "./markdown";
 import { StatusSymbol } from "./status";
+import { BenchpilotLogo } from "./benchpilot-logo";
 
 type Message = { role: "user" | "agent"; text: string };
 
@@ -487,13 +488,8 @@ function AppHeader({
   onToggleTheme: () => void;
 }) {
   return (
-    <header className="flex items-center gap-3 border-b border-border bg-surface px-6 py-3">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/benchpilot-logo.svg"
-        alt="BenchPilot — protocol generation engine"
-        className="h-10 w-auto"
-      />
+    <header className="flex items-center gap-3 border-b border-border bg-surface px-6 py-3 text-foreground">
+      <BenchpilotLogo className="h-10 w-auto" />
       <div className="ml-auto flex items-center gap-3">
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
         <ProfileBadge />

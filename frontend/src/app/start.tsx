@@ -12,6 +12,7 @@ import {
   parseTemplateDraft,
 } from "@/lib/hypothesis-template";
 import { Markdown } from "./markdown";
+import { BenchpilotLogo } from "./benchpilot-logo";
 
 type ProtocolHit = {
   sourceId: string;
@@ -226,13 +227,6 @@ export default function Start({
   return (
     <div data-testid="start-page" className="flex min-h-screen flex-col bg-background text-foreground">
       <header data-testid="start-header" className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-6 py-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/benchpilot-logo.svg"
-          alt="BenchPilot"
-          data-testid="benchpilot-logo"
-          className="h-10 w-auto"
-        />
         <div data-testid="step-tabs" className="ml-3 flex items-center gap-1 rounded-md border border-border-strong bg-surface p-0.5 text-xs">
           <StepButton testId="step-tab-hypothesis" active={step === "hypothesis"} onClick={() => setStep("hypothesis")}>
             1. Hypothesis
@@ -442,6 +436,12 @@ function HypothesisView({
   const chatInputRef = useAutoResize(chatInput, 1, 6);
   return (
     <>
+      <div className="flex justify-center pt-2 pb-4 text-foreground">
+        <BenchpilotLogo
+          testId="benchpilot-logo"
+          className="h-24 w-auto sm:h-28 md:h-32"
+        />
+      </div>
       <div className="rounded-lg border border-accent bg-accent-soft p-4">
         <label
           htmlFor="research-question"
