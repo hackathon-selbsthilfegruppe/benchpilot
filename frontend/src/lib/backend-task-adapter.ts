@@ -7,7 +7,7 @@ export function adaptBackendTask(task: BackendTask): Task {
     from: task.fromComponentInstanceId,
     to: task.toComponentInstanceId,
     title: task.title,
-    body: task.request,
+    body: task.resultText ?? task.request,
     status: mapBackendTaskStatus(task.status),
     created: task.createdAt,
   };

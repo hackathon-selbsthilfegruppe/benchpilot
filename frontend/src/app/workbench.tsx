@@ -20,6 +20,8 @@ import {
   buildBackendComponentPrewarmTargets,
   shouldUseBackendComponentSession,
 } from "@/lib/workbench-session-routing";
+import { listBackendTasks } from "@/lib/benchpilot-task-client";
+import { applyBackendTasksToWorkbench } from "@/lib/backend-task-workbench";
 import { reorderGroups } from "@/lib/reorder";
 import { Markdown } from "./markdown";
 import { StatusSymbol } from "./status";
@@ -90,6 +92,7 @@ export default function Workbench({
     group: "primary" | "supporting";
   } | null>(null);
   const [activeHeightPx, setActiveHeightPx] = useState<number | null>(null);
+  const backendTasksEnabled = Boolean(backendBenchId);
 
   useEffect(() => {
     // Synchronise initial theme with the user's localStorage / OS
@@ -154,6 +157,37 @@ export default function Workbench({
       cancelled = true;
     };
   }, [backendBenchId, components, supporting]);
+
+  useEffect(() => {
+    if (!backendBenchId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function syncTasks() {
+      try {
+        const backendTasks = await listBackendTasks({ benchId: backendBenchId });
+        if (cancelled) return;
+        const projected = applyBackendTasksToWorkbench(components, supporting, hypothesisState, backendTasks);
+        setComponents(projected.components);
+        setSupporting(projected.supporting);
+        setHypothesisState(projected.hypothesis);
+      } catch {
+        // Keep the UI stable; retry on the next poll tick.
+      }
+    }
+
+    void syncTasks();
+    const interval = window.setInterval(() => {
+      void syncTasks();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [backendBenchId]);
 
   async function send(chatId: ChatId, text: string) {
     if (!text.trim()) return;
@@ -323,6 +357,10 @@ export default function Workbench({
   }
 
   async function changeTaskStatus(task: Task, status: TaskStatus) {
+    if (backendBenchId) {
+      return;
+    }
+
     try {
       const res = await fetch(`/api/tasks/${task.to}/${task.id}`, {
         method: "PATCH",
@@ -375,6 +413,7 @@ export default function Workbench({
           setActiveRightTab((prev) => ({ ...prev, [id]: tab }))
         }
         onChangeTaskStatus={changeTaskStatus}
+        taskActionsEnabled={!backendTasksEnabled}
         dragId={dragId}
         dropTarget={dropTarget}
         onDragStart={(id) => setDragId(id)}
@@ -610,6 +649,7 @@ function ComponentStrip({
   activeRightTab,
   setActiveRightTab,
   onChangeTaskStatus,
+  taskActionsEnabled,
   dragId,
   dropTarget,
   onDragStart,
@@ -638,6 +678,7 @@ function ComponentStrip({
   activeRightTab: Record<string, "chat" | "tasks">;
   setActiveRightTab: (id: string, tab: "chat" | "tasks") => void;
   onChangeTaskStatus: (task: Task, status: TaskStatus) => Promise<void>;
+  taskActionsEnabled: boolean;
   dragId: string | null;
   dropTarget: { id: string; group: "primary" | "supporting" } | null;
   onDragStart: (id: string) => void;
@@ -686,6 +727,7 @@ function ComponentStrip({
         rightTab={activeRightTab[c.id] ?? "chat"}
         setRightTab={(tab) => setActiveRightTab(c.id, tab)}
         onChangeTaskStatus={onChangeTaskStatus}
+        taskActionsEnabled={taskActionsEnabled}
         isDragging={dragId === c.id}
         isDropTarget={dropTarget?.id === c.id && dropTarget.group === group}
         onDragStart={() => onDragStart(c.id)}
@@ -733,6 +775,7 @@ function ComponentStrip({
           rightTab={activeRightTab[hypothesis.id] ?? "chat"}
           setRightTab={(tab) => setActiveRightTab(hypothesis.id, tab)}
           onChangeTaskStatus={onChangeTaskStatus}
+          taskActionsEnabled={taskActionsEnabled}
           activeHeightPx={activeHeightPx}
           setActiveHeightPx={setActiveHeightPx}
         />
@@ -826,6 +869,7 @@ function ComponentCard({
   rightTab,
   setRightTab,
   onChangeTaskStatus,
+  taskActionsEnabled,
   isDragging,
   isDropTarget,
   onDragStart,
@@ -854,6 +898,7 @@ function ComponentCard({
   rightTab: "chat" | "tasks";
   setRightTab: (tab: "chat" | "tasks") => void;
   onChangeTaskStatus: (task: Task, status: TaskStatus) => Promise<void>;
+  taskActionsEnabled: boolean;
   isDragging?: boolean;
   isDropTarget?: boolean;
   onDragStart?: () => void;
@@ -1068,6 +1113,7 @@ function ComponentCard({
               allComponents={allComponents}
               outboundTasks={outboundTasks}
               onChangeTaskStatus={onChangeTaskStatus}
+              taskActionsEnabled={taskActionsEnabled}
             />
           )}
         </div>
@@ -1141,11 +1187,13 @@ function TasksPanel({
   allComponents,
   outboundTasks,
   onChangeTaskStatus,
+  taskActionsEnabled,
 }: {
   component: BenchComponent;
   allComponents: BenchComponent[];
   outboundTasks: Task[];
   onChangeTaskStatus: (task: Task, status: TaskStatus) => Promise<void>;
+  taskActionsEnabled: boolean;
 }) {
   const componentNames = useMemo(() => {
     const map: Record<string, string> = {};
@@ -1185,6 +1233,7 @@ function TasksPanel({
                     <TaskActions
                       task={task}
                       onChangeStatus={onChangeTaskStatus}
+                      enabled={taskActionsEnabled}
                     />
                   </div>
                 </div>
@@ -1237,16 +1286,20 @@ function TasksPanel({
 function TaskActions({
   task,
   onChangeStatus,
+  enabled,
 }: {
   task: Task;
   onChangeStatus: (task: Task, status: TaskStatus) => Promise<void>;
+  enabled: boolean;
 }) {
   const buttons: { label: string; status: TaskStatus }[] = [];
-  if (task.status === "open") {
-    buttons.push({ label: "Accept", status: "accepted" });
-    buttons.push({ label: "Decline", status: "declined" });
-  } else if (task.status === "accepted") {
-    buttons.push({ label: "Mark done", status: "done" });
+  if (enabled) {
+    if (task.status === "open") {
+      buttons.push({ label: "Accept", status: "accepted" });
+      buttons.push({ label: "Decline", status: "declined" });
+    } else if (task.status === "accepted") {
+      buttons.push({ label: "Mark done", status: "done" });
+    }
   }
 
   if (buttons.length === 0) {
