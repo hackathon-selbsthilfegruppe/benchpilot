@@ -31,7 +31,12 @@ export function normalizeRoleDefinition(role: RoleDefinition): NormalizedRoleDef
   };
 }
 
-async function ensureFile(filePath: string, content: string): Promise<void> {
+async function ensureFile(filePath: string, content: string, overwrite = false): Promise<void> {
+  if (overwrite) {
+    await writeFile(filePath, content, "utf8");
+    return;
+  }
+
   try {
     await readFile(filePath, "utf8");
   } catch {
@@ -39,15 +44,21 @@ async function ensureFile(filePath: string, content: string): Promise<void> {
   }
 }
 
-export async function ensureRoleWorkspace(workspaceRoot: string, role: NormalizedRoleDefinition): Promise<string> {
+export async function ensureRoleWorkspace(
+  workspaceRoot: string,
+  role: NormalizedRoleDefinition,
+  options: { overwritePromptFiles?: boolean } = {},
+): Promise<string> {
   const roleDir = role.cwd ?? path.join(workspaceRoot, role.id);
   const dataDir = path.join(roleDir, "data");
+  const overwritePromptFiles = options.overwritePromptFiles ?? false;
 
   await mkdir(dataDir, { recursive: true });
 
   await ensureFile(
     path.join(roleDir, "preprompt.md"),
     `# ${role.name}\n\n${role.instructions}\n`,
+    overwritePromptFiles,
   );
 
   await ensureFile(
@@ -65,6 +76,7 @@ export async function ensureRoleWorkspace(workspaceRoot: string, role: Normalize
       "Do not assume write access to sibling component folders unless an explicit tool is added later.",
       "",
     ].join("\n"),
+    overwritePromptFiles,
   );
 
   await ensureFile(
