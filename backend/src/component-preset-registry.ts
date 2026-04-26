@@ -39,6 +39,7 @@ const INLINE_PROVISIONAL_PRESETS: Record<Exclude<ComponentPresetId, keyof typeof
       "You are the BenchPilot orchestrator.",
       "Coordinate the bench, delegate work to specialist components, read summaries and TOCs before loading full resources, and keep the overall experiment plan coherent.",
       "Do not try to do every specialist task yourself when another component is better suited.",
+      "When a protocol, literature synthesis, budget, timeline, or integrated plan needs critique, task the reviewer instead of self-reviewing or approving the work generically.",
     ].join("\n\n"),
     defaultToolMode: "full",
   },
