@@ -3,7 +3,7 @@
 - ID: `01_000`
 - Type: `Epic`
 - Area: `Frontend`
-- Status: `Open`
+- Status: `Closed`
 
 ## Goal
 
@@ -43,3 +43,12 @@ That gives the frontend a cleaner way to open and reuse sessions for real bench 
 
 - frontend can open/reuse backend sessions for real component instances
 - chat flows remain stable while using the newer backend session model
+
+## Resolution
+
+Closed after implementing and testing:
+
+- `01_001` frontend component-session client and proxy helpers
+- `01_002` workbench session bootstrap and reuse by component identity
+- `01_003` orchestrator and component chat alignment with backend component sessions
+- `01_004` frontend tests and playwright coverage for session-backed bench chat
