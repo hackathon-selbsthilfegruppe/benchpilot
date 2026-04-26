@@ -83,12 +83,17 @@ export default function Start({
       if (!mod || e.altKey || e.shiftKey) return;
       if (e.key === "." || e.code === "Period") {
         e.preventDefault();
+        e.stopPropagation();
         setStep("hypothesis");
         setQuestion(EXAMPLE_QUESTIONS[0]);
       }
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
   }, []);
 
   async function ensureSession(): Promise<BenchpilotSessionSummary> {
