@@ -212,6 +212,8 @@ export class IntakeService {
     const protocolsComponent = requirePresetComponent(components, "protocols");
     const budgetComponent = requirePresetComponent(components, "budget");
     const timelineComponent = requirePresetComponent(components, "timeline");
+    const reviewerComponent = requirePresetComponent(components, "reviewer");
+    const experimentPlannerComponent = requirePresetComponent(components, "experiment-planner");
 
     const requirements = await createInitialRequirements(this.store, update.bench.id, {
       orchestratorComponentId: orchestratorComponent.id,
@@ -219,6 +221,8 @@ export class IntakeService {
       protocolsComponentId: protocolsComponent.id,
       budgetComponentId: budgetComponent.id,
       timelineComponentId: timelineComponent.id,
+      reviewerComponentId: reviewerComponent.id,
+      experimentPlannerComponentId: experimentPlannerComponent.id,
     });
 
     const literatureRequirement = requirements.find((entry) => entry.componentInstanceIds.includes(literatureComponent.id));
@@ -336,6 +340,8 @@ async function createInitialRequirements(
     protocolsComponentId: string;
     budgetComponentId: string;
     timelineComponentId: string;
+    reviewerComponentId: string;
+    experimentPlannerComponentId: string;
   },
 ): Promise<RequirementMetadata[]> {
   const existingRequirements = await store.listRequirements(benchId);
@@ -371,6 +377,16 @@ async function createInitialRequirements(
       summary: "Map phases, dependencies, and plausible execution timing for the proposed experiment.",
       componentInstanceIds: [componentIds.timelineComponentId],
     },
+    {
+      title: "Review specialist output for defects and unjustified assumptions",
+      summary: "Challenge protocol, literature, budget, timeline, and integrated-plan outputs by surfacing concrete defects, missing controls, weak evidence, and unjustified assumptions.",
+      componentInstanceIds: [componentIds.reviewerComponentId],
+    },
+    {
+      title: "Assemble the integrated experiment plan deliverable",
+      summary: "Integrate protocol, literature, budget, timeline, and review outputs into the single experiment-plan deliverable or an explicit gap report.",
+      componentInstanceIds: [componentIds.experimentPlannerComponentId],
+    },
   ]) {
     const requirement = createRequirement({ benchId, ...draft }, { existingRequirementIds: usedRequirementIds });
     usedRequirementIds.push(requirement.id);
@@ -387,6 +403,8 @@ async function createInitialRequirements(
     store.readComponent(benchId, componentIds.protocolsComponentId),
     store.readComponent(benchId, componentIds.budgetComponentId),
     store.readComponent(benchId, componentIds.timelineComponentId),
+    store.readComponent(benchId, componentIds.reviewerComponentId),
+    store.readComponent(benchId, componentIds.experimentPlannerComponentId),
   ]);
   const requirementByComponentId = new Map(requirements.flatMap((requirement) =>
     requirement.componentInstanceIds.map((componentId) => [componentId, requirement.id] as const),
