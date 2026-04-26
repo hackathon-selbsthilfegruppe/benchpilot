@@ -7,6 +7,7 @@ import {
   loadHypothesis,
   loadSupportingIds,
 } from "@/lib/components-fs";
+import { loadBackendWorkbench } from "@/lib/benchpilot-workbench-server";
 import type { BenchComponent } from "@/lib/components-shared";
 import Workbench from "../../workbench";
 
@@ -30,26 +31,41 @@ export default async function BenchPage({
 }) {
   const { slug } = await params;
   const idx = await loadHypothesesIndex();
-  if (!idx.hypotheses.some((h) => h.slug === slug)) {
+  const isLocalBench = idx.hypotheses.some((h) => h.slug === slug);
+
+  if (isLocalBench) {
+    const [primaryIds, supportingIds] = await Promise.all([
+      loadComponentIds(slug),
+      loadSupportingIds(slug),
+    ]);
+
+    const [components, supporting, hypothesis] = await Promise.all([
+      Promise.all(primaryIds.map((id) => hydrateComponent(slug, id))),
+      Promise.all(supportingIds.map((id) => hydrateComponent(slug, id))),
+      hydrateHypothesis(slug),
+    ]);
+
+    return (
+      <Workbench
+        components={components}
+        supporting={supporting}
+        hypothesis={hypothesis}
+        hypotheses={idx.hypotheses}
+        activeHypothesisSlug={slug}
+      />
+    );
+  }
+
+  const backendWorkbench = await loadBackendWorkbench(slug);
+  if (!backendWorkbench) {
     notFound();
   }
 
-  const [primaryIds, supportingIds] = await Promise.all([
-    loadComponentIds(slug),
-    loadSupportingIds(slug),
-  ]);
-
-  const [components, supporting, hypothesis] = await Promise.all([
-    Promise.all(primaryIds.map((id) => hydrateComponent(slug, id))),
-    Promise.all(supportingIds.map((id) => hydrateComponent(slug, id))),
-    hydrateHypothesis(slug),
-  ]);
-
   return (
     <Workbench
-      components={components}
-      supporting={supporting}
-      hypothesis={hypothesis}
+      components={backendWorkbench.components}
+      supporting={backendWorkbench.supporting}
+      hypothesis={backendWorkbench.hypothesis}
       hypotheses={idx.hypotheses}
       activeHypothesisSlug={slug}
     />
