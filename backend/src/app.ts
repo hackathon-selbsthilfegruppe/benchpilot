@@ -123,6 +123,16 @@ export function createApp(pool: SessionService, benchReadService?: BenchReadServ
     res.json({ resource });
   }));
 
+  app.patch("/api/benches/:benchId/components/:componentInstanceId/summary", asyncHandler(async (req, res) => {
+    ensureBenchWriteService(benchWriteService);
+    const component = await benchWriteService.updateComponentSummary(
+      requireBenchId(req),
+      requireComponentInstanceId(req),
+      req.body,
+    );
+    res.json({ component });
+  }));
+
   app.get("/api/agent-sessions", (_req, res) => {
     res.json({ sessions: pool.list() });
   });

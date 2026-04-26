@@ -511,6 +511,19 @@ describe("createApp", () => {
         createdAt: "2026-04-25T19:10:00.000Z",
         updatedAt: "2026-04-25T19:11:00.000Z",
       }),
+      updateComponentSummary: async () => ({
+        id: "literature-crp-biosensor",
+        benchId: "bench-crp-biosensor",
+        presetId: "literature",
+        name: "Literature — CRP biosensor",
+        summary: "Updated public summary.",
+        requirementIds: ["req-assess-novelty"],
+        toolMode: "read-only",
+        resourceCount: 1,
+        status: "active",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:12:00.000Z",
+      }),
     });
 
     const app = createApp(createFakePool({}), undefined, benchWriteService);
@@ -636,6 +649,40 @@ describe("createApp", () => {
         updatedAt: "2026-04-25T19:11:00.000Z",
       },
     });
+
+    const summaryResponse = await request(
+      app,
+      "/api/benches/bench-crp-biosensor/components/literature-crp-biosensor/summary",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          actor: {
+            benchId: "bench-crp-biosensor",
+            componentInstanceId: "literature-crp-biosensor",
+            presetId: "literature",
+          },
+          summary: "Updated public summary.",
+        }),
+      },
+    );
+
+    expect(summaryResponse.status).toBe(200);
+    expect(await summaryResponse.json()).toEqual({
+      component: {
+        id: "literature-crp-biosensor",
+        benchId: "bench-crp-biosensor",
+        presetId: "literature",
+        name: "Literature — CRP biosensor",
+        summary: "Updated public summary.",
+        requirementIds: ["req-assess-novelty"],
+        toolMode: "read-only",
+        resourceCount: 1,
+        status: "active",
+        createdAt: "2026-04-25T19:10:00.000Z",
+        updatedAt: "2026-04-25T19:12:00.000Z",
+      },
+    });
   });
 });
 
@@ -678,6 +725,9 @@ function createFakeBenchWriteService(overrides: Partial<BenchWriteService>): Ben
     },
     updateResource: async () => {
       throw new Error("missing updateResource");
+    },
+    updateComponentSummary: async () => {
+      throw new Error("missing updateComponentSummary");
     },
     ...overrides,
   } as BenchWriteService;

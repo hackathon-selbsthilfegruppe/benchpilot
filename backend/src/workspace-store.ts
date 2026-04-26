@@ -107,6 +107,23 @@ export class WorkspaceStore {
     await this.refreshComponentToc(parsed.benchId, parsed.id);
   }
 
+  async updateComponentSummary(
+    benchId: string,
+    componentInstanceId: string,
+    summary: string,
+    updatedAt: string = new Date().toISOString(),
+  ): Promise<ComponentInstance> {
+    const existing = await this.readComponent(benchId, componentInstanceId);
+    const updated = componentInstanceSchema.parse({
+      ...existing,
+      summary,
+      updatedAt,
+    });
+    await writeJsonFile(getComponentMetadataPath(this.workspaceRoot, benchId, componentInstanceId), updated);
+    await writeFile(getComponentSummaryPath(this.workspaceRoot, benchId, componentInstanceId), `${summary}\n`, "utf8");
+    return updated;
+  }
+
   async readComponent(benchId: string, componentInstanceId: string): Promise<ComponentInstance> {
     return readJsonFile(
       getComponentMetadataPath(this.workspaceRoot, benchId, componentInstanceId),

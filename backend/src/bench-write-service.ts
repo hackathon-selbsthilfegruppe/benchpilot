@@ -64,6 +64,13 @@ export const updateResourceRequestSchema = z.object({
 
 export type UpdateResourceRequest = z.infer<typeof updateResourceRequestSchema>;
 
+const updateComponentSummaryRequestSchema = z.object({
+  actor: componentWriteActorSchema,
+  summary: z.string().trim().min(1),
+}).strict();
+
+export type UpdateComponentSummaryRequest = z.infer<typeof updateComponentSummaryRequestSchema>;
+
 export class BenchWriteService {
   private readonly ingestion: ResourceIngestionService;
 
@@ -168,6 +175,23 @@ export class BenchWriteService {
     );
 
     return updated;
+  }
+
+  async updateComponentSummary(
+    benchId: string,
+    componentInstanceId: string,
+    input: unknown,
+  ) {
+    const request = updateComponentSummaryRequestSchema.parse(input);
+    const actor = this.assertScopedActor(request.actor, benchId, componentInstanceId);
+
+    assertWriteAccess(actor, {
+      kind: "write-component-summary",
+      benchId,
+      componentInstanceId,
+    });
+
+    return this.store.updateComponentSummary(benchId, componentInstanceId, request.summary);
   }
 
   private assertScopedActor(
