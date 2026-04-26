@@ -30,6 +30,7 @@ import { reorderGroups } from "@/lib/reorder";
 import { Markdown } from "./markdown";
 import { StatusSymbol } from "./status";
 import { BenchpilotLogo } from "./benchpilot-logo";
+import { TaskInspectPanel } from "./task-inspect-panel";
 
 type Message = { role: "user" | "agent"; text: string };
 
@@ -516,6 +517,8 @@ export default function Workbench({
         }
         onChangeTaskStatus={changeTaskStatus}
         taskActionsEnabled={!backendTasksEnabled}
+        backendBenchId={backendBenchId}
+        backendOrchestratorComponentId={backendOrchestratorComponentId}
         dragId={dragId}
         dropTarget={dropTarget}
         onDragStart={(id) => setDragId(id)}
@@ -838,6 +841,8 @@ function ComponentStrip({
   setActiveRightTab,
   onChangeTaskStatus,
   taskActionsEnabled,
+  backendBenchId,
+  backendOrchestratorComponentId,
   dragId,
   dropTarget,
   onDragStart,
@@ -867,6 +872,8 @@ function ComponentStrip({
   setActiveRightTab: (id: string, tab: "chat" | "tasks") => void;
   onChangeTaskStatus: (task: Task, status: TaskStatus) => Promise<void>;
   taskActionsEnabled: boolean;
+  backendBenchId?: string;
+  backendOrchestratorComponentId?: string;
   dragId: string | null;
   dropTarget: { id: string; group: "primary" | "supporting" } | null;
   onDragStart: (id: string) => void;
@@ -916,6 +923,8 @@ function ComponentStrip({
         setRightTab={(tab) => setActiveRightTab(c.id, tab)}
         onChangeTaskStatus={onChangeTaskStatus}
         taskActionsEnabled={taskActionsEnabled}
+        backendBenchId={backendBenchId}
+        backendOrchestratorComponentId={backendOrchestratorComponentId}
         isDragging={dragId === c.id}
         isDropTarget={dropTarget?.id === c.id && dropTarget.group === group}
         onDragStart={() => onDragStart(c.id)}
@@ -964,6 +973,8 @@ function ComponentStrip({
           setRightTab={(tab) => setActiveRightTab(hypothesis.id, tab)}
           onChangeTaskStatus={onChangeTaskStatus}
           taskActionsEnabled={taskActionsEnabled}
+          backendBenchId={backendBenchId}
+          backendOrchestratorComponentId={backendOrchestratorComponentId}
           activeHeightPx={activeHeightPx}
           setActiveHeightPx={setActiveHeightPx}
         />
@@ -1058,6 +1069,8 @@ function ComponentCard({
   setRightTab,
   onChangeTaskStatus,
   taskActionsEnabled,
+  backendBenchId,
+  backendOrchestratorComponentId,
   isDragging,
   isDropTarget,
   onDragStart,
@@ -1087,6 +1100,8 @@ function ComponentCard({
   setRightTab: (tab: "chat" | "tasks") => void;
   onChangeTaskStatus: (task: Task, status: TaskStatus) => Promise<void>;
   taskActionsEnabled: boolean;
+  backendBenchId?: string;
+  backendOrchestratorComponentId?: string;
   isDragging?: boolean;
   isDropTarget?: boolean;
   onDragStart?: () => void;
@@ -1310,6 +1325,8 @@ function ComponentCard({
               outboundTasks={outboundTasks}
               onChangeTaskStatus={onChangeTaskStatus}
               taskActionsEnabled={taskActionsEnabled}
+              backendBenchId={backendBenchId}
+              backendOrchestratorComponentId={backendOrchestratorComponentId}
             />
           )}
         </div>
@@ -1384,12 +1401,16 @@ function TasksPanel({
   outboundTasks,
   onChangeTaskStatus,
   taskActionsEnabled,
+  backendBenchId,
+  backendOrchestratorComponentId,
 }: {
   component: BenchComponent;
   allComponents: BenchComponent[];
   outboundTasks: Task[];
   onChangeTaskStatus: (task: Task, status: TaskStatus) => Promise<void>;
   taskActionsEnabled: boolean;
+  backendBenchId?: string;
+  backendOrchestratorComponentId?: string;
 }) {
   const componentNames = useMemo(() => {
     const map: Record<string, string> = {};
@@ -1442,6 +1463,11 @@ function TasksPanel({
                       onChangeStatus={onChangeTaskStatus}
                       enabled={taskActionsEnabled}
                     />
+                    <TaskInspectPanel
+                      task={task}
+                      benchId={backendBenchId}
+                      orchestratorComponentInstanceId={backendOrchestratorComponentId}
+                    />
                   </div>
                 </div>
               </li>
@@ -1481,6 +1507,11 @@ function TasksPanel({
                       {task.taskSessionId && <span>task session: {task.taskSessionId}</span>}
                       {task.resultResourceId && <span>result resource: {task.resultResourceId}</span>}
                     </div>
+                    <TaskInspectPanel
+                      task={task}
+                      benchId={backendBenchId}
+                      orchestratorComponentInstanceId={backendOrchestratorComponentId}
+                    />
                   </div>
                 </div>
               </li>
