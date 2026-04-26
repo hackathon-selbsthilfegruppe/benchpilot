@@ -23,6 +23,7 @@ import {
   shouldUseBackendComponentSession,
 } from "@/lib/workbench-session-routing";
 import { listBackendTasks } from "@/lib/benchpilot-task-client";
+import { buildBackendTaskActivityMessages, type BackendTaskActivitySnapshot } from "@/lib/backend-task-activity";
 import { applyBackendTasksToWorkbench } from "@/lib/backend-task-workbench";
 import { formatTaskLifecycleText, summarizeTaskLifecycle } from "@/lib/task-visibility";
 import { reorderGroups } from "@/lib/reorder";
@@ -90,6 +91,7 @@ export default function Workbench({
   const [streamingText, setStreamingText] = useState<Record<ChatId, string>>({});
   const [activeTool, setActiveTool] = useState<Record<ChatId, ToolActivity | undefined>>({});
   const [sessionsByRoleId, setSessionsByRoleId] = useState<Record<string, BenchpilotSessionSummary>>({});
+  const backendTaskSnapshotsRef = useRef<Record<string, BackendTaskActivitySnapshot>>({});
   const [theme, setTheme] = useState<Theme>("dark");
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
@@ -227,9 +229,25 @@ export default function Workbench({
         const backendTasks = await listBackendTasks({ benchId });
         if (cancelled) return;
         const projected = applyBackendTasksToWorkbench(components, supporting, hypothesisState, backendTasks);
+        const componentNames = buildComponentNameLookup(projected.components, projected.supporting, projected.hypothesis, backendOrchestratorComponentId);
+        const activity = buildBackendTaskActivityMessages(
+          backendTaskSnapshotsRef.current,
+          backendTasks,
+          componentNames,
+        );
+        backendTaskSnapshotsRef.current = activity.next;
         setComponents(projected.components);
         setSupporting(projected.supporting);
         setHypothesisState(projected.hypothesis);
+        if (activity.messages.length > 0) {
+          setChats((prev) => ({
+            ...prev,
+            orchestrator: [
+              ...(prev.orchestrator ?? []),
+              ...activity.messages.map((text) => ({ role: "agent" as const, text })),
+            ],
+          }));
+        }
       } catch {
         // Keep the UI stable; retry on the next poll tick.
       }
@@ -499,6 +517,24 @@ function mergeSessions(
     next[session.role.id] = session;
   }
   return next;
+}
+
+function buildComponentNameLookup(
+  components: BenchComponent[],
+  supporting: BenchComponent[],
+  hypothesis: BenchComponent,
+  backendOrchestratorComponentId?: string,
+): Record<string, string> {
+  const lookup: Record<string, string> = {
+    [hypothesis.id]: hypothesis.name,
+  };
+  for (const component of [...components, ...supporting]) {
+    lookup[component.id] = component.name;
+  }
+  if (backendOrchestratorComponentId) {
+    lookup[backendOrchestratorComponentId] = "Orchestrator";
+  }
+  return lookup;
 }
 
 function convertSessionHistoryToMessages(history: SessionHistory): Message[] {
