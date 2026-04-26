@@ -56,6 +56,14 @@ describe("backend task workbench projection", () => {
         body: "Similar work exists.",
         status: "done",
         created: "2026-04-25T00:00:00.000Z",
+        updatedAt: "2026-04-25T00:01:00.000Z",
+        completedAt: "2026-04-25T00:01:00.000Z",
+        backendStatus: "completed",
+        taskSessionId: undefined,
+        executionStartedAt: undefined,
+        resultResourceId: undefined,
+        createdResourceIds: [],
+        modifiedResourceIds: [],
       },
     ]);
     expect(result.hypothesis.tasks).toEqual([]);

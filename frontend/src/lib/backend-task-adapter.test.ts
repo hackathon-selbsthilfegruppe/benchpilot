@@ -24,6 +24,14 @@ describe("backend task adapter", () => {
       body: "Check whether related work exists.",
       status: "accepted",
       created: "2026-04-25T00:00:00.000Z",
+      updatedAt: "2026-04-25T00:01:00.000Z",
+      completedAt: undefined,
+      backendStatus: "running",
+      taskSessionId: undefined,
+      executionStartedAt: undefined,
+      resultResourceId: undefined,
+      createdResourceIds: [],
+      modifiedResourceIds: [],
     });
   });
 
@@ -44,6 +52,7 @@ describe("backend task adapter", () => {
         body: "Check whether related work exists.",
         status: "accepted",
         created: "2026-04-25T00:00:00.000Z",
+        backendStatus: "running",
       },
       {
         taskId: "task-1",
@@ -62,6 +71,11 @@ describe("backend task adapter", () => {
       body: "Similar work exists.",
       status: "done",
       created: "2026-04-25T00:00:00.000Z",
+      backendStatus: "completed",
+      completedAt: "2026-04-25T00:02:00.000Z",
+      resultResourceId: "lit-0007",
+      createdResourceIds: ["lit-0007"],
+      modifiedResourceIds: [],
     });
   });
 });

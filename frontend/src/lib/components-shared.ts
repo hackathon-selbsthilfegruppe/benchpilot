@@ -23,6 +23,14 @@ export type Task = {
   body: string;
   status: TaskStatus;
   created: string;
+  updatedAt?: string;
+  completedAt?: string;
+  backendStatus?: "pending" | "running" | "completed" | "error";
+  taskSessionId?: string;
+  executionStartedAt?: string;
+  resultResourceId?: string;
+  createdResourceIds?: string[];
+  modifiedResourceIds?: string[];
 };
 
 export type BenchComponent = {

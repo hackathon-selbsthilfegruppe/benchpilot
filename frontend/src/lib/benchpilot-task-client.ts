@@ -7,6 +7,7 @@ export type BackendTask = {
   request: string;
   status: "pending" | "running" | "completed" | "error";
   taskSessionId?: string;
+  executionStartedAt?: string;
   resultText?: string;
   resultResourceId?: string;
   createdResourceIds: string[];
