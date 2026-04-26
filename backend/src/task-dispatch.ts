@@ -20,6 +20,10 @@ export function getRunnableTaskCandidate(task: TaskMetadata): RunnableTaskCandid
     return null;
   }
 
+  if (task.executionStartedAt) {
+    return null;
+  }
+
   return {
     taskId: task.id,
     benchId: task.benchId,
