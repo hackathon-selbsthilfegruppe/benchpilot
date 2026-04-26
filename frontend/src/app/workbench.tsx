@@ -16,6 +16,10 @@ import type {
   Task,
   TaskStatus,
 } from "@/lib/components-shared";
+import {
+  buildBackendComponentPrewarmTargets,
+  shouldUseBackendComponentSession,
+} from "@/lib/workbench-session-routing";
 import { reorderGroups } from "@/lib/reorder";
 import { Markdown } from "./markdown";
 import { StatusSymbol } from "./status";
@@ -124,10 +128,7 @@ export default function Workbench({
 
         if (backendBenchId) {
           const componentSessions = await prewarmComponentSessions(
-            [...components, ...supporting].map((component) => ({
-              benchId: backendBenchId,
-              componentInstanceId: component.id,
-            })),
+            buildBackendComponentPrewarmTargets(backendBenchId, components, supporting),
           );
           if (cancelled) return;
           setSessionsByRoleId((prev) => mergeSessions(prev, componentSessions));
@@ -419,15 +420,11 @@ async function ensureSession(
     return existing;
   }
 
-  const created = backendBenchId && isBackendComponentChat(chatId, hypothesis)
+  const created = shouldUseBackendComponentSession(chatId, hypothesis.id, backendBenchId)
     ? await createComponentSession(backendBenchId, chatId)
     : await createSession(resolveRoleInput(chatId, components, supporting, hypothesis));
   setSessionsByRoleId((prev) => ({ ...prev, [created.role.id]: created }));
   return created;
-}
-
-function isBackendComponentChat(chatId: ChatId, hypothesis: BenchComponent): chatId is string {
-  return chatId !== "orchestrator" && chatId !== hypothesis.id;
 }
 
 function resolveRoleInput(
