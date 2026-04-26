@@ -44,6 +44,7 @@ describe("component preset registry", () => {
     expect(registry.reviewer.source.kind).toBe("inline-provisional");
     expect(registry.orchestrator.source.kind).toBe("inline-provisional");
     expect(registry.orchestrator.preprompt).toContain("task the reviewer");
+    expect(registry.orchestrator.preprompt).toContain("task the experiment-planner");
     expect(registry.literature.source.kind).toBe("inline-provisional");
   });
 
