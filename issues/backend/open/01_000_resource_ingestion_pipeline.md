@@ -35,10 +35,11 @@ We already know we need support for `.md`, `.txt`, and `.pdf`, with extracted `.
 
 ## Candidate child issues
 
-- PDF extraction pipeline
-- file metadata schema
-- resource folder materialization
-- validation and error handling
+- `01_001` supported file contract and ingestion validation
+- `01_002` resource file materialization and storage writes
+- `01_003` PDF extracted-text generation
+- `01_004` file inventory metadata and description persistence
+- `01_005` ingestion service orchestration and error handling
 
 ## Exit criteria
 
