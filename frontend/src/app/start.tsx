@@ -31,8 +31,27 @@ type SourceResult = {
   error?: string;
 };
 
+type LiteratureHit = {
+  sourceId: string;
+  externalId: string;
+  title: string;
+  authors?: string;
+  year?: number;
+  url: string;
+  doi?: string;
+  summary?: string;
+  citationCount?: number;
+  openAccessPdfUrl?: string;
+};
+
+type LiteratureSourceResult = {
+  sourceId: string;
+  hits: LiteratureHit[];
+  error?: string;
+};
+
 type ChatTurn = { role: "user" | "agent"; text: string };
-type Step = "hypothesis" | "protocols";
+type Step = "hypothesis" | "literature" | "protocols";
 type FinalizeStage = null | "drafting" | "creating";
 
 type HypothesisOption = { slug: string; name: string; domain?: string };
@@ -67,6 +86,11 @@ export default function Start({
   const [searchedQuery, setSearchedQuery] = useState<string | null>(null);
   const [sources, setSources] = useState<SourceResult[]>([]);
   const [kept, setKept] = useState<Record<string, boolean>>({});
+
+  const [litSearching, setLitSearching] = useState(false);
+  const [litSearchedQuery, setLitSearchedQuery] = useState<string | null>(null);
+  const [litSources, setLitSources] = useState<LiteratureSourceResult[]>([]);
+  const [litKept, setLitKept] = useState<Record<string, boolean>>({});
 
   const [finalizeStage, setFinalizeStage] = useState<FinalizeStage>(null);
 
@@ -184,6 +208,44 @@ export default function Start({
     }
   }
 
+  async function searchLiterature(q: string) {
+    if (!q || litSearching) return;
+    setError(null);
+    setLitSearching(true);
+    try {
+      const res = await fetch("/api/literature-sources/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q, pageSize: 10 }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      const body = (await res.json()) as { sources: LiteratureSourceResult[] };
+      setLitSources(body.sources);
+      const next: Record<string, boolean> = {};
+      for (const src of body.sources) {
+        for (const h of src.hits) next[litHitKey(h)] = true;
+      }
+      setLitKept(next);
+      setLitSearchedQuery(q);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLitSearching(false);
+    }
+  }
+
+  function goToLiterature() {
+    setError(null);
+    setStep("literature");
+    const q = question.trim();
+    if (q && q !== litSearchedQuery && !litSearching) {
+      void searchLiterature(q);
+    }
+  }
+
   async function finalize() {
     const q = question.trim();
     if (!q || finalizeStage) return;
@@ -199,7 +261,20 @@ export default function Start({
           url: h.url,
           description: h.description,
         }));
-      const reply = await runOrchestrator(buildDraftPrompt({ question: q, protocols }));
+      const literature = litSources
+        .flatMap((s) => s.hits)
+        .filter((h) => litKept[litHitKey(h)])
+        .map((h) => ({
+          sourceId: h.sourceId,
+          title: h.title,
+          url: h.url,
+          description:
+            (h.authors ? `${h.authors}${h.year ? ` (${h.year})` : ""}. ` : "") +
+            (h.summary ?? ""),
+        }));
+      const reply = await runOrchestrator(
+        buildDraftPrompt({ question: q, protocols: [...protocols, ...literature] }),
+      );
       const template = parseTemplateDraft(reply);
 
       setFinalizeStage("creating");
@@ -223,6 +298,9 @@ export default function Start({
   const keptCount = sources
     .flatMap((s) => s.hits)
     .filter((h) => kept[hitKey(h)]).length;
+  const litKeptCount = litSources
+    .flatMap((s) => s.hits)
+    .filter((h) => litKept[litHitKey(h)]).length;
 
   return (
     <div data-testid="start-page" className="flex min-h-screen flex-col bg-background text-foreground">
@@ -231,8 +309,11 @@ export default function Start({
           <StepButton testId="step-tab-hypothesis" active={step === "hypothesis"} onClick={() => setStep("hypothesis")}>
             1. Hypothesis
           </StepButton>
+          <StepButton testId="step-tab-literature" active={step === "literature"} onClick={goToLiterature} disabled={!question.trim()}>
+            2. Literature{litKeptCount > 0 ? ` (${litKeptCount})` : ""}
+          </StepButton>
           <StepButton testId="step-tab-protocols" active={step === "protocols"} onClick={goToProtocols} disabled={!question.trim()}>
-            2. Protocols{keptCount > 0 ? ` (${keptCount})` : ""}
+            3. Protocols{keptCount > 0 ? ` (${keptCount})` : ""}
           </StepButton>
         </div>
         <div className="ml-auto flex items-center gap-2 text-xs">
@@ -277,6 +358,18 @@ export default function Start({
               streaming={streaming}
               pending={pending}
               chatScrollRef={chatScrollRef}
+              onContinue={goToLiterature}
+            />
+          </div>
+          <div data-testid="literature-step" hidden={step !== "literature"} className="flex flex-1 flex-col gap-3">
+            <LiteratureView
+              question={question}
+              searching={litSearching}
+              sources={litSources}
+              kept={litKept}
+              setKept={setLitKept}
+              onResearch={() => void searchLiterature(question.trim())}
+              onBack={() => setStep("hypothesis")}
               onContinue={goToProtocols}
             />
           </div>
@@ -288,7 +381,7 @@ export default function Start({
               kept={kept}
               setKept={setKept}
               onResearch={() => void searchProtocols(question.trim())}
-              onBack={() => setStep("hypothesis")}
+              onBack={() => setStep("literature")}
               onFinalize={() => void finalize()}
               finalizeStage={finalizeStage}
             />
@@ -513,12 +606,12 @@ function HypothesisView({
       <div className="flex justify-end">
         <button
           type="button"
-          data-testid="continue-to-protocols-button"
+          data-testid="continue-to-literature-button"
           onClick={onContinue}
           disabled={!question.trim()}
           className="rounded-md bg-accent-strong px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
-          Continue → Protocols
+          Continue → Literature
         </button>
       </div>
     </>
@@ -730,6 +823,190 @@ function ChatBubble({
 
 function hitKey(h: ProtocolHit): string {
   return `${h.sourceId}:${h.externalId}`;
+}
+
+function litHitKey(h: LiteratureHit): string {
+  return `${h.sourceId}:${h.externalId}`;
+}
+
+function LiteratureView({
+  question,
+  searching,
+  sources,
+  kept,
+  setKept,
+  onResearch,
+  onBack,
+  onContinue,
+}: {
+  question: string;
+  searching: boolean;
+  sources: LiteratureSourceResult[];
+  kept: Record<string, boolean>;
+  setKept: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  onResearch: () => void;
+  onBack: () => void;
+  onContinue: () => void;
+}) {
+  const totalHits = sources.reduce((n, s) => n + s.hits.length, 0);
+  const keptCount = Object.values(kept).filter(Boolean).length;
+  return (
+    <>
+      <div data-testid="literature-question-display" className="rounded-lg border border-border bg-surface-elev p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">
+            <div className="text-xs font-semibold uppercase tracking-wide text-subtle">
+              Research question
+            </div>
+            <div className="mt-1 text-base font-semibold leading-snug">
+              {question || <span className="text-subtle">(none yet)</span>}
+            </div>
+          </div>
+          <button
+            type="button"
+            data-testid="literature-back-button"
+            onClick={onBack}
+            className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface"
+          >
+            ← Edit
+          </button>
+        </div>
+      </div>
+
+      <div data-testid="literature-panel" className="rounded-lg border border-border bg-surface-elev p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-sm font-semibold">Related literature</div>
+            <div data-testid="literature-status-text" className="text-xs text-subtle">
+              {searching
+                ? "Searching configured sources…"
+                : sources.length === 0
+                  ? "No search has been run yet for this question."
+                  : `${keptCount} kept of ${totalHits} found`}
+            </div>
+          </div>
+          <button
+            type="button"
+            data-testid="literature-search-button"
+            onClick={onResearch}
+            disabled={!question.trim() || searching}
+            className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-elev disabled:opacity-50"
+          >
+            {searching ? "Searching…" : sources.length === 0 ? "Search now" : "Re-search"}
+          </button>
+        </div>
+        {sources.length > 0 && sources.every((s) => s.error) && (
+          <div data-testid="literature-all-errored-banner" className="mt-3 rounded-md border border-status-pending bg-status-pending-soft p-3 text-xs text-foreground">
+            <div className="font-semibold">Every literature source returned an error.</div>
+            <ul className="mt-1 list-disc space-y-1 pl-4">
+              {sources.map((s) => (
+                <li key={s.sourceId} data-testid={`literature-error-line-${s.sourceId}`}>
+                  <span className="font-mono">{s.sourceId}</span>: {s.error}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-2">
+              You can still continue to <span className="font-semibold">Protocols</span> below — the
+              orchestrator will draft the bench from your question alone if no references stick.
+            </div>
+          </div>
+        )}
+        <div data-testid="literature-results-list" className="mt-3 flex max-h-[36rem] flex-col gap-3 overflow-y-auto pr-1">
+          {sources.map((src) => (
+            <div
+              key={src.sourceId}
+              data-testid={`literature-source-${src.sourceId}`}
+              className="rounded-md border border-border bg-surface p-2"
+            >
+              <div className="mb-2 flex items-center justify-between text-xs font-semibold text-subtle">
+                <span>{src.sourceId}</span>
+                <span>{src.error ? "error" : `${src.hits.length} hits`}</span>
+              </div>
+              {src.error && (
+                <p data-testid={`literature-source-${src.sourceId}-error`} className="text-xs text-status-blocked">
+                  {src.error}
+                </p>
+              )}
+              <ul className="flex flex-col gap-2">
+                {src.hits.map((h) => {
+                  const k = litHitKey(h);
+                  const keep = kept[k] ?? true;
+                  return (
+                    <li
+                      key={k}
+                      data-testid={`literature-hit-${k}`}
+                      className={`rounded-md border p-2 text-xs ${
+                        keep
+                          ? "border-accent bg-accent-soft text-accent-soft-fg"
+                          : "border-border bg-surface-elev"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          data-testid={`literature-hit-${k}-keep`}
+                          checked={keep}
+                          onChange={(e) =>
+                            setKept((prev) => ({ ...prev, [k]: e.target.checked }))
+                          }
+                          className="mt-1"
+                        />
+                        <div className="flex-1">
+                          <a
+                            href={h.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            data-testid={`literature-hit-${k}-link`}
+                            className="font-semibold underline"
+                          >
+                            {h.title}
+                          </a>
+                          <div className="text-[11px] opacity-80">
+                            {[h.authors, h.year ? String(h.year) : null, h.citationCount != null ? `${h.citationCount} citations` : null]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </div>
+                          {h.summary && <div className="mt-1 leading-snug">{h.summary}</div>}
+                          {h.openAccessPdfUrl && (
+                            <a
+                              href={h.openAccessPdfUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-1 inline-block text-[11px] underline opacity-80"
+                            >
+                              open-access PDF
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+          {!searching && sources.length === 0 && (
+            <p data-testid="literature-empty-hint" className="text-xs text-subtle">
+              Click &ldquo;Search now&rdquo; to pull related papers from Semantic Scholar.
+              Skipping is fine — you can still finalize without references.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          data-testid="continue-to-protocols-from-literature-button"
+          onClick={onContinue}
+          disabled={!question.trim()}
+          className="rounded-md bg-accent-strong px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          Continue → Protocols
+        </button>
+      </div>
+    </>
+  );
 }
 
 function extractRevisedQuestion(text: string): string | null {

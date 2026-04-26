@@ -9,6 +9,7 @@ import {
   fetchProtocolIo,
   searchProtocolsIo,
 } from "./protocols/index.js";
+import { searchSemanticScholar } from "./literature/index.js";
 
 export interface SessionService {
   list(): SessionSummary[];
@@ -164,6 +165,17 @@ export function createApp(pool: SessionService, benchReadService?: BenchReadServ
     }
     const protocol = await fetchProtocolIo(uri);
     res.json({ protocol });
+  }));
+
+  const literatureSearchSchema = z.object({
+    query: z.string().min(1),
+    pageSize: z.number().int().positive().max(50).optional(),
+  });
+
+  app.post("/api/literature/search", asyncHandler(async (req, res) => {
+    const { query, pageSize } = literatureSearchSchema.parse(req.body);
+    const hits = await searchSemanticScholar(query, pageSize ?? 20);
+    res.json({ hits });
   }));
 
   app.delete("/api/agent-sessions/:sessionId", asyncHandler(async (req, res) => {
