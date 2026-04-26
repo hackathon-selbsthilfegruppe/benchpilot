@@ -894,10 +894,10 @@ function ComponentCard({
           onDragEnd={() => onDragEnd?.()}
           onClick={onOpen}
           data-testid={`open-${component.id}`}
-          className={`group flex w-full items-center gap-4 rounded-lg border px-4 py-3 text-left transition ${
+          className={`group flex w-full items-center gap-4 rounded-lg border-2 px-4 py-3 text-left transition-colors duration-150 ${
             supporting
-              ? "border-dashed border-border bg-transparent hover:border-accent hover:bg-surface"
-              : "border-border bg-surface hover:border-accent hover:bg-surface-elev"
+              ? "border-dashed border-border bg-transparent hover:border-accent hover:bg-accent-soft hover:text-accent-soft-fg"
+              : "border-border bg-surface hover:border-accent hover:bg-accent-soft hover:text-accent-soft-fg"
           } ${isDragging ? "opacity-40" : ""}`}
         >
         <span
@@ -963,19 +963,19 @@ function ComponentCard({
     <article
       ref={articleRef}
       style={heightStyle}
-      className="flex shrink-0 flex-col rounded-xl border border-accent bg-surface ring-1 ring-accent-ring"
+      className="flex shrink-0 flex-col overflow-hidden rounded-xl border-2 border-accent bg-surface ring-1 ring-accent-ring"
     >
       <button
         type="button"
         onClick={onClose}
         data-testid={`close-${component.id}`}
-        className="group flex w-full items-center gap-3 border-b border-border px-5 py-4 text-left transition hover:bg-surface-elev"
+        className="group flex w-full items-center gap-3 border-b border-border px-5 py-4 text-left transition-colors duration-150 hover:bg-accent-soft hover:text-accent-soft-fg"
       >
         <span className="inline-block h-2 w-2 rounded-full bg-accent" />
-        <h3 className="text-base font-semibold text-foreground group-hover:text-accent">
+        <h3 className="text-base font-semibold text-foreground group-hover:text-accent-soft-fg">
           {component.name}
         </h3>
-        <span className="ml-auto text-xs text-subtle group-hover:text-accent">
+        <span className="ml-auto text-xs text-subtle group-hover:text-accent-soft-fg">
           ← collapse
         </span>
       </button>
