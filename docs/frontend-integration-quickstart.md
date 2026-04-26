@@ -6,13 +6,15 @@ This document is intentionally short. It describes the **minimum stable flow** t
 
 ## Entry point: the start page
 
-The user-facing entry is `/`, the start page (`frontend/src/app/start.tsx`). It uses the same chat/session endpoints below — there is one orchestrator session that refines the question and drafts a protocol template. Once the user clicks Finalize, the start page POSTs to `/api/hypotheses` and routes to `/bench/<slug>`, where the workbench takes over with the long-lived component sessions described in this document.
+The user-facing entry is `/`, the start page (`frontend/src/app/start.tsx`). It keeps the guided intake shell, but the durable flow is now backend-owned underneath. The intake orchestrator is the real backend orchestrator component session, and Finalize routes through `/api/benchpilot/intake/<briefId>/finalize`, activating a backend bench at `/bench/<benchId>`.
 
-The two intake-only routes are:
+The intake-facing routes now are:
 - `POST /api/protocol-sources/search` — fans out to all configured protocol-source adapters.
-- `POST /api/hypotheses` — finalizes a template into bench files.
+- `POST /api/literature-sources/search` — fans out to configured literature sources, including the `bx`/Brave fallback.
+- `POST /api/benchpilot/intake` — creates a backend intake brief + draft bench.
+- `POST /api/benchpilot/intake/<briefId>/finalize` — activates the backend bench and persists intake selections as backend resources.
 
-Both live in the Next.js app, not the Node backend. The session/prompt endpoints below are unchanged.
+The session/prompt endpoints below remain the stable chat surface.
 
 ## Goal of stage 1
 

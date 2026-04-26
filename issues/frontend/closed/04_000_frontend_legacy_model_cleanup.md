@@ -3,7 +3,7 @@
 - ID: `04_000`
 - Type: `Epic`
 - Area: `Frontend`
-- Status: `Open`
+- Status: `Closed`
 
 ## Goal
 
@@ -34,7 +34,8 @@ It is useful to track it now so we do not forget the cleanup step later, but it 
 
 ## Candidate child issues
 
-- later
+- `04_001` remove unused local intake materialization path
+- `04_002` isolate legacy local bench support as fallback only
 
 ## Exit criteria
 

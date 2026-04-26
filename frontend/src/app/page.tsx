@@ -5,6 +5,8 @@ import Start from "./start";
 export default async function Page() {
   const idx = await loadHypothesesIndex();
   const backendHypotheses = await loadBackendBenchOptions();
+  // Merge backend benches with legacy local benches so older local data stays
+  // reachable, while backend-created benches remain the primary path.
   const existingHypotheses = dedupeHypotheses([...idx.hypotheses, ...backendHypotheses]);
   return <Start existingHypotheses={existingHypotheses} />;
 }

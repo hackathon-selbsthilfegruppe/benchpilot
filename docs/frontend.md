@@ -46,7 +46,7 @@ There is intentionally **no third "preview the bench" step**. Component editing 
 
 ### Finalize
 
-Finalize runs the template-draft prompt through the same orchestrator session, materializes the bench on disk, and routes to `/bench/<slug>`.
+Finalize now calls the backend-owned intake/bench flow. The guided intake shell stays the same, but the frontend finalizes through the backend intake brief, materializes a preset-baseline backend bench, and routes to `/bench/<benchId>`.
 
 ## Workbench layout
 

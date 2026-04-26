@@ -124,6 +124,7 @@ This layer is already partially implemented and should remain stable.
 - `POST /api/agent-sessions`
 - `POST /api/agent-sessions/prewarm`
 - `POST /api/agent-sessions/:sessionId/prompt`
+- `GET /api/agent-sessions/:sessionId/history`
 - `DELETE /api/agent-sessions/:sessionId`
 
 ### Prompt stream event types

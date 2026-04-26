@@ -33,6 +33,8 @@ export default async function BenchPage({
   const idx = await loadHypothesesIndex();
   const isLocalBench = idx.hypotheses.some((h) => h.slug === slug);
 
+  // Compatibility fallback for older frontend-local benches. New benches
+  // created through the guided intake flow are backend-backed and load below.
   if (isLocalBench) {
     const [primaryIds, supportingIds] = await Promise.all([
       loadComponentIds(slug),

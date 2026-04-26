@@ -42,7 +42,7 @@ The currently implemented start page is a single route (`/start` or `/`) with **
 
 There is **no preview-of-the-bench step**. The components the orchestrator drafts are not edited on a third intake screen — they are edited *on the bench*, which is already the right place for that work.
 
-"Finalize" runs the template-draft prompt through the same orchestrator session (showing an inline status line such as `drafting template… creating bench…`), parses the fenced JSON, then POSTs to `POST /api/hypotheses`. The server allocates a unique slug, writes `hypothesis.json`, an `index.json`, and one `component.json` per drafted component (with empty TOC and tasks), updates `hypotheses.json`, and routes the user to `/bench/<slug>`.
+"Finalize" now stays on the same guided intake surface but hands off to the backend-owned intake flow. The intake orchestrator is already the real bench orchestrator session, and finalize persists the kept literature/protocol selections as backend component resources, materializes the preset-baseline backend bench, and routes the user to `/bench/<benchId>`.
 
 The intake step should produce a structured brief, not just a raw string. A useful brief may include:
 

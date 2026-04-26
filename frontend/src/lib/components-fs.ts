@@ -1,4 +1,7 @@
 import "server-only";
+// Legacy local-bench compatibility layer. New guided intake/finalize flows are
+// backend-owned; this filesystem surface remains only so pre-existing local
+// benches can still be opened safely during the transition.
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
 import type { TocEntry, DetailDoc, Task } from "./components-shared";

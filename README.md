@@ -11,7 +11,7 @@ Early milestone:
 - manage multiple **standby** agent sessions from the backend
 - keep the UI free to evolve separately
 
-The frontend now opens at a **start page** (`/`) where the user defines a research question, searches across configured protocol-source adapters (currently protocols.io), and asks the orchestrator to draft a *protocol template* (an ordered list of component skeletons). On finalize, the bench is materialized on disk under `frontend/components-data/<slug>/` and the user is routed to `/bench/<slug>`. See `docs/concept.md` ("Hypothesis intake & protocol discovery") for the full flow.
+The frontend now opens at a **start page** (`/`) where the user defines a research question, searches literature/protocol sources, and works with the real backend orchestrator session underneath the guided intake shell. On finalize, the frontend activates a backend bench and routes to `/bench/<benchId>`. Existing local benches under `frontend/components-data/` remain viewable as a compatibility fallback, but they are no longer the canonical intake/materialization path. See `docs/concept.md` for the full flow.
 
 ## Why pi
 
@@ -83,9 +83,9 @@ npm run dev
 Backend default URL:
 - `http://localhost:8787`
 
-## Frontend hypothesis-intake API
+## Frontend intake + compatibility API
 
-These routes live in the Next.js app (not the Node backend) because they touch `frontend/components-data/` directly.
+These routes live in the Next.js app as either thin backend proxies for the guided intake flow or compatibility support for existing local benches under `frontend/components-data/`.
 
 ### Search across all configured protocol sources
 
@@ -97,15 +97,25 @@ curl -X POST http://localhost:3000/api/protocol-sources/search \
 
 Response: `{ sources: [{ sourceId, hits: [...], error? }] }`. One block per registered adapter; per-source errors are returned inline so one broken adapter does not break the page. Adapters live under `frontend/src/lib/protocol-sources/` and implement the `ProtocolSource` interface.
 
-### Finalize a hypothesis template into a bench
+### Create and finalize backend intake
 
 ```bash
-curl -X POST http://localhost:3000/api/hypotheses \
+curl -X POST http://localhost:3000/api/benchpilot/intake \
   -H 'content-type: application/json' \
-  -d @template.json
+  -d '{"question":"Can we build a paper-based electrochemical biosensor for CRP?"}'
 ```
 
-Body shape: `{ template: { hypothesis: { name, summary, preprompt }, components: [...], supporting?: [...] }, slugBase?, domain? }`. Response: `{ slug }`. Writes `hypothesis.json`, `index.json`, and one `component.json` per drafted component, then updates `hypotheses.json`.
+This returns an intake brief, a draft backend bench, the preset baseline components, and the real orchestrator component session.
+
+Finalize through the intake brief:
+
+```bash
+curl -X POST http://localhost:3000/api/benchpilot/intake/<briefId>/finalize \
+  -H 'content-type: application/json' \
+  -d '{"question":"Can we build a paper-based electrochemical biosensor for CRP?","literatureSelections":[],"protocolSelections":[]}'
+```
+
+This activates the backend bench, persists intake selections as backend resources, and routes the UI to `/bench/<benchId>`.
 
 ## Backend API
 

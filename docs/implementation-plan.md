@@ -33,15 +33,16 @@ Add file-backed task delegation so component instances can ask other component i
 
 That keeps the product moving even if the shared data model is still evolving.
 
-## Milestone 0 — Hypothesis intake (✅ shipped)
+## Milestone 0 — Guided intake shell (✅ shipped, now backend-owned underneath)
 
-Deliverables (all in the Next.js app, not the Node backend):
-- start page at `/` as a two-step segmented intake (`Hypothesis` view ⇄ `Protocols` view), single shared orchestrator session, both views stay mounted so back-and-forth is lossless
-- `POST /api/protocol-sources/search` over a pluggable `ProtocolSource` adapter set (currently only protocols.io)
-- JSON-fenced template parser (`frontend/src/lib/hypothesis-template.ts`) and on-disk materializer (`frontend/src/lib/hypothesis-fs.ts`)
-- `POST /api/hypotheses` writes `hypothesis.json`, `index.json`, and one `component.json` per drafted component, then routes to `/bench/<slug>`
+Deliverables:
+- start page at `/` as a guided intake shell (`Hypothesis` ⇄ `Literature` ⇄ `Protocols`), both views stay mounted so back-and-forth is lossless
+- `POST /api/protocol-sources/search` over a pluggable `ProtocolSource` adapter set
+- `POST /api/literature-sources/search` over the configured literature-source adapters, including a `bx`/Brave fallback path
+- backend-owned intake creation/finalization through `/api/benchpilot/intake...`
+- finalize activates a backend bench with the preset baseline and routes to `/bench/<benchId>`
 
-The template draft runs as a final orchestrator prompt during Finalize (no preview step on the start page — components are edited on the bench).
+The guided shell stays in the Next.js app, but the durable intake/bench state is now owned by the backend rather than a frontend-local materialization path.
 
 This sits *before* Milestone A in user flow but doesn't block it: it leans on the same orchestrator session endpoint Milestone A delivers.
 
