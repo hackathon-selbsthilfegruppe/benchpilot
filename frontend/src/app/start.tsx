@@ -85,7 +85,7 @@ export default function Start({
         e.preventDefault();
         e.stopPropagation();
         setStep("hypothesis");
-        setQuestion(EXAMPLE_QUESTIONS[0]);
+        setChatInput(EXAMPLE_QUESTIONS[0]);
       }
     }
     window.addEventListener("keydown", onKey, true);
@@ -224,14 +224,14 @@ export default function Start({
     .filter((h) => kept[hitKey(h)]).length;
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-6 py-3">
+    <div data-testid="start-page" className="flex min-h-screen flex-col bg-background text-foreground">
+      <header data-testid="start-header" className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-6 py-3">
         <span className="text-sm font-semibold">BenchPilot — start</span>
-        <div className="ml-3 flex items-center gap-1 rounded-md border border-border-strong bg-surface p-0.5 text-xs">
-          <StepButton active={step === "hypothesis"} onClick={() => setStep("hypothesis")}>
+        <div data-testid="step-tabs" className="ml-3 flex items-center gap-1 rounded-md border border-border-strong bg-surface p-0.5 text-xs">
+          <StepButton testId="step-tab-hypothesis" active={step === "hypothesis"} onClick={() => setStep("hypothesis")}>
             1. Hypothesis
           </StepButton>
-          <StepButton active={step === "protocols"} onClick={goToProtocols} disabled={!question.trim()}>
+          <StepButton testId="step-tab-protocols" active={step === "protocols"} onClick={goToProtocols} disabled={!question.trim()}>
             2. Protocols{keptCount > 0 ? ` (${keptCount})` : ""}
           </StepButton>
         </div>
@@ -240,6 +240,7 @@ export default function Start({
             <>
               <span className="text-subtle">Open existing:</span>
               <select
+                data-testid="open-existing-hypothesis-select"
                 className="rounded-md border border-border-strong bg-surface px-2 py-1 text-xs text-foreground"
                 onChange={(e) => {
                   if (e.target.value) router.push(`/bench/${e.target.value}`);
@@ -258,14 +259,14 @@ export default function Start({
       </header>
 
       {error && (
-        <div className="border-b border-status-blocked bg-status-blocked-soft px-6 py-2 text-sm text-status-blocked">
+        <div data-testid="start-error-banner" className="border-b border-status-blocked bg-status-blocked-soft px-6 py-2 text-sm text-status-blocked">
           {error}
         </div>
       )}
 
       <main className="flex flex-1 justify-center p-6">
         <div className="flex w-full max-w-3xl flex-col gap-4">
-          <div hidden={step !== "hypothesis"} className="flex flex-1 flex-col gap-3">
+          <div data-testid="hypothesis-step" hidden={step !== "hypothesis"} className="flex flex-1 flex-col gap-3">
             <HypothesisView
               question={question}
               onQuestionChange={setQuestion}
@@ -279,7 +280,7 @@ export default function Start({
               onContinue={goToProtocols}
             />
           </div>
-          <div hidden={step !== "protocols"} className="flex flex-1 flex-col gap-3">
+          <div data-testid="protocols-step" hidden={step !== "protocols"} className="flex flex-1 flex-col gap-3">
             <ProtocolsView
               question={question}
               searching={searching}
@@ -303,15 +304,19 @@ function StepButton({
   disabled,
   onClick,
   children,
+  testId,
 }: {
   active: boolean;
   disabled?: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  testId?: string;
 }) {
   return (
     <button
       type="button"
+      data-testid={testId}
+      data-active={active ? "true" : "false"}
       onClick={onClick}
       disabled={disabled}
       className={`rounded px-2 py-1 font-semibold transition ${
@@ -440,6 +445,7 @@ function HypothesisView({
         </label>
         <textarea
           id="research-question"
+          data-testid="research-question-textarea"
           ref={questionRef}
           value={question}
           onChange={(e) => onQuestionChange(e.target.value)}
@@ -449,17 +455,20 @@ function HypothesisView({
         />
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface-elev p-4">
+      <div data-testid="orchestrator-chat" className="flex flex-1 flex-col gap-2 rounded-lg border border-border bg-surface-elev p-4">
         <div className="text-sm font-semibold">Chat with the orchestrator</div>
-        <div ref={chatScrollRef} className="min-h-[8rem] flex-1 overflow-y-auto rounded-md border border-border bg-surface px-3 py-2 text-sm">
+        <div data-testid="orchestrator-chat-history" ref={chatScrollRef} className="min-h-[8rem] flex-1 overflow-y-auto rounded-md border border-border bg-surface px-3 py-2 text-sm">
           {chat.map((turn, i) => (
-            <ChatBubble key={i} turn={turn} />
+            <ChatBubble key={i} turn={turn} index={i} />
           ))}
-          {streaming && <ChatBubble turn={{ role: "agent", text: streaming }} />}
-          {pending && !streaming && <span className="text-xs text-subtle">orchestrator thinking…</span>}
+          {streaming && <ChatBubble turn={{ role: "agent", text: streaming }} index={-1} streaming />}
+          {pending && !streaming && (
+            <span data-testid="orchestrator-thinking" className="text-xs text-subtle">orchestrator thinking…</span>
+          )}
         </div>
         <div className="flex items-end gap-2">
           <textarea
+            data-testid="orchestrator-chat-input"
             ref={chatInputRef}
             value={chatInput}
             onChange={(e) => onChatInputChange(e.target.value)}
@@ -476,6 +485,7 @@ function HypothesisView({
           />
           <button
             type="button"
+            data-testid="orchestrator-chat-send"
             onClick={onSend}
             disabled={pending || !chatInput.trim()}
             className="rounded-md bg-accent px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
@@ -488,6 +498,7 @@ function HypothesisView({
       <div className="flex justify-end">
         <button
           type="button"
+          data-testid="continue-to-protocols-button"
           onClick={onContinue}
           disabled={!question.trim()}
           className="rounded-md bg-accent-strong px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
@@ -523,18 +534,19 @@ function ProtocolsView({
   const finalizing = finalizeStage !== null;
   return (
     <>
-      <div className="rounded-lg border border-border bg-surface-elev p-4">
+      <div data-testid="protocols-question-display" className="rounded-lg border border-border bg-surface-elev p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <div className="text-xs font-semibold uppercase tracking-wide text-subtle">
               Research question
             </div>
-            <div className="mt-1 text-base font-semibold leading-snug">
+            <div data-testid="protocols-question-text" className="mt-1 text-base font-semibold leading-snug">
               {question || <span className="text-subtle">(none yet)</span>}
             </div>
           </div>
           <button
             type="button"
+            data-testid="protocols-back-button"
             onClick={onBack}
             disabled={finalizing}
             className="rounded-md border border-border-strong px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface disabled:opacity-50"
@@ -544,11 +556,11 @@ function ProtocolsView({
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface-elev p-4">
+      <div data-testid="protocols-panel" className="rounded-lg border border-border bg-surface-elev p-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-sm font-semibold">Candidate protocols</div>
-            <div className="text-xs text-subtle">
+            <div data-testid="protocols-status-text" className="text-xs text-subtle">
               {searching
                 ? "Searching configured sources…"
                 : sources.length === 0
@@ -558,6 +570,7 @@ function ProtocolsView({
           </div>
           <button
             type="button"
+            data-testid="protocols-search-button"
             onClick={onResearch}
             disabled={!question.trim() || searching || finalizing}
             className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-elev disabled:opacity-50"
@@ -566,11 +579,11 @@ function ProtocolsView({
           </button>
         </div>
         {sources.length > 0 && sources.every((s) => s.error) && (
-          <div className="mt-3 rounded-md border border-status-pending bg-status-pending-soft p-3 text-xs text-foreground">
+          <div data-testid="protocols-all-errored-banner" className="mt-3 rounded-md border border-status-pending bg-status-pending-soft p-3 text-xs text-foreground">
             <div className="font-semibold">Every protocol source returned an error.</div>
             <ul className="mt-1 list-disc space-y-1 pl-4">
               {sources.map((s) => (
-                <li key={s.sourceId}>
+                <li key={s.sourceId} data-testid={`protocols-error-line-${s.sourceId}`}>
                   <span className="font-mono">{s.sourceId}</span>: {s.error}
                 </li>
               ))}
@@ -581,14 +594,22 @@ function ProtocolsView({
             </div>
           </div>
         )}
-        <div className="mt-3 flex max-h-[36rem] flex-col gap-3 overflow-y-auto pr-1">
+        <div data-testid="protocols-results-list" className="mt-3 flex max-h-[36rem] flex-col gap-3 overflow-y-auto pr-1">
           {sources.map((src) => (
-            <div key={src.sourceId} className="rounded-md border border-border bg-surface p-2">
+            <div
+              key={src.sourceId}
+              data-testid={`protocol-source-${src.sourceId}`}
+              className="rounded-md border border-border bg-surface p-2"
+            >
               <div className="mb-2 flex items-center justify-between text-xs font-semibold text-subtle">
                 <span>{src.sourceId}</span>
                 <span>{src.error ? "error" : `${src.hits.length} hits`}</span>
               </div>
-              {src.error && <p className="text-xs text-status-blocked">{src.error}</p>}
+              {src.error && (
+                <p data-testid={`protocol-source-${src.sourceId}-error`} className="text-xs text-status-blocked">
+                  {src.error}
+                </p>
+              )}
               <ul className="flex flex-col gap-2">
                 {src.hits.map((h) => {
                   const k = hitKey(h);
@@ -596,6 +617,7 @@ function ProtocolsView({
                   return (
                     <li
                       key={k}
+                      data-testid={`protocol-hit-${k}`}
                       className={`rounded-md border p-2 text-xs ${
                         keep
                           ? "border-accent bg-accent-soft text-accent-soft-fg"
@@ -605,6 +627,7 @@ function ProtocolsView({
                       <div className="flex items-start gap-2">
                         <input
                           type="checkbox"
+                          data-testid={`protocol-hit-${k}-keep`}
                           checked={keep}
                           onChange={(e) =>
                             setKept((prev) => ({ ...prev, [k]: e.target.checked }))
@@ -617,6 +640,7 @@ function ProtocolsView({
                             href={h.url}
                             target="_blank"
                             rel="noreferrer"
+                            data-testid={`protocol-hit-${k}-link`}
                             className="font-semibold underline"
                           >
                             {h.title}
@@ -634,7 +658,7 @@ function ProtocolsView({
             </div>
           ))}
           {!searching && sources.length === 0 && (
-            <p className="text-xs text-subtle">
+            <p data-testid="protocols-empty-hint" className="text-xs text-subtle">
               Click “Search now” to pull candidate protocols from the configured sources.
               Skipping is fine — the orchestrator will draft the bench from the question alone.
             </p>
@@ -643,12 +667,13 @@ function ProtocolsView({
       </div>
 
       <div className="flex items-center justify-between">
-        <span className="text-xs text-subtle">
+        <span data-testid="finalize-status" className="text-xs text-subtle">
           {finalizeStage === "drafting" && "Drafting protocol template…"}
           {finalizeStage === "creating" && "Creating bench…"}
         </span>
         <button
           type="button"
+          data-testid="finalize-button"
           onClick={onFinalize}
           disabled={!question.trim() || finalizing}
           className="rounded-md bg-accent-strong px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
@@ -660,10 +685,19 @@ function ProtocolsView({
   );
 }
 
-function ChatBubble({ turn }: { turn: ChatTurn }) {
+function ChatBubble({
+  turn,
+  index,
+  streaming,
+}: {
+  turn: ChatTurn;
+  index: number;
+  streaming?: boolean;
+}) {
+  const testId = streaming ? "chat-bubble-streaming" : `chat-bubble-${turn.role}-${index}`;
   if (turn.role === "user") {
     return (
-      <div className="my-1 flex justify-end">
+      <div data-testid={testId} className="my-1 flex justify-end">
         <div className="max-w-[85%] rounded-md bg-user-bubble px-3 py-1.5 text-sm text-user-bubble-fg">
           {turn.text}
         </div>
@@ -671,7 +705,7 @@ function ChatBubble({ turn }: { turn: ChatTurn }) {
     );
   }
   return (
-    <div className="my-1 flex justify-start">
+    <div data-testid={testId} className="my-1 flex justify-start">
       <div className="max-w-[85%] rounded-md bg-agent-bubble px-3 py-1.5 text-sm text-agent-bubble-fg">
         <Markdown>{turn.text}</Markdown>
       </div>
