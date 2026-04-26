@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# BenchPilot pre-commit quality hook.
+#
+# Inspired by iam/scripts/quality/git-hooks/pre-commit but rewritten —
+# this repo is Node-only, so we just gate on ./scripts/quality/quality-check.sh
+# in --quick mode.
+#
+# Bypass (emergency only): git commit --no-verify
+# Install via: ./scripts/quality/install-hooks.sh
+
+set -e
+
+PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+cd "$PROJECT_ROOT"
+
+# Run the quick gate. The script writes a full log to .local/quality-check.log
+# regardless of pass/fail, so we don't duplicate output here.
+exec ./scripts/quality/quality-check.sh --quick
