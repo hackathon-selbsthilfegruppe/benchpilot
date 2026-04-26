@@ -40,10 +40,17 @@ describe("component session service", () => {
       name: "Reviewer — CRP biosensor",
       summary: "Reviews specialist output.",
     });
+    const planner = createComponentInstance({
+      benchId: bench.id,
+      presetId: "experiment-planner",
+      name: "Experiment Planner — CRP biosensor",
+      summary: "Integrates specialist output into the final plan.",
+    });
 
     await store.writeBench(bench);
     await store.writeComponent(component);
     await store.writeComponent(reviewer);
+    await store.writeComponent(planner);
 
     const createdRoles: RoleDefinition[] = [];
     const pool = createFakeBootstrapService((role) => {
@@ -80,6 +87,7 @@ describe("component session service", () => {
     expect(session.role.instructions).toContain("## BenchPilot backend operations");
     expect(session.role.instructions).toContain(`tasks create --bench ${bench.id} --from ${component.id}`);
     expect(session.role.instructions).toContain("reviewer: ask it to critique concrete outputs");
+    expect(session.role.instructions).toContain("experiment-planner: ask it to integrate specialist outputs");
     expect(session.cwd).toBe(path.join(store.workspaceRoot, "benches", bench.id, "components", component.id));
 
     const reused = await service.ensureComponentSession(bench.id, component.id);
@@ -154,6 +162,74 @@ describe("component session service", () => {
 
     expect(session.role.instructions).toContain("Reviewer task-run framing:");
     expect(session.role.instructions).toContain("This is review-of-X work");
+  });
+
+  it("frames experiment-planner task-run sessions as gather-and-integrate work", async () => {
+    const baseDir = await mkdtemp(path.join(os.tmpdir(), "benchpilot-planner-task-session-"));
+    tempDirs.push(baseDir);
+
+    const store = new WorkspaceStore(baseDir);
+    const bench = createBench({
+      title: "CRP biosensor",
+      question: "Can we build a paper-based electrochemical biosensor for CRP?",
+    });
+    const planner = createComponentInstance({
+      benchId: bench.id,
+      presetId: "experiment-planner",
+      name: "Experiment Planner — CRP biosensor",
+      summary: "Integrates specialist output into the final plan.",
+    });
+    const protocols = createComponentInstance({
+      benchId: bench.id,
+      presetId: "protocols",
+      name: "Protocols — CRP biosensor",
+      summary: "Tracks protocol candidates.",
+      toolMode: "read-only",
+    });
+
+    await store.writeBench(bench);
+    await store.writeComponent(planner);
+    await store.writeComponent(protocols);
+
+    const pool = createFakeBootstrapService((role) => ({
+      id: "task-run-1",
+      role: {
+        id: role.id ?? "generated-role",
+        name: role.name,
+        description: role.description,
+        instructions: role.instructions ?? "",
+        cwd: role.cwd,
+        toolMode: role.toolMode ?? "full",
+      },
+      cwd: role.cwd ?? "/tmp/benchpilot",
+      status: "idle",
+      createdAt: "2026-04-25T19:15:00.000Z",
+    }));
+
+    const service = new ComponentSessionService(
+      pool,
+      new BenchReadService(store),
+      store,
+      path.join(process.cwd(), ".."),
+    );
+
+    const session = await service.createTaskRunSession({
+      id: "task-build-plan",
+      benchId: bench.id,
+      fromComponentInstanceId: protocols.id,
+      toComponentInstanceId: planner.id,
+      title: "Assemble plan",
+      request: "Integrate the protocol and missing inputs into a consolidated plan.",
+      status: "running",
+      taskSessionId: "task-run-1",
+      createdResourceIds: [],
+      modifiedResourceIds: [],
+      createdAt: "2026-04-25T19:20:00.000Z",
+      updatedAt: "2026-04-25T19:20:00.000Z",
+    });
+
+    expect(session.role.instructions).toContain("Experiment-planner task-run framing:");
+    expect(session.role.instructions).toContain("Gather and integrate current specialist outputs");
   });
 });
 
