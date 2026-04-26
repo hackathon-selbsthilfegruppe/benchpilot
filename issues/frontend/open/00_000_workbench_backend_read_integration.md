@@ -41,7 +41,10 @@ That means the frontend can start consuming the real backend state without touch
 
 ## Candidate child issues
 
-- later
+- `00_001` frontend backend-read client and proxy helpers
+- `00_002` backend bench-to-workbench view model adapter
+- `00_003` bench page backend-loading path with safe fallback
+- `00_004` playwright and integration test adaptation for backend-backed bench reads
 
 ## Exit criteria
 
