@@ -3,7 +3,7 @@
 - ID: `04_000`
 - Type: `Epic`
 - Area: `Backend`
-- Status: `Open`
+- Status: `Closed`
 
 ## Goal
 
@@ -48,3 +48,13 @@ This is where the preset component definitions and prompt-engineering work conne
 - backend can start a session for a component using its metadata and pre-prompt
 - component sessions see the cheap global component index by default
 - component sessions can access richer resource detail only when needed
+
+## Resolution
+
+Closed after implementing and testing:
+
+- `04_001` preset metadata registry and prompt source loading
+- `04_002` component session prompt builder and context assembly
+- `04_003` component-aware session bootstrap and lookup
+- `04_004` component session API wiring and preload support
+- `04_005` session wiring integration tests and preset coverage review
