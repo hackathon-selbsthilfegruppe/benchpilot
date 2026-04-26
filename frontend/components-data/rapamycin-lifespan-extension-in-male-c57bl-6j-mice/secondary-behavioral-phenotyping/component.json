@@ -1,9 +1,0 @@
-{
-  "id": "secondary-behavioral-phenotyping",
-  "name": "Secondary Behavioral Phenotyping",
-  "preprompt": "If included, specify a Barnes maze protocol for assessing spatial learning and memory in surviving mice at a defined timepoint. Include apparatus, habituation, cueing, trial structure, outcome measures, and criteria for interpreting cognitive performance.",
-  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
-  "summary": "Optional secondary outcome to assess whether treatment affects cognition alongside lifespan. Useful if the study wants functional aging readouts beyond survival.",
-  "toc": [],
-  "tasks": []
-}

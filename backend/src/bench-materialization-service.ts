@@ -55,7 +55,10 @@ export class BenchMaterializationService {
           {
             benchId: bench.id,
             presetId: preset.id,
-            name: `${preset.name} — ${bench.title}`,
+            // Just the preset name; the bench title (= research question)
+            // already shows above the component strip and would otherwise
+            // be repeated on every card, drowning out the role label.
+            name: preset.name,
             summary: preset.shortDescription,
             toolMode: preset.defaultToolMode,
           },

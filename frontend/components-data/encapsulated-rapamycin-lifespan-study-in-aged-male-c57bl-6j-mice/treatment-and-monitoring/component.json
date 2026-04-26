@@ -1,9 +1,0 @@
-{
-  "id": "treatment-and-monitoring",
-  "name": "Treatment Administration and Longitudinal Monitoring",
-  "preprompt": "Lay out the day-to-day treatment procedures after assignment, including ad libitum feeding, cage-level diet replacement schedule, body weight tracking, food intake or consumption checks if used, and routine welfare assessments. Define how treatment adherence, deviations, intercurrent illness, and supportive care are recorded.",
-  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
-  "summary": "Implements the intervention and tracks animal status over the course of the lifespan study.",
-  "toc": [],
-  "tasks": []
-}

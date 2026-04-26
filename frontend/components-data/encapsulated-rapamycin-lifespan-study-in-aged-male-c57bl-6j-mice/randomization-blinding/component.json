@@ -1,9 +1,0 @@
-{
-  "id": "randomization-blinding",
-  "name": "Randomization, Allocation, and Blinding",
-  "preprompt": "Describe the randomization method used to assign mice to rapamycin or control chow at 12 months of age, including any stratification by body weight or cage. Specify who is blinded, how diet codes are concealed, and how unblinding is handled only if required for animal welfare.",
-  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
-  "summary": "Creates unbiased treatment allocation and preserves blinded outcome assessment wherever feasible.",
-  "toc": [],
-  "tasks": []
-}

@@ -1,9 +1,0 @@
-{
-  "id": "necropsy-and-cause-of-death-review",
-  "name": "Necropsy and Cause-of-Death Review",
-  "preprompt": "Define standardized necropsy procedures for mice at death or humane endpoint, including tissue collection, gross pathology, sample preservation, and optional histology. Include a rule for adjudicating cause of death or major terminal pathology when possible.",
-  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
-  "summary": "Captures terminal pathology and biospecimens for interpretation. Helps distinguish survival effects from possible treatment-related adverse events.",
-  "toc": [],
-  "tasks": []
-}

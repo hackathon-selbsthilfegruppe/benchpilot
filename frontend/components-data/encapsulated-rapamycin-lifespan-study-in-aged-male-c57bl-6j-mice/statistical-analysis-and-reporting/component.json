@@ -1,9 +1,0 @@
-{
-  "id": "statistical-analysis-and-reporting",
-  "name": "Survival Analysis and Reporting",
-  "preprompt": "Specify the analysis plan for median lifespan comparison, including Kaplan-Meier estimation, log-rank testing or equivalent survival comparison, censoring handling, effect size reporting, and any sensitivity analyses. State how results, exclusions, and deviations will be summarized for reporting.",
-  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
-  "summary": "Turns the survival data into a pre-specified, analysis-ready result package.",
-  "toc": [],
-  "tasks": []
-}

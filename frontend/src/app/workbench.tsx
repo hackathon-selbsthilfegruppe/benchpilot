@@ -1260,7 +1260,7 @@ function ComponentCard({
                     : [
                         {
                           role: "agent",
-                          text: `I'm the ${component.name} component. ${component.preprompt}`,
+                          text: `Hi — I'm the ${component.name} component. What do you need?`,
                         },
                       ]
                 }

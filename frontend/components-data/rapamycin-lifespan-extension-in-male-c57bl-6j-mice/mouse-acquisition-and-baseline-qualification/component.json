@@ -1,9 +1,0 @@
-{
-  "id": "mouse-acquisition-and-baseline-qualification",
-  "name": "Mouse Acquisition and Baseline Qualification",
-  "preprompt": "Define how male C57BL/6J mice are sourced, aged to 12 months, acclimated, and screened before randomization. Include housing conditions, health criteria, baseline measurements, and any exclusions prior to treatment start.",
-  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
-  "summary": "Establishes the eligible cohort and baseline conditions before intervention begins. Ensures mice are healthy, age-matched, and ready for randomized assignment at 12 months.",
-  "toc": [],
-  "tasks": []
-}

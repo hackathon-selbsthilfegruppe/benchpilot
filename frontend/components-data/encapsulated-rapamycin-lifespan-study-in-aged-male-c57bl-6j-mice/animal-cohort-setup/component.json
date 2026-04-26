@@ -1,9 +1,0 @@
-{
-  "id": "animal-cohort-setup",
-  "name": "Animal Cohort Setup and Acclimation",
-  "preprompt": "Specify the mouse cohort requirements for the study: male C57BL/6J strain, age 12 months at treatment start, vendor/source consistency, health status, acclimation period, cage density, environmental conditions, and baseline weight/health recording. Include inclusion/exclusion criteria before randomization and the handling of any pre-existing illness.",
-  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
-  "summary": "Establishes the eligible aged male mouse cohort and standardizes baseline conditions before treatment begins.",
-  "toc": [],
-  "tasks": []
-}

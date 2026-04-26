@@ -1,9 +1,0 @@
-{
-  "id": "chow-formulation-and-dose-verification",
-  "name": "Chow Formulation and Dose Verification",
-  "preprompt": "Specify preparation or procurement of encapsulated rapamycin chow at 14 ppm and matched eudragit-only control chow. Include formulation details, storage, stability/QC checks, batch labeling, and how the approximate mg/kg/day exposure is justified or estimated.",
-  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
-  "summary": "Defines the treatment and control diets and how dose consistency is verified. This component ensures the intervention is chemically and operationally matched except for rapamycin.",
-  "toc": [],
-  "tasks": []
-}

@@ -1,9 +1,0 @@
-{
-  "id": "randomization-blinding-and-treatment-initiation",
-  "name": "Randomization, Blinding, and Treatment Initiation",
-  "preprompt": "Describe the randomization scheme, allocation concealment, blinding plan, cage assignment, and the exact day treatment starts at 12 months of age. Include how treatment codes are maintained and how the first dose is administered.",
-  "tooling": "Read: own data, TOCs and summaries of all other components. Write: own data only.",
-  "summary": "Assigns mice to rapamycin or control chow in a bias-minimized way. Locks down the start of exposure and preserves masking where feasible.",
-  "toc": [],
-  "tasks": []
-}
