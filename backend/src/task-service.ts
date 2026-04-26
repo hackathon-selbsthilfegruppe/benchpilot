@@ -311,6 +311,7 @@ export class TaskService {
       benchId,
       status: task.status,
       resultResourceId: task.resultResourceId ?? null,
+      failureKind: task.failureKind ?? null,
     });
     return {
       taskId: task.id,
@@ -320,6 +321,10 @@ export class TaskService {
       createdResourceIds: task.createdResourceIds,
       modifiedResourceIds: task.modifiedResourceIds,
       completedAt: task.completedAt ?? null,
+      failureKind: task.failureKind ?? null,
+      failureMessage: task.failureMessage ?? null,
+      lastActivityAt: task.lastActivityAt ?? null,
+      attemptCount: task.attemptCount,
     };
   }
 }

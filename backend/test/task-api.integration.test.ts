@@ -129,17 +129,20 @@ describe("task api integration", () => {
 
     const resultResponse = await request(app, `/api/tasks/${taskId}/result?benchId=${encodeURIComponent(bench.id)}`, { method: "GET" });
     expect(resultResponse.status).toBe(200);
-    expect(await resultResponse.json()).toEqual({
-      result: {
-        taskId,
-        status: "completed",
-        resultText: "Similar work exists.",
-        resultResourceId,
-        createdResourceIds: [resultResourceId],
-        modifiedResourceIds: [],
-        completedAt: completeTaskBody.task.completedAt,
-      },
+    const resultBody = await resultResponse.json();
+    expect(resultBody.result).toMatchObject({
+      taskId,
+      status: "completed",
+      resultText: "Similar work exists.",
+      resultResourceId,
+      createdResourceIds: [resultResourceId],
+      modifiedResourceIds: [],
+      completedAt: completeTaskBody.task.completedAt,
+      failureKind: null,
+      failureMessage: null,
+      attemptCount: 1,
     });
+    expect(typeof resultBody.result.lastActivityAt).toBe("string");
 
     const linkedResourceResponse = await request(
       app,
@@ -149,6 +152,61 @@ describe("task api integration", () => {
     expect(linkedResourceResponse.status).toBe(200);
     const linkedResourceBody = await linkedResourceResponse.json();
     expect(linkedResourceBody.resource.content).toBe("# Result\nSimilar work exists.");
+  });
+
+  it("exposes failure context (failureKind, failureMessage, lastActivityAt, attemptCount) for failed tasks", async () => {
+    const { app, bench, orchestrator, literature, taskService } = await createTaskApiApp();
+
+    const createTaskResponse = await request(
+      app,
+      "/api/tasks",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          actor: {
+            benchId: bench.id,
+            componentInstanceId: orchestrator.id,
+            presetId: "orchestrator",
+          },
+          fromComponentInstanceId: orchestrator.id,
+          toComponentInstanceId: literature.id,
+          title: "Stalled review",
+          request: "This run will stall.",
+        }),
+      },
+    );
+    expect(createTaskResponse.status).toBe(201);
+    const taskId = (await createTaskResponse.json()).task.id as string;
+
+    await taskService.failTask(taskId, bench.id, "inactivity_timeout", "no activity for 600000ms");
+
+    const taskResponse = await request(
+      app,
+      `/api/tasks/${taskId}?benchId=${encodeURIComponent(bench.id)}`,
+      { method: "GET" },
+    );
+    const taskBody = await taskResponse.json();
+    expect(taskBody.task.status).toBe("error");
+    expect(taskBody.task.failureKind).toBe("inactivity_timeout");
+    expect(taskBody.task.failureMessage).toBe("no activity for 600000ms");
+    expect(taskBody.task.attemptCount).toBe(1);
+    expect(typeof taskBody.task.lastActivityAt).toBe("string");
+    expect(taskBody.task.resultText).toBeUndefined();
+
+    const resultResponse = await request(
+      app,
+      `/api/tasks/${taskId}/result?benchId=${encodeURIComponent(bench.id)}`,
+      { method: "GET" },
+    );
+    const resultBody = await resultResponse.json();
+    expect(resultBody.result).toMatchObject({
+      taskId,
+      status: "error",
+      failureKind: "inactivity_timeout",
+      failureMessage: "no activity for 600000ms",
+      attemptCount: 1,
+    });
   });
 });
 
@@ -198,7 +256,7 @@ async function createTaskApiApp() {
     taskService,
   );
 
-  return { app, bench, orchestrator, literature };
+  return { app, bench, orchestrator, literature, taskService };
 }
 
 function createFakeBootstrapService(): SessionBootstrapService {
