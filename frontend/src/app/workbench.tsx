@@ -24,6 +24,7 @@ import {
 } from "@/lib/workbench-session-routing";
 import { listBackendTasks } from "@/lib/benchpilot-task-client";
 import { applyBackendTasksToWorkbench } from "@/lib/backend-task-workbench";
+import { formatTaskLifecycleText, summarizeTaskLifecycle } from "@/lib/task-visibility";
 import { reorderGroups } from "@/lib/reorder";
 import { Markdown } from "./markdown";
 import { StatusSymbol } from "./status";
@@ -1011,6 +1012,9 @@ function ComponentCard({
   // before any early return so the rules-of-hooks invariant holds.
   const articleRef = useRef<HTMLElement>(null);
 
+  const inboundSummary = summarizeTaskLifecycle(component.tasks);
+  const outboundSummary = summarizeTaskLifecycle(outboundTasks);
+
   if (state !== "active") {
     const supporting = variant === "supporting";
     return (
@@ -1060,12 +1064,17 @@ function ComponentCard({
         >
           {component.name}
         </span>
-        {inboundOpen > 0 && (
+        {(inboundSummary.queued + inboundSummary.running + inboundSummary.failed + inboundSummary.completed) > 0 && (
           <span
             title={`${inboundOpen} open inbound task${inboundOpen === 1 ? "" : "s"}`}
             className="shrink-0 font-mono text-xs text-muted"
           >
-            → {inboundOpen}
+            {[
+              inboundSummary.queued > 0 ? `q ${inboundSummary.queued}` : null,
+              inboundSummary.running > 0 ? `r ${inboundSummary.running}` : null,
+              inboundSummary.completed > 0 ? `d ${inboundSummary.completed}` : null,
+              inboundSummary.failed > 0 ? `e ${inboundSummary.failed}` : null,
+            ].filter(Boolean).join(" · ")}
           </span>
         )}
         <span
@@ -1179,7 +1188,7 @@ function ComponentCard({
             <RightTab
               active={rightTab === "tasks"}
               onClick={() => setRightTab("tasks")}
-              label={`Tasks (in ${inboundOpenCount} / out ${outboundOpenCount})`}
+              label={`Tasks (in ${component.tasks.length} / out ${outboundTasks.length})`}
             />
           </header>
           {rightTab === "chat" ? (
@@ -1299,9 +1308,15 @@ function TasksPanel({
     for (const c of allComponents) map[c.id] = c.name;
     return map;
   }, [allComponents]);
+  const inboundSummary = summarizeTaskLifecycle(component.tasks);
+  const outboundSummary = summarizeTaskLifecycle(outboundTasks);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <section className="border-b border-border bg-surface p-4 text-[11px] text-subtle">
+        <div>Inbound — queued {inboundSummary.queued} · running {inboundSummary.running} · completed {inboundSummary.completed} · failed {inboundSummary.failed}</div>
+        <div className="mt-1">Outbound — queued {outboundSummary.queued} · running {outboundSummary.running} · completed {outboundSummary.completed} · failed {outboundSummary.failed}</div>
+      </section>
       <section className="border-b border-border p-4">
         <h4 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-subtle">
           Inbound — sent to {component.name}
@@ -1328,6 +1343,11 @@ function TasksPanel({
                     </div>
                     <div className="mt-1 text-xs leading-snug text-muted">
                       {task.body}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-subtle">
+                      <span>lifecycle: {formatTaskLifecycleText(task)}</span>
+                      {task.taskSessionId && <span>task session: {task.taskSessionId}</span>}
+                      {task.resultResourceId && <span>result resource: {task.resultResourceId}</span>}
                     </div>
                     <TaskActions
                       task={task}
@@ -1368,8 +1388,10 @@ function TasksPanel({
                     <div className="mt-1 text-xs leading-snug text-muted">
                       {task.body}
                     </div>
-                    <div className="mt-1 text-[11px] text-subtle">
-                      status: {task.status}
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-subtle">
+                      <span>lifecycle: {formatTaskLifecycleText(task)}</span>
+                      {task.taskSessionId && <span>task session: {task.taskSessionId}</span>}
+                      {task.resultResourceId && <span>result resource: {task.resultResourceId}</span>}
                     </div>
                   </div>
                 </div>
