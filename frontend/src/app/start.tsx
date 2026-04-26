@@ -330,17 +330,26 @@ function StepButton({
   );
 }
 
+// Long, fully-specified questions used as the canned shortcut (Cmd/Ctrl+.).
+// These contain enough method/dose/comparator detail that the orchestrator
+// won't immediately push back asking for specificity.
 const EXAMPLE_QUESTIONS = [
-  // Short — fits comfortably in the protocols-step header.
   "Does encapsulated rapamycin (14 ppm in chow, ≈2.24 mg/kg/day) extend median lifespan in male C57BL/6J mice vs eudragit-only control chow when treatment starts at 12 months of age?",
-  // Medium.
   "Does the H148A mutant of E. coli alkaline phosphatase (PhoA) retain ≥70% of wild-type activity at pH 5, measured by p-nitrophenyl phosphate hydrolysis at 37 °C with 1 mM substrate?",
-  // Medium-long.
   "Does Lactobacillus rhamnosus GG (1×10^9 CFU/day oral gavage, 4 weeks) reduce intestinal permeability in 10-week-old C57BL/6J mice by ≥30% vs vehicle, measured by FITC-dextran (4 kDa, 600 mg/kg) plasma concentration at 4 h post-gavage?",
-  // Long.
   "Can a paper-based electrochemical biosensor functionalized with anti-CRP monoclonal antibodies (clone C7) detect C-reactive protein in unprocessed whole blood at ≥0.5 mg/L within 10 min at 25 °C, with Pearson r ≥ 0.95 vs commercial high-sensitivity ELISA across n=30 patient samples?",
-  // Very long — stress case for layout.
   "Does Sporomusa ovata DSM 2662 in a single-chamber bioelectrochemical reactor at a cathode potential of −400 mV vs SHE (graphite felt electrode, 30 °C, CO2-saturated medium) fix CO2 into acetate at ≥150 mmol L⁻¹ day⁻¹ over 7 days, at least 20% above the Nevin et al. 2010 benchmark of 124 mmol L⁻¹ day⁻¹ under matched conditions?",
+];
+
+// Short, header-fittable questions used by the typewriter placeholder so the
+// animated example never overflows the question textarea on a single line.
+const PLACEHOLDER_EXAMPLE_QUESTIONS = [
+  "Does rapamycin extend lifespan in C57BL/6J mice?",
+  "Which His residue drives PhoA's pH activity loss?",
+  "Does L. rhamnosus GG reduce gut permeability in mice?",
+  "Can a paper biosensor detect CRP in whole blood?",
+  "Does S. ovata fix CO2 to acetate at >150 mmol/L/day?",
+  "Does trehalose beat sucrose as a HeLa cryoprotectant?",
 ];
 
 function useAutoResize(value: string, minRows = 1, maxRows = 8) {
@@ -431,7 +440,7 @@ function HypothesisView({
   chatScrollRef: React.RefObject<HTMLDivElement | null>;
   onContinue: () => void;
 }) {
-  const placeholder = useTypewriterPlaceholder(EXAMPLE_QUESTIONS, question.length > 0);
+  const placeholder = useTypewriterPlaceholder(PLACEHOLDER_EXAMPLE_QUESTIONS, question.length > 0);
   const questionRef = useAutoResize(question, 1, 8);
   const chatInputRef = useAutoResize(chatInput, 1, 6);
   return (
